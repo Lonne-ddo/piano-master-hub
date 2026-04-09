@@ -249,11 +249,11 @@
     //  CONFIG ÉLÈVES — modifier ici pour ajouter/retirer
     // ──────────────────────────────────────────────
     const ELEVES = {
-        youri:  { nom: "Youri",  drive: "https://drive.google.com/drive/folders/ID_YOURI",  koalendar: "https://koalendar.com/e/cours-piano-master?name=Youri" },
-        messon: { nom: "Messon", drive: "https://drive.google.com/drive/folders/ID_MESSON", koalendar: "https://koalendar.com/e/cours-piano-master?name=Messon" },
-        tara:   { nom: "Tara",   drive: "https://drive.google.com/drive/folders/ID_TARA",   koalendar: "https://koalendar.com/e/cours-piano-master?name=Tara" },
-        japhet: { nom: "Japhet", drive: "https://drive.google.com/drive/folders/1AUB8zd4LgfOfQ5lcGeEm0z3bYNzZTfYc?usp=sharing", koalendar: "https://koalendar.com/e/cours-piano-master?name=Japhet", telegram: "https://t.me/+Kt0JwAghijoxODk0", telegramDeep: "tg://join?invite=Kt0JwAghijoxODk0" },
-        dexter: { nom: "Dexter", drive: "https://drive.google.com/drive/folders/ID_DEXTER", koalendar: "https://koalendar.com/e/cours-piano-master?name=Dexter" },
+        youri:  { nom: "Youri",  drive: "", telegram: "", koalendar: "https://koalendar.com/e/cours-piano-master?name=Youri" },
+        messon: { nom: "Messon", drive: "https://drive.google.com/drive/folders/1fWxnPi8uMfhpPPv182CelgjVnNuy4U9R?usp=drive_link", telegram: "", koalendar: "https://koalendar.com/e/cours-piano-master?name=Messon" },
+        tara:   { nom: "Tara",   drive: "https://drive.google.com/drive/folders/1b18WMHYT2cDYM3DLbEUU7WzLqKBMhtts?usp=drive_link", telegram: "", koalendar: "https://koalendar.com/e/cours-piano-master?name=Tara" },
+        japhet: { nom: "Japhet", drive: "https://drive.google.com/drive/folders/1AUB8zd4LgfOfQ5lcGeEm0z3bYNzZTfYc?usp=sharing", telegram: "https://t.me/+Kt0JwAghijoxODk0", koalendar: "https://koalendar.com/e/cours-piano-master?name=Japhet" },
+        dexter: { nom: "Dexter", drive: "https://drive.google.com/drive/folders/1Mk7aXS0SsI2B74gfHZtGcm09PccUOTu1?usp=drive_link", telegram: "https://t.me/+o4DoTBKy2XllMGE0", koalendar: "https://koalendar.com/e/cours-piano-master?name=Dexter" },
     };
 
     // ──────────────────────────────────────────────
@@ -323,8 +323,8 @@
         var koalendarInitialized = false;
 
         LINKS.forEach(function(link) {
-            // Skip Drive card if no student identified
-            if (link.needsEleve && !eleve) return;
+            // Skip Drive card if no student or empty drive URL
+            if (link.needsEleve && (!eleve || !eleve.drive)) return;
 
             // Toggle card for Koalendar
             if (link.isToggle) {
@@ -373,7 +373,9 @@
             // Per-student Telegram override
             if (link.id === "chat" && eleve && eleve.telegram) {
                 href = eleve.telegram;
-                deepLink = eleve.telegramDeep || null;
+                // Derive deep link: https://t.me/+CODE → tg://join?invite=CODE
+                var tgMatch = eleve.telegram.match(/t\.me\/\+(.+)/);
+                deepLink = tgMatch ? "tg://join?invite=" + tgMatch[1] : null;
             }
 
             var a = document.createElement("a");
