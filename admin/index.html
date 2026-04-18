@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Master Hub Admin</title>
+    <meta name="theme-color" content="#0f0f14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MH Admin">
+    <meta name="description" content="Master Hub Admin — console d'outils">
+    <link rel="icon" id="app-icon">
+    <link rel="apple-touch-icon" id="app-touch-icon" sizes="180x180">
+    <style>
+        :root {
+            --bg: #0f0f14;
+            --bg-card: #1a1a24;
+            --bg-card-hover: #22222f;
+            --text: #eee;
+            --text-muted: #888;
+            --accent: #8B6FE8;
+            --accent-soft: rgba(139, 111, 232, 0.14);
+            --radius: 16px;
+            --tap-min: 48px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 24px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            min-height: 100dvh;
+            justify-content: flex-start;
+        }
+
+        .header {
+            text-align: center;
+            padding: 32px 0 8px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header .logo {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            display: block;
+        }
+
+        .header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #ffffff;
+        }
+
+        .header .subtitle {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .cards {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 28px;
+            width: 100%;
+        }
+
+        .card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--radius);
+            padding: 16px;
+            text-decoration: none;
+            color: var(--text);
+            min-height: var(--tap-min);
+            transition: background 0.2s, transform 0.15s;
+            opacity: 0;
+            transform: translateY(12px);
+            animation: fadeInUp 0.4s ease forwards;
+        }
+
+        .card:nth-child(1) { animation-delay: 0.05s; }
+        .card:nth-child(2) { animation-delay: 0.10s; }
+        .card:nth-child(3) { animation-delay: 0.15s; }
+        .card:nth-child(4) { animation-delay: 0.20s; }
+
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card:active {
+            transform: scale(0.97);
+            background: var(--bg-card-hover);
+        }
+
+        @media (hover: hover) {
+            .card:hover {
+                background: var(--bg-card-hover);
+                transform: translateY(-2px);
+            }
+        }
+
+        .card.disabled {
+            opacity: 0.5;
+            cursor: default;
+            pointer-events: none;
+        }
+
+        .card.disabled:hover,
+        .card.disabled:active {
+            background: var(--bg-card);
+            transform: none;
+        }
+
+        .card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: var(--accent-soft);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 1.3rem;
+        }
+
+        .card-body {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .card-sub {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .card-arrow {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .logout {
+            margin-top: 32px;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            text-decoration: none;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: inherit;
+            padding: 8px 12px;
+        }
+
+        .logout:hover {
+            color: var(--text);
+            text-decoration: underline;
+        }
+
+        /* Login overlay */
+        #login-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(15, 15, 20, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        #login-overlay.hidden { display: none; }
+
+        .login-card {
+            width: 100%;
+            max-width: 360px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: var(--radius);
+            padding: 32px 24px 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .login-card .logo {
+            width: 56px;
+            height: 56px;
+        }
+
+        .login-card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .login-card form {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .login-card input {
+            width: 100%;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 1rem;
+            font-family: inherit;
+            min-height: var(--tap-min);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .login-card input:focus {
+            border-color: var(--accent);
+        }
+
+        .login-card button {
+            width: 100%;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 1rem;
+            font-weight: 600;
+            min-height: var(--tap-min);
+            cursor: pointer;
+            font-family: inherit;
+            transition: opacity 0.2s;
+        }
+
+        .login-card button:hover {
+            opacity: 0.9;
+        }
+
+        .login-error {
+            font-size: 0.85rem;
+            color: #ff7a7a;
+            text-align: center;
+            min-height: 1.2em;
+        }
+
+        .content.hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="login-overlay">
+        <div class="login-card">
+            <svg class="logo" width="56" height="56" viewBox="0 0 72 72">
+                <circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+                <rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+                <rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+                <rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+                <rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+                <rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+            </svg>
+            <h2>Master Hub Admin</h2>
+            <form id="login-form" autocomplete="off">
+                <input id="login-input" type="password" placeholder="Code d'accès" autocomplete="off" inputmode="numeric">
+                <div class="login-error" id="login-error"></div>
+                <button type="submit">Entrer</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="container content hidden" id="content">
+        <header class="header">
+            <svg class="logo" width="64" height="64" viewBox="0 0 72 72">
+                <circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+                <rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+                <rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+                <rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+                <rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+                <rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+            </svg>
+            <h1>Master Hub Admin</h1>
+            <p class="subtitle">Outils</p>
+        </header>
+
+        <div class="cards">
+            <a class="card" href="/admin/transcripteur.html">
+                <div class="card-icon">&#127897;&#65039;</div>
+                <div class="card-body">
+                    <div class="card-title">Transcripteur</div>
+                    <div class="card-sub">Audio &rarr; texte &rarr; cours</div>
+                </div>
+                <span class="card-arrow">&rsaquo;</span>
+            </a>
+            <div class="card disabled">
+                <div class="card-icon">&#129345;</div>
+                <div class="card-body">
+                    <div class="card-title">Drum Loop</div>
+                    <div class="card-sub">&Agrave; venir</div>
+                </div>
+            </div>
+            <div class="card disabled">
+                <div class="card-icon">&#127898;</div>
+                <div class="card-body">
+                    <div class="card-title">S&eacute;parateur de pistes</div>
+                    <div class="card-sub">&Agrave; venir</div>
+                </div>
+            </div>
+            <div class="card disabled">
+                <div class="card-icon">&#128101;</div>
+                <div class="card-body">
+                    <div class="card-title">&Eacute;l&egrave;ves</div>
+                    <div class="card-sub">&Agrave; venir</div>
+                </div>
+            </div>
+        </div>
+
+        <button class="logout" id="logout-btn" type="button">Se d&eacute;connecter</button>
+    </div>
+
+    <script>
+    // ── AUTH (localStorage, overlay plein écran) ──
+    (function(){
+        var overlay = document.getElementById('login-overlay');
+        var content = document.getElementById('content');
+        var form = document.getElementById('login-form');
+        var input = document.getElementById('login-input');
+        var err = document.getElementById('login-error');
+
+        function reveal(){
+            overlay.classList.add('hidden');
+            content.classList.remove('hidden');
+        }
+        function lock(){
+            overlay.classList.remove('hidden');
+            content.classList.add('hidden');
+            setTimeout(function(){ input.focus(); }, 50);
+        }
+
+        if (localStorage.getItem('mh_admin') === '4697') {
+            reveal();
+        } else {
+            lock();
+        }
+
+        form.addEventListener('submit', function(e){
+            e.preventDefault();
+            if (input.value === '4697') {
+                localStorage.setItem('mh_admin', '4697');
+                err.textContent = '';
+                input.value = '';
+                reveal();
+            } else {
+                err.textContent = 'Code incorrect';
+                input.value = '';
+                input.focus();
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', function(){
+            localStorage.removeItem('mh_admin');
+            window.location.reload();
+        });
+    })();
+    </script>
+
+    <script>
+    // ── Manifest PWA inline (violet #8B6FE8 pour distinguer de l'élève) ──
+    (function(){
+        var iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="192" height="192">'
+            + '<rect width="72" height="72" rx="16" fill="#8B6FE8"/>'
+            + '<circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="1.5"/>'
+            + '<rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
+            + '<rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
+            + '<rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
+            + '<rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>'
+            + '<rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>'
+            + '</svg>';
+        var iconUrl = 'data:image/svg+xml;base64,' + btoa(iconSvg);
+
+        document.getElementById('app-icon').href = iconUrl;
+        document.getElementById('app-touch-icon').href = iconUrl;
+
+        var manifest = {
+            name: "Master Hub Admin",
+            short_name: "MH Admin",
+            description: "Console d'outils admin",
+            start_url: "/admin/",
+            scope: "/admin/",
+            display: "standalone",
+            background_color: "#0f0f14",
+            theme_color: "#0f0f14",
+            icons: [
+                { src: iconUrl, sizes: "192x192", type: "image/svg+xml" },
+                { src: iconUrl, sizes: "512x512", type: "image/svg+xml" }
+            ]
+        };
+        var blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        var link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = URL.createObjectURL(blob);
+        document.head.appendChild(link);
+    })();
+    </script>
+
+    <script>
+    // ── Fond animé — touches piano flottantes (cohérent avec l'index élève) ──
+    (function() {
+        var canvas = document.getElementById("bg-canvas");
+        var ctx = canvas.getContext("2d");
+        var particles = [];
+        var COUNT = 18;
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", resize);
+        resize();
+
+        function createParticle() {
+            var w = 6 + Math.random() * 4;
+            var h = 18 + Math.random() * 10;
+            return {
+                x: Math.random() * canvas.width,
+                y: canvas.height + h,
+                w: w,
+                h: h,
+                r: 2,
+                speed: 0.15 + Math.random() * 0.35,
+                opacity: 0.04 + Math.random() * 0.04,
+                drift: (Math.random() - 0.5) * 0.3
+            };
+        }
+
+        for (var i = 0; i < COUNT; i++) {
+            var p = createParticle();
+            p.y = Math.random() * canvas.height;
+            particles.push(p);
+        }
+
+        function drawRoundRect(x, y, w, h, r, alpha) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < particles.length; i++) {
+                var p = particles[i];
+                p.y -= p.speed;
+                p.x += p.drift;
+                drawRoundRect(p.x, p.y, p.w, p.h, p.r, p.opacity);
+                if (p.y + p.h < 0) {
+                    particles[i] = createParticle();
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+    })();
+    </script>
+
+</body>
+</html>

@@ -3,14 +3,8 @@
 <head>
   <script>
   (function(){
-    var ok = sessionStorage.getItem('mh_admin');
-    if (ok !== '4697') {
-      var code = prompt('Code admin');
-      if (code === '4697') {
-        sessionStorage.setItem('mh_admin', '4697');
-      } else {
-        window.location.replace('/');
-      }
+    if (localStorage.getItem('mh_admin') !== '4697') {
+      window.location.replace('/admin/');
     }
   })();
   </script>
