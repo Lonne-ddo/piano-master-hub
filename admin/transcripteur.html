@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <script>
+  (function(){
+    var ok = sessionStorage.getItem('mh_admin');
+    if (ok !== '4697') {
+      var code = prompt('Code admin');
+      if (code === '4697') {
+        sessionStorage.setItem('mh_admin', '4697');
+      } else {
+        window.location.replace('/');
+      }
+    }
+  })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Piano Key — Transcripteur</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <meta name="theme-color" content="#8B6FE8">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PianoKey">
+  <link rel="apple-touch-icon" href="../assets/icons/icon-192.svg">
+  <style>
+
+    /* ── Zone de dépôt ── */
+    .drop-zone {
+      border: 2px dashed var(--border2);
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .22s, background .22s, box-shadow .22s;
+      background: var(--bg3);
+      user-select: none;
+    }
+
+    .drop-zone:hover {
+      border-color: var(--v);
+      background: var(--vg);
+    }
+
+    .drop-zone.drag-over {
+      border-color: var(--v2);
+      background: var(--vg);
+      box-shadow: 0 0 0 6px rgba(139,111,232,.12);
+      animation: borderDash .5s linear infinite;
+    }
+
+    @keyframes borderDash {
+      0%   { border-color: var(--v);  }
+      50%  { border-color: var(--v2); }
+      100% { border-color: var(--v);  }
+    }
+
+    .drop-icon {
+      font-size: 30px;
+      margin-bottom: .65rem;
+      display: block;
+      transition: transform .2s;
+    }
+
+    .drop-zone:hover .drop-icon,
+    .drop-zone.drag-over .drop-icon { transform: translateY(-3px); }
+
+    .drop-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text1);
+      margin-bottom: .35rem;
+    }
+
+    .drop-sub {
+      font-size: 12px;
+      color: var(--text3);
+      line-height: 1.6;
+    }
+
+    .drop-sub span {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--v2);
+    }
+
+    /* ── Info fichier sélectionné ── */
+    .file-info {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .7rem 1rem;
+      background: var(--bg3);
+      border: 1px solid var(--borderv);
+      border-radius: 9px;
+      margin-top: .85rem;
+    }
+
+    .file-emoji { font-size: 20px; flex-shrink: 0; }
+
+    .file-details { flex: 1; min-width: 0; }
+
+    .file-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text1);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-size {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 1px;
+    }
+
+    .file-remove {
+      background: none;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      padding: 4px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      transition: color .15s;
+    }
+    .file-remove:hover { color: var(--red); }
+
+    /* ── Liste cumulative de fichiers sélectionnés ── */
+    .file-list { display: flex; flex-direction: column; gap: 4px; margin-top: .6rem; }
+    .file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 8px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 6px;
+      font-size: 0.82rem;
+      color: var(--text1);
+    }
+    .file-item span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      min-width: 0;
+    }
+    .file-item button {
+      background: transparent;
+      border: none;
+      color: var(--text2);
+      cursor: pointer;
+      padding: 0 4px;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .file-item button:hover { color: var(--red); }
+    .offset-display {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      color: rgba(139,111,232,0.6);
+      display: block;
+      margin-top: 2px;
+      white-space: normal;
+    }
+    .clear-all-btn {
+      background: transparent;
+      border: 1px solid var(--borderv);
+      color: var(--text2);
+      cursor: pointer;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      border-radius: 6px;
+      margin-top: 6px;
+      align-self: flex-start;
+    }
+    .clear-all-btn:hover { color: var(--red); border-color: var(--red); }
+
+    /* ── Étapes de progression ── */
+    .steps { margin-bottom: 1rem; }
+
+    .step-row {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      padding: .45rem 0;
+    }
+
+    .step-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: background .2s;
+    }
+
+    .step-dot.wait  { background: var(--bg4); border: 1.5px solid var(--text3); }
+    .step-dot.run   { background: var(--v); animation: stepBlink 1s ease-in-out infinite; }
+    .step-dot.ok    { background: var(--green); }
+    .step-dot.fail  { background: var(--red); }
+
+    @keyframes stepBlink { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+    .step-lbl { font-size: 12px; color: var(--text2); }
+    .step-row.run  .step-lbl { color: var(--text1); font-weight: 500; }
+    .step-row.ok   .step-lbl { color: var(--green); }
+    .step-row.fail .step-lbl { color: var(--red); }
+
+    /* ── Barre de progression ── */
+    .pg-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: .45rem;
+    }
+
+    .pg-label { font-size: 12px; color: var(--text2); }
+    .pg-pct   { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--v2); }
+
+    .pg-track {
+      height: 4px;
+      background: var(--bg4);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .pg-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--v), var(--v2));
+      border-radius: 2px;
+      width: 0%;
+      transition: width .35s ease;
+    }
+
+    .pg-fill.shimmer {
+      width: 100% !important;
+      background: linear-gradient(90deg,
+        var(--bg4)   0%,
+        var(--v)    35%,
+        var(--v2)   60%,
+        var(--bg4) 100%);
+      background-size: 200% 100%;
+      animation: shimmerAnim 1.5s linear infinite;
+    }
+
+    @keyframes shimmerAnim {
+      0%   { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
+    }
+
+    /* ── Résultats ── */
+    .res-section-title {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      color: var(--v2);
+      margin-bottom: .75rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .res-summary p {
+      font-size: 13.5px;
+      line-height: 1.78;
+      color: var(--text1);
+      margin-bottom: .85rem;
+    }
+    .res-summary p:last-child { margin-bottom: 0; }
+
+    .res-bullets ul {
+      list-style: none;
+      padding: 0; margin: 0;
+    }
+
+    .res-bullets li {
+      display: flex;
+      gap: .65rem;
+      font-size: 0.875rem;
+      line-height: 1.5;
+      color: var(--text1);
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border1);
+    }
+
+    .res-bullets li:last-child { border-bottom: none; }
+
+    .res-bullets li::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--v);
+      flex-shrink: 0;
+      margin-top: .45rem;
+    }
+
+    .res-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border1);
+    }
+
+    .copy-ok {
+      font-size: 11px;
+      color: var(--green);
+      opacity: 0;
+      transition: opacity .3s;
+      font-weight: 500;
+    }
+    .copy-ok.on { opacity: 1; }
+
+    /* ── Champ titre résultat ── */
+    .res-title-input {
+      display: block;
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--border1);
+      color: var(--text1);
+      font-size: 18px;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 6px 0 8px;
+      margin-bottom: 1.25rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .res-title-input::placeholder { color: var(--text3); }
+    .res-title-input:focus { border-color: var(--v); }
+
+    /* ── Shorts cards ── */
+    .short-card {
+      border: 1px solid var(--border1);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      background: var(--bg2);
+      border-left: 4px solid var(--v);
+    }
+    .short-card[data-type="Explication"] { border-left-color: #8B6FE8; }
+    .short-card[data-type="Q&R"]        { border-left-color: #5b8def; }
+    .short-card[data-type="Conseil"]     { border-left-color: #3dd68c; }
+    .short-card[data-type="Démonstration"] { border-left-color: #e8a43b; }
+    .short-card[data-type="Anecdote"]    { border-left-color: #e86b8a; }
+
+    .short-timecode {
+      font-family: var(--mono, 'DM Mono', monospace);
+      font-size: 0.8rem;
+      color: var(--v);
+      margin-bottom: 8px;
+    }
+
+    .short-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    .short-badge[data-type="Explication"] { background: rgba(139,111,232,.15); color: #a48ff0; }
+    .short-badge[data-type="Q&R"]        { background: rgba(91,141,239,.15);  color: #5b8def; }
+    .short-badge[data-type="Conseil"]     { background: rgba(61,214,140,.15);  color: #3dd68c; }
+    .short-badge[data-type="Démonstration"] { background: rgba(232,164,59,.15); color: #e8a43b; }
+    .short-badge[data-type="Anecdote"]    { background: rgba(232,107,138,.15); color: #e86b8a; }
+
+    .short-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text1);
+      margin-bottom: 8px;
+    }
+    .short-passage {
+      background: var(--bg3);
+      border: 1px solid var(--border1);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text1);
+      max-height: 160px;
+      overflow-y: auto;
+      margin-bottom: 8px;
+    }
+    .short-reason {
+      font-size: 12px;
+      color: var(--text2);
+      font-style: italic;
+      margin-bottom: 8px;
+    }
+    .short-copy-btn {
+      background: none;
+      border: 1px solid var(--border1);
+      border-radius: 6px;
+      color: var(--text2);
+      font-size: 12px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: color .15s, border-color .15s;
+    }
+    .short-copy-btn:hover { color: var(--v); border-color: var(--v); }
+
+  </style>
+</head>
+<body>
+
+
+<!-- ══ LAYOUT ══════════════════════════════════════════════ -->
+<div class="layout">
+
+
+  <!-- ── Main ────────────────────────────────────────────── -->
+  <main class="main">
+
+    <div class="ph">
+      <div class="ph-title">
+        Transcripteur
+        <span class="badge b-adm">Groq + Claude</span>
+      </div>
+      <p class="ph-desc">
+        Dépose un fichier audio — MP3, MP4, M4A, WAV — jusqu'à ~90 min — pour obtenir
+        la transcription complète et une synthèse structurée par l'IA.
+      </p>
+    </div>
+
+    <!-- ── Zone de dépôt ───────────────────────────────── -->
+    <div class="card" id="upload-card" style="margin-bottom:16px;">
+      <div class="card-title">
+        <svg viewBox="0 0 14 14" fill="none" width="13" height="13" style="opacity:.7">
+          <path d="M7 1v8M4 4l3-3 3 3" stroke="currentColor" stroke-width="1.3"
+                stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M1 10v2a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-2"
+                stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        Fichier audio / vidéo
+      </div>
+
+      <div class="drop-zone" id="drop-zone" onclick="triggerPicker()">
+        <span class="drop-icon" id="drop-icon">🎵</span>
+        <div class="drop-title" id="drop-title">Dépose ton fichier ici</div>
+        <div class="drop-sub" id="drop-sub">
+          ou <u>clique pour parcourir</u><br>
+          <span>.mp3 · .mp4 · .m4a · .wav · .webm · .ogg</span> — illimité
+        </div>
+      </div>
+
+      <!-- Fichier sélectionné (résumé) -->
+      <div class="file-info" id="file-info" style="display:none;">
+        <span class="file-emoji" id="file-emoji">🎵</span>
+        <div class="file-details">
+          <div class="file-name" id="file-name">—</div>
+          <div class="file-size" id="file-size">—</div>
+        </div>
+        <button class="file-remove" onclick="clearFile()" title="Tout retirer">✕</button>
+      </div>
+
+      <!-- Liste cumulative des fichiers (un ✕ par fichier) -->
+      <div class="file-list" id="file-list"></div>
+
+      <input type="file" id="file-input" accept=".mp3,.mp4,.m4a,.wav,.webm,.ogg"
+             style="display:none;" multiple onchange="onPicked(this.files); this.value=''">
+
+      <button class="gen-btn" id="btn-go" onclick="startJob()"
+              style="margin-top:14px;" disabled>
+        Analyser →
+      </button>
+    </div>
+
+    <!-- ── Progression ──────────────────────────────────── -->
+    <div class="card" id="prog-card" style="display:none;margin-bottom:16px;">
+      <div class="card-title">
+        <svg viewBox="0 0 14 14" fill="none" width="13" height="13" style="opacity:.7">
+          <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M7 4v3.5l2 1.5" stroke="currentColor" stroke-width="1.3"
+                stroke-linecap="round"/>
+        </svg>
+        Traitement en cours
+      </div>
+
+      <!-- Étapes dynamiques -->
+      <div class="steps">
+        <div class="step-row" id="sr-split">
+          <div class="step-dot wait" id="sd-split"></div>
+          <span class="step-lbl" id="sl-split">Découpe du fichier…</span>
+        </div>
+        <div class="step-row" id="sr-transcribe">
+          <div class="step-dot wait" id="sd-transcribe"></div>
+          <span class="step-lbl" id="sl-transcribe">Transcription…</span>
+        </div>
+        <div class="step-row" id="sr-analyze">
+          <div class="step-dot wait" id="sd-analyze"></div>
+          <span class="step-lbl" id="sl-analyze">Analyse et structuration par Claude…</span>
+        </div>
+      </div>
+
+      <!-- Barre -->
+      <div class="pg-head">
+        <span class="pg-label" id="pg-label">Initialisation…</span>
+        <span class="pg-pct"   id="pg-pct">0 %</span>
+      </div>
+      <div class="pg-track">
+        <div class="pg-fill" id="pg-fill"></div>
+      </div>
+
+      <button class="btn-secondary" onclick="cancelJob()"
+              style="margin-top:1rem;width:100%;">
+        Annuler
+      </button>
+    </div>
+
+    <!-- ── Résultats ─────────────────────────────────────── -->
+    <div class="card" id="result-card" style="display:none;">
+      <div class="card-title flex-between">
+        <span>
+          <svg viewBox="0 0 14 14" fill="none" width="13" height="13"
+               style="opacity:.7;margin-right:6px;vertical-align:-2px;">
+            <rect x="1" y="1" width="12" height="12" rx="2"
+                  stroke="currentColor" stroke-width="1.3"/>
+            <path d="M4 5h6M4 7.5h4M4 10h5" stroke="currentColor"
+                  stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+          Résultat
+        </span>
+        <span id="res-fname"
+              style="font-size:11px;font-weight:400;color:var(--text3);
+                     font-family:'DM Mono',monospace;max-width:240px;
+                     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+      </div>
+
+      <!-- Titre éditable -->
+      <input type="text" class="res-title-input" id="res-title"
+             placeholder="Ajouter un titre…"
+             oninput="onTitleEdit()">
+
+      <!-- 4 catégories -->
+      <div id="res-cours" style="display:none;margin-bottom:1rem;">
+        <div class="res-section-title">🎹 Cours</div>
+        <div class="res-bullets" id="res-cours-list"></div>
+      </div>
+      <div id="res-afaire" style="display:none;margin-bottom:1rem;">
+        <div class="res-section-title">✅ À faire</div>
+        <div class="res-bullets" id="res-afaire-list"></div>
+      </div>
+      <div id="res-conseils" style="display:none;margin-bottom:1rem;">
+        <div class="res-section-title">💡 Remarques</div>
+        <div class="res-bullets" id="res-conseils-list"></div>
+      </div>
+      <div id="res-musical" style="display:none;margin-bottom:1rem;">
+        <div class="res-section-title">🎵 Analyse musicale</div>
+        <div class="res-bullets" id="res-musical-list"></div>
+      </div>
+      <div id="res-shorts" style="display:none;margin-bottom:1rem;">
+        <div class="res-section-title">🎬 Shorts</div>
+        <div id="res-shorts-list"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="res-actions">
+        <button class="btn-primary" onclick="copyAll()">
+          <svg viewBox="0 0 14 14" fill="none" width="13" height="13">
+            <rect x="4" y="1" width="9" height="9" rx="1.5"
+                  stroke="currentColor" stroke-width="1.2"/>
+            <path d="M10 10v2a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h2"
+                  stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          </svg>
+          Copier tout
+        </button>
+        <button class="btn-secondary" onclick="downloadTxt()">
+          <svg viewBox="0 0 14 14" fill="none" width="13" height="13">
+            <path d="M7 1v8M4 7l3 3 3-3" stroke="currentColor" stroke-width="1.3"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M1 11v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1"
+                  stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          Télécharger .txt
+        </button>
+        <span class="copy-ok" id="copy-ok">✓ Copié !</span>
+        <div style="flex:1;"></div>
+        <button class="btn-secondary" onclick="resetAll()">Nouvelle analyse</button>
+      </div>
+    </div>
+
+    <!-- ── Erreur ─────────────────────────────────────────── -->
+    <div id="err-card" style="display:none;margin-top:16px;">
+      <div class="error-msg" id="err-msg">Une erreur est survenue.</div>
+      <button class="btn-secondary" onclick="hideError()" style="margin-top:10px;">
+        Réessayer
+      </button>
+    </div>
+
+    <!-- ── Historique ──────────────────────────────────────── -->
+    <div class="card" id="history-card" style="margin-top:16px;">
+      <div class="card-title">
+        <svg viewBox="0 0 14 14" fill="none" width="13" height="13" style="opacity:.7">
+          <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M7 4.5V7l2 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        Historique
+      </div>
+      <div id="history-list">
+        <p style="color:var(--text3);font-size:13px;">Chargement…</p>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══ SCRIPT ════════════════════════════════════════════════ -->
+<script src="/assets/js/nav.js?v=4"></script>
+<script>
+// ─────────────────────────────────────────────────────────────
+// Piano Key — Transcripteur · Groq Whisper + Claude
+// Vanilla JS, aucune dépendance externe
+// Architecture : chunking client → /api/transcribe → /api/claude
+// ─────────────────────────────────────────────────────────────
+
+const CHUNK_SIZE = 24 * 1024 * 1024   // 24 Mo (limite Groq : 25 Mo)
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+// ── Appel /api/claude — gère SSE streaming (Groq) et JSON (Gemini fallback) ──
+async function streamClaude(payload, signal) {
+  const resp = await fetch('/api/claude', {
+    method:  'POST',
+    headers: {
+      'Content-Type':   'application/json',
+      'x-admin-secret': ADMIN_SECRET,
+    },
+    body:    JSON.stringify(payload),
+    signal,
+  })
+
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}))
+    throw new Error(e.error || `Erreur HTTP ${resp.status}`)
+  }
+
+  const contentType = resp.headers.get('content-type') || ''
+
+  if (contentType.includes('text/event-stream')) {
+    // Lecture SSE streaming (proxy Groq)
+    const reader  = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer    = ''
+    let fullText  = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const parsed = JSON.parse(line.slice(6))
+          if (parsed.type === 'content_block_delta') {
+            fullText += parsed.delta?.text || ''
+          } else if (parsed.type === 'message_stop' && parsed.full_text) {
+            fullText = parsed.full_text
+          }
+        } catch {}
+      }
+    }
+    if (!fullText) throw new Error('Réponse vide de Claude')
+    return fullText
+  }
+
+  // JSON direct (fallback Gemini)
+  const data = await resp.json()
+  const fullText = data?.content?.[0]?.text || ''
+  if (!fullText) throw new Error(data?.error || 'Réponse vide de Claude')
+  return fullText
+}
+
+// ── Admin token pour l'historique ────────────────────────────
+// TODO: clé exposée — ADMIN_SECRET ne doit pas figurer en dur ici.
+// À remplacer par un token Clerk (Clerk.session.getToken()) puis vérifier
+// côté Worker via JWT Clerk plutôt que via le secret statique env.ADMIN_SECRET.
+// En attendant cette migration, la valeur est retirée du source ;
+// les endpoints /api/history, /api/access/grant, /api/access/revoke
+// nécessiteront une mise à jour de l'auth côté Worker.
+const ADMIN_SECRET = '4697'
+
+// ── État ─────────────────────────────────────────────────────
+let selectedFiles   = []     // Fichiers sélectionnés
+let fileOffsets     = []     // Offsets cumulés (secondes) — lus depuis la durée audio
+let offsetsReady    = false  // Flag : offsets calculés pour selectedFiles actuel
+let abortController = null   // AbortController (annulation)
+let currentStep     = null   // Étape courante pour marquage erreur
+let resultRaw       = ''     // Texte pour copie/DL
+let resultName      = ''     // Nom fichier courant
+let currentHistoryKey = null
+const historyRegistry = {}
+
+// ── MIME ─────────────────────────────────────────────────────
+const MIMES = {
+  mp3: 'audio/mpeg', mp4: 'video/mp4', m4a: 'audio/mp4',
+  wav: 'audio/wav',  webm: 'audio/webm', ogg: 'audio/ogg',
+}
+
+function getMime(name) {
+  return MIMES[name.split('.').pop().toLowerCase()] || 'audio/mpeg'
+}
+
+function fileEmoji(name) {
+  return ['mp4','webm'].includes(name.split('.').pop().toLowerCase()) ? '🎬' : '🎵'
+}
+
+function fmtSize(b) {
+  if (b < 1048576)         return (b / 1024).toFixed(1)        + ' Ko'
+  if (b < 1073741824)      return (b / 1048576).toFixed(1)     + ' Mo'
+  return                          (b / 1073741824).toFixed(2)   + ' Go'
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
+// ── Init ─────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('drop-zone')
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over') })
+  dz.addEventListener('dragleave', e => { if (!dz.contains(e.relatedTarget)) dz.classList.remove('drag-over') })
+  dz.addEventListener('drop',      e => { e.preventDefault(); dz.classList.remove('drag-over'); handleFiles(e.dataTransfer.files) })
+  checkReady()
+  loadHistory()
+})
+
+// ── Fichier ───────────────────────────────────────────────────
+function triggerPicker() { document.getElementById('file-input').click() }
+function onPicked(files)  { if (files && files.length) handleFiles(files) }
+
+function handleFiles(fileList) {
+  if (!fileList || !fileList.length) return
+
+  const ok = ['mp3','mp4','m4a','wav','webm','ogg']
+  const newFiles = []
+  for (let i = 0; i < fileList.length; i++) {
+    const f = fileList[i]
+    const ext = f.name.split('.').pop().toLowerCase()
+    if (!ok.includes(ext)) {
+      showError(`Format non supporté : .${ext}\nFormats acceptés : mp3 mp4 m4a wav webm ogg`)
+      return
+    }
+    // Évite les doublons (même nom + même taille)
+    const dup = selectedFiles.some(s => s.name === f.name && s.size === f.size)
+    if (!dup) newFiles.push(f)
+  }
+
+  // Ajout cumulatif (ne remplace plus la sélection précédente)
+  selectedFiles = [...selectedFiles, ...newFiles]
+  refreshFileUI()
+  refreshOffsets()
+}
+
+// Met à jour tous les éléments d'UI liés à la sélection courante
+function refreshFileUI() {
+  const dz = document.getElementById('drop-zone')
+  const fi = document.getElementById('file-info')
+
+  if (!selectedFiles.length) {
+    dz.classList.remove('has-file')
+    fi.style.display = 'none'
+    document.getElementById('drop-icon').textContent = '🎵'
+    document.getElementById('drop-title').textContent = 'Dépose ton fichier ici'
+    document.getElementById('drop-sub').innerHTML =
+      'ou <u>clique pour parcourir</u><br>' +
+      '<span>.mp3 · .mp4 · .m4a · .wav · .webm · .ogg</span> — illimité'
+    renderFileList()
+    checkReady()
+    return
+  }
+
+  dz.classList.add('has-file')
+  resultName = selectedFiles.length === 1
+    ? selectedFiles[0].name
+    : selectedFiles.length + ' fichiers'
+
+  if (selectedFiles.length === 1) {
+    const f = selectedFiles[0]
+    document.getElementById('drop-icon').textContent = fileEmoji(f.name)
+    document.getElementById('drop-title').textContent = 'Fichier prêt'
+    document.getElementById('drop-sub').innerHTML = `<span>${esc(f.name)}</span>`
+    fi.style.display = 'flex'
+    document.getElementById('file-emoji').textContent = fileEmoji(f.name)
+    document.getElementById('file-name').textContent  = f.name
+    document.getElementById('file-size').textContent  = fmtSize(f.size)
+  } else {
+    document.getElementById('drop-icon').textContent = '🎶'
+    document.getElementById('drop-title').textContent = selectedFiles.length + ' fichiers sélectionnés'
+    document.getElementById('drop-sub').innerHTML =
+      selectedFiles.map(f => `<span>${esc(f.name)}</span>`).join(' · ')
+    fi.style.display = 'flex'
+    document.getElementById('file-emoji').textContent = '🎶'
+    document.getElementById('file-name').textContent  = selectedFiles.length + ' fichiers'
+    document.getElementById('file-size').textContent  =
+      fmtSize(selectedFiles.reduce((s, f) => s + f.size, 0)) + ' total'
+  }
+
+  renderFileList()
+  checkReady()
+}
+
+// Affiche la liste détaillée avec un ✕ par fichier + bouton "Tout effacer"
+function renderFileList(state) {
+  const container = document.getElementById('file-list')
+  if (!container) return
+  if (!selectedFiles.length) { container.innerHTML = ''; return }
+
+  const multi = selectedFiles.length > 1
+  const items = selectedFiles.map((f, i) => {
+    let offsetLine = ''
+    if (multi) {
+      if (state === 'reading') {
+        offsetLine = `<span class="offset-display">⏱ Lecture des durées audio…</span>`
+      } else if (offsetsReady && typeof fileOffsets[i] === 'number') {
+        offsetLine = `<span class="offset-display">⏱ Début : ${formatTime(fileOffsets[i])}</span>`
+      }
+    }
+    return `
+    <div class="file-item">
+      <span>${esc(f.name)} <em style="color:var(--text3);font-style:normal;">(${fmtSize(f.size)})</em>${offsetLine}</span>
+      <button type="button" onclick="removeFile(${i})" title="Retirer ce fichier">✕</button>
+    </div>
+  `}).join('')
+
+  // Bouton "Tout effacer" affiché seulement si plus d'un fichier
+  const clearBtn = selectedFiles.length > 1
+    ? `<button type="button" class="clear-all-btn" onclick="clearFile()">Tout effacer</button>`
+    : ''
+
+  container.innerHTML = items + clearBtn
+}
+
+function removeFile(index) {
+  selectedFiles.splice(index, 1)
+  refreshFileUI()
+  refreshOffsets()
+}
+
+function clearFile() {
+  selectedFiles = []
+  fileOffsets = []
+  offsetsReady = false
+  document.getElementById('file-input').value = ''
+  refreshFileUI()
+}
+
+function checkReady() {
+  document.getElementById('btn-go').disabled = !selectedFiles.length
+}
+
+// ── Transcription via Worker /api/transcribe ─────────────────
+// La clé Groq est lue côté serveur depuis env.GROQ_API_KEY (Cloudflare).
+// Ne jamais écrire la clé ici — tout appel audio passe par le proxy Worker.
+
+async function transcribeFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase()
+  const validExts = ['mp3', 'mp4', 'm4a', 'wav', 'ogg', 'webm']
+  if (!validExts.includes(ext)) {
+    throw new Error('Format non supporté. Utilise MP3, MP4, M4A, WAV ou OGG.')
+  }
+  if (file.size > 200 * 1024 * 1024) {
+    throw new Error('Fichier trop grand (max 200MB).')
+  }
+  step('transcribe', 'run', 'Préparation du fichier audio…')
+  pg('Préparation…', 20, true)
+  let audioFile = file
+  // Si MP4 ou webm → extraire l'audio en WAV via Web Audio API
+  if (ext === 'mp4' || ext === 'webm') {
+    try {
+      step('transcribe', 'run', 'Extraction audio du MP4…')
+      pg('Extraction audio…', 30, true)
+      audioFile = await extractAudioFromVideo(file)
+    } catch(e) {
+      throw new Error('Impossible d\'extraire l\'audio : ' + e.message)
+    }
+  }
+  // Vérifier taille après extraction
+  if (audioFile.size > 25 * 1024 * 1024) {
+    throw new Error(
+      'Audio trop long (max ~90 min). ' +
+      'Découpe ton fichier en parties plus courtes.'
+    )
+  }
+  step('transcribe', 'run', 'Transcription en cours…')
+  pg('Transcription en cours…', 50, true)
+  const formData = new FormData()
+  formData.append('file', audioFile,
+    audioFile.name || file.name.replace(/\.[^.]+$/, '.wav'))
+  formData.append('model', 'whisper-large-v3-turbo')
+  formData.append('response_format', 'verbose_json')
+  formData.append('language', 'fr')
+  return await transcribeWithRetry(formData)
+}
+
+// ── Lecture du flux SSE renvoyé par /api/transcribe ──
+// Le proxy maintient la connexion ouverte avec des heartbeats pendant que
+// Groq Whisper traite l'audio (évite le timeout 30s de Cloudflare → 502).
+// Renvoie { text } en succès, { error, status } en erreur.
+async function streamTranscribe(formData) {
+  const resp = await fetch('/api/transcribe', { method: 'POST', body: formData })
+
+  // Le serveur ouvre toujours un 200 (puisqu'il commence à streamer avant
+  // d'avoir la réponse Groq). Une 4xx/5xx ici signale un échec amont
+  // (multipart invalide, clé manquante, etc.).
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => '')
+    return { error: txt || ('Erreur HTTP ' + resp.status), status: resp.status }
+  }
+
+  const reader  = resp.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer    = ''
+  let result    = null
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      // Ignore les commentaires (heartbeats : ': keepalive')
+      if (line.startsWith(':') || line.trim() === '') continue
+      if (!line.startsWith('data: ')) continue
+      const data = line.slice(6).trim()
+      if (!data) continue
+      try {
+        result = JSON.parse(data)
+      } catch { /* ligne SSE incomplète, ignorée */ }
+    }
+  }
+
+  if (!result) return { error: 'Réponse vide du proxy /api/transcribe', status: 502 }
+  return result
+}
+
+// ── Tentative Groq unique, fallback immédiat sur AssemblyAI ─────
+// Retourne { text, segments } — segments peut être [] si fallback AssemblyAI
+async function transcribeWithRetry(formData) {
+  try {
+    const data = await streamTranscribe(formData)
+
+    // Erreur applicative renvoyée dans l'event SSE final
+    if (data.error) {
+      const msg = data.error
+      if (msg.includes('429')) {
+        console.log('Groq quota dépassé, bascule vers AssemblyAI…')
+        pg('Groq indisponible — AssemblyAI prend le relais…', 45, true)
+        const file = formData.get('file')
+        return await transcribeWithAssemblyAI(file, file?.name)
+      }
+      throw new Error('Erreur Groq: ' + msg)
+    }
+
+    return { text: data.text || '', segments: data.segments || [] }
+
+  } catch (err) {
+    // Erreur réseau ou exception → on tente quand même AssemblyAI
+    console.log('Groq erreur, bascule vers AssemblyAI:', err.message)
+    pg('Groq indisponible — AssemblyAI prend le relais…', 45, true)
+    const file = formData.get('file')
+    return await transcribeWithAssemblyAI(file, file?.name)
+  }
+}
+
+// Fallback Whisper via AssemblyAI — accepte les gros fichiers,
+// gère le français nativement, pas de restriction de langue mixte
+// Retourne { text, segments:[] } pour rester compatible avec l'appelant
+async function transcribeWithAssemblyAI(file, fileName) {
+  pg('AssemblyAI — upload en cours…', 45, true)
+
+  const formData = new FormData()
+  formData.append('file', file, fileName || 'audio.mp3')
+
+  const resp = await fetch('/api/transcribe-assembly', {
+    method: 'POST',
+    headers: { 'x-admin-secret': ADMIN_SECRET },
+    body: formData
+  })
+
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}))
+    throw new Error(e.error || 'AssemblyAI erreur ' + resp.status)
+  }
+
+  const data = await resp.json()
+  return { text: data.text || '', segments: [] }
+}
+
+// Extrait l'audio d'une vidéo MP4 et retourne un Blob WAV
+async function extractAudioFromVideo(file) {
+  return new Promise((resolve, reject) => {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const arrayBuffer = e.target.result
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
+        // Convertir AudioBuffer en WAV
+        const wavBlob = audioBufferToWav(audioBuffer)
+        resolve(new File([wavBlob],
+          file.name.replace(/\.[^.]+$/, '.wav'),
+          { type: 'audio/wav' }))
+      } catch(err) {
+        reject(new Error('Décodage audio échoué: ' + err.message))
+      } finally {
+        audioCtx.close()
+      }
+    }
+    reader.onerror = () => reject(new Error('Lecture fichier échouée'))
+    reader.readAsArrayBuffer(file)
+  })
+}
+
+// Convertit un AudioBuffer en Blob WAV (PCM 16-bit)
+function audioBufferToWav(audioBuffer) {
+  const numChannels = Math.min(audioBuffer.numberOfChannels, 2)
+  const sampleRate = audioBuffer.sampleRate
+  const length = audioBuffer.length
+  const bytesPerSample = 2
+  const blockAlign = numChannels * bytesPerSample
+  const byteRate = sampleRate * blockAlign
+  const dataSize = length * blockAlign
+  const buffer = new ArrayBuffer(44 + dataSize)
+  const view = new DataView(buffer)
+  function writeStr(offset, str) {
+    for (let i = 0; i < str.length; i++)
+      view.setUint8(offset + i, str.charCodeAt(i))
+  }
+  function writeUint32(offset, val) { view.setUint32(offset, val, true) }
+  function writeUint16(offset, val) { view.setUint16(offset, val, true) }
+  writeStr(0, 'RIFF')
+  writeUint32(4, 36 + dataSize)
+  writeStr(8, 'WAVE')
+  writeStr(12, 'fmt ')
+  writeUint32(16, 16)
+  writeUint16(20, 1) // PCM
+  writeUint16(22, numChannels)
+  writeUint32(24, sampleRate)
+  writeUint32(28, byteRate)
+  writeUint16(32, blockAlign)
+  writeUint16(34, 16) // bits per sample
+  writeStr(36, 'data')
+  writeUint32(40, dataSize)
+  // Écrire les samples PCM 16-bit
+  const channels = []
+  for (let c = 0; c < numChannels; c++) {
+    channels.push(audioBuffer.getChannelData(c))
+  }
+  let offset = 44
+  for (let i = 0; i < length; i++) {
+    for (let c = 0; c < numChannels; c++) {
+      const sample = Math.max(-1, Math.min(1, channels[c][i]))
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
+      offset += 2
+    }
+  }
+  return new Blob([buffer], { type: 'audio/wav' })
+}
+
+// ── Annulation ────────────────────────────────────────────────
+function cancelJob() {
+  if (abortController) { abortController.abort(); abortController = null }
+  document.getElementById('prog-card').style.display   = 'none'
+  document.getElementById('upload-card').style.display = 'block'
+  checkReady()
+}
+
+// ── Erreur ────────────────────────────────────────────────────
+function showError(msg) {
+  document.getElementById('prog-card').style.display = 'none'
+  document.getElementById('err-card').style.display  = 'block'
+  document.getElementById('err-msg').textContent     = msg
+}
+function hideError() { document.getElementById('err-card').style.display = 'none' }
+
+// ── Reset ─────────────────────────────────────────────────────
+function resetAll() {
+  cancelJob()
+  selectedFiles = []
+  resultRaw     = ''
+  document.getElementById('file-input').value = ''
+  document.getElementById('result-card').style.display   = 'none'
+  document.getElementById('err-card').style.display      = 'none'
+  document.getElementById('upload-card').style.display   = 'block'
+  clearFile()
+}
+
+// ── UI Progression ────────────────────────────────────────────
+function step(id, state, label = null) {
+  document.getElementById('sr-' + id).className = 'step-row ' + state
+  document.getElementById('sd-' + id).className = 'step-dot ' + state
+  if (label !== null) document.getElementById('sl-' + id).textContent = label
+}
+
+function pg(label, pct, spin = false) {
+  document.getElementById('pg-label').textContent = label
+  document.getElementById('pg-pct').textContent   = spin ? '…' : pct + ' %'
+  const bar = document.getElementById('pg-fill')
+  if (spin) {
+    bar.classList.add('shimmer')
+  } else {
+    bar.classList.remove('shimmer')
+    bar.style.width = pct + '%'
+  }
+}
+
+// ── Durée audio & offsets cumulés ─────────────────────────────
+function formatTime(s) {
+  if (!Number.isFinite(s)) return '0:00'
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = Math.floor(s % 60)
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+  return `${m}:${String(sec).padStart(2,'0')}`
+}
+
+function getAudioDuration(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const audio = new Audio()
+    audio.preload = 'metadata'
+    audio.onloadedmetadata = () => {
+      const d = audio.duration
+      URL.revokeObjectURL(url)
+      resolve(Number.isFinite(d) ? d : null)
+    }
+    audio.onerror = () => {
+      URL.revokeObjectURL(url)
+      resolve(null)
+    }
+    audio.src = url
+  })
+}
+
+async function computeOffsets(files) {
+  const offsets = []
+  let cumulative = 0
+  for (const file of files) {
+    offsets.push(cumulative)
+    const duration = await getAudioDuration(file)
+    if (duration && !isNaN(duration)) cumulative += duration
+  }
+  return offsets
+}
+
+// Recalcule les offsets puis re-render la liste. Idempotent.
+let _offsetToken = 0
+async function refreshOffsets() {
+  const token = ++_offsetToken
+  offsetsReady = false
+  fileOffsets = []
+  if (!selectedFiles.length) { renderFileList(); return }
+  const snap = [...selectedFiles]
+  renderFileList('reading')
+  const offsets = await computeOffsets(snap)
+  // Si selectedFiles a changé pendant l'async, ignorer ce résultat
+  if (token !== _offsetToken) return
+  fileOffsets = offsets
+  offsetsReady = true
+  renderFileList()
+}
+
+// ── Job principal ─────────────────────────────────────────────
+async function startJob() {
+  if (!selectedFiles.length) return
+
+  abortController = new AbortController()
+  const { signal } = abortController
+
+  document.getElementById('upload-card').style.display = 'none'
+  document.getElementById('prog-card').style.display   = 'block'
+  document.getElementById('err-card').style.display    = 'none'
+  document.getElementById('btn-go').disabled = true
+
+  const totalFiles   = selectedFiles.length
+  const allTranscripts = []
+  const allSegments    = []
+
+  // S'assurer que les offsets ont bien été lus depuis les durées audio.
+  // Normalement déjà fait dès la sélection — recalcul uniquement si nécessaire.
+  if (!offsetsReady || fileOffsets.length !== totalFiles) {
+    pg('Lecture des durées audio…', 5, true)
+    fileOffsets = await computeOffsets(selectedFiles)
+    offsetsReady = true
+  }
+
+  try {
+    for (let fi = 0; fi < totalFiles; fi++) {
+      const file = selectedFiles[fi]
+      const fileLabel = totalFiles > 1 ? `Fichier ${fi+1}/${totalFiles}` : ''
+      const chunkOffsetSeconds = fileOffsets[fi] || 0
+
+      currentStep = 'split'
+      step('split',      'run',  fileLabel ? `${fileLabel} — Préparation…` : 'Préparation du fichier…')
+      step('transcribe', 'wait', 'Transcription…')
+      step('analyze',    'wait', 'Analyse et structuration par Claude…')
+      pg(fileLabel ? `${fileLabel} — préparation…` : 'Préparation…', Math.round(fi / totalFiles * 80))
+
+      step('split', 'ok', fileLabel ? `${fileLabel} — Fichier prêt` : 'Fichier prêt')
+
+      currentStep = 'transcribe'
+      step('transcribe', 'run', fileLabel ? `${fileLabel} — Transcription…` : 'Transcription…')
+      pg(fileLabel ? `${fileLabel} — transcription…` : 'Transcription…', 35, true)
+
+      const result = await transcribeFile(file)
+      const text = result?.text || ''
+      const segments = result?.segments || []
+      if (!text || text.trim().length < 5)
+        throw new Error(`"${file.name}" : transcription vide.`)
+
+      allTranscripts.push(text)
+
+      // Accumuler les segments avec l'offset lu depuis la durée audio
+      if (segments.length) {
+        segments.forEach(seg => {
+          allSegments.push({
+            start: seg.start + chunkOffsetSeconds,
+            end:   seg.end   + chunkOffsetSeconds,
+            text:  seg.text
+          })
+        })
+      }
+
+      step('transcribe', 'ok', fileLabel ? `${fileLabel} — Transcrit ✓` : 'Transcription terminée')
+
+      if (fi < selectedFiles.length - 1) {
+        pg(`Pause 8s pour respecter les limites Groq… (avant fichier ${fi + 2}/${selectedFiles.length})`, Math.round((fi + 1) / totalFiles * 80))
+        await sleep(8000)
+      }
+    }
+
+    // ── Analyser la transcription complète avec Claude ────
+    const fullTranscript = allTranscripts.join('\n\n---\n\n')
+
+    currentStep = 'analyze'
+    step('analyze', 'run', 'Analyse et structuration par Claude…')
+    pg('Analyse et structuration par Claude…', 80, true)
+
+    // Appel JSON à /api/claude (proxy Groq) — system + user prompt structuré
+    let analysisResult
+    try {
+      analysisResult = await streamClaude({
+        system: `Tu es un assistant qui prend des notes de cours de piano.
+Tu reçois une transcription brute d'une vraie séance.
+
+MISSION : extraire uniquement ce qui a été EXPLICITEMENT dit par le professeur. Jamais inventer, jamais généraliser.
+
+RÈGLES CRITIQUES :
+- Chaque point doit être une idée SPÉCIFIQUE tirée du cours
+- INTERDIT : conseils évidents ("pratiquer régulièrement", "écouter de la musique", "comprendre les bases")
+- INTERDIT : reformuler en généralités ce qui était précis
+- Si le prof a dit quelque chose de spécifique → garde la précision (ex: "les notes de la mélodie sont souvent dans la gamme du morceau" et non "comprendre la gamme")
+- Maximum 4 bullets par section, 0 répétition
+- Style : note de cours dense, pas rédactionnel
+
+SECTIONS :
+
+"cours" → Ce qui a été enseigné/expliqué pendant la séance. Concepts, techniques, théorie abordés. Spécifique.
+
+"afaire" → Devoirs et exercices précis donnés par le prof. Avec le titre du morceau si mentionné.
+
+"remarques" → Observations pertinentes du prof sur le jeu de l'élève, insights musicaux notables, liens entre concepts (ex: "accords de la grille = accords diatoniques de la tonalité"). Uniquement si dit explicitement.
+
+"analyse" → Points théoriques ou musicaux avancés soulevés (harmonie, structure, tonalité, style). Spécifique au cours.
+
+STRUCTURE JSON (strict, sans markdown) :
+{
+  "cours": ["...", "..."],
+  "afaire": ["...", "..."],
+  "remarques": ["...", "..."],
+  "analyse": ["...", "..."]
+}
+
+Maximum 4 items par tableau. Si rien de pertinent dans une section → tableau vide [].`,
+        messages: [{
+          role: 'user',
+          content: `Voici la transcription de la séance :\n\n${fullTranscript}`
+        }],
+        temperature: 0.2,
+        max_tokens: 600
+      }, signal)
+    } catch (e) {
+      throw new Error(`Analyse : ${e.message}`)
+    }
+    const aData = { result: analysisResult }
+
+    step('analyze', 'ok', 'Analyse terminée !')
+    pg('Recherche de Shorts…', 90, true)
+
+    // ── Second appel Claude : identification de Shorts ────
+    let shortsRaw = ''
+    try {
+      const shortsPrompt = `Tu es un créateur de contenu spécialisé dans les Shorts YouTube et TikTok (format vertical, max 60 secondes).
+
+Analyse la transcription et identifie entre 2 et 5 passages qui feraient d'excellents Shorts. Critères de sélection :
+- Une explication claire et autonome d'un concept musical (ex: "la différence entre majeur et mineur c'est...")
+- Une question d'élève suivie d'une réponse du prof, naturelle et pédagogique
+- Un moment "aha!" ou une démonstration frappante
+- Un conseil pratique immédiatement applicable
+- Une anecdote ou métaphore mémorable sur la musique
+
+Pour chaque passage identifié, fournis :
+1. Un titre accrocheur (max 60 caractères, style YouTube)
+2. Le timecode de début et de fin au format MM:SS → MM:SS (utilise les timestamps fournis pour trouver le moment exact)
+3. Le passage textuel exact (mot pour mot, ~100-150 mots pour couvrir 45-60 secondes)
+4. Pourquoi ce passage est pertinent pour un Short (1 phrase)
+5. Le type : "Explication" | "Q&R" | "Conseil" | "Démonstration" | "Anecdote"
+
+Si aucun passage ne convient vraiment, dis-le clairement plutôt que de forcer.
+
+Réponds UNIQUEMENT avec un tableau JSON valide, sans texte avant ni après, sans balises markdown, sans backticks. Format exact :
+[
+  { "titre": "...", "timecode": "12:34 → 13:45", "passage": "...", "raison": "...", "type": "Explication" }
+]
+
+Transcription :
+${fullTranscript}`
+
+      shortsRaw = await streamClaude({
+        transcript: shortsPrompt,
+        segments: allSegments,
+        temperature: 0.5,
+        max_tokens: 4096
+      }, signal)
+    } catch(e) { console.warn('Shorts non générés:', e) }
+
+    pg('Terminé !', 100)
+
+    const filename = totalFiles > 1
+      ? `${totalFiles} fichiers (${selectedFiles.map(f => f.name).join(', ')})`
+      : selectedFiles[0].name
+
+    setTimeout(() => renderResults(aData.result, filename, shortsRaw), 350)
+
+  } catch (err) {
+    if (err.name === 'AbortError') return
+    console.error(err)
+    step(currentStep, 'fail')
+    showError(
+      err.message.includes('429') ? '❌ Quota API dépassé. Attends quelques minutes.'
+      : err.message.includes('413') ? '❌ Chunk trop volumineux (> 25 Mo).'
+      : '❌ ' + (err.message || 'Erreur inattendue.')
+    )
+  }
+}
+
+// ── Afficher les résultats ────────────────────────────────────
+function renderResults(raw, filename, shortsRaw) {
+  resultName = filename || resultName
+
+  // Parser la réponse — XML balisé (Groq) en priorité, sinon JSON, sinon brut
+  let data = null
+
+  // Extraction robuste : tag exact, puis tag tronqué (Groq génère parfois
+  // <a_f>...</a_f> au lieu de <a_faire>...</a_faire>)
+  function extractSection(text, tag) {
+    const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i')
+    const match = text.match(regex)
+    if (match) return match[1].trim()
+
+    const shortTag = tag.substring(0, 4)
+    const shortRegex = new RegExp(`<${shortTag}[^>]*>([\\s\\S]*?)<\\/${shortTag}[^>]*>`, 'i')
+    const shortMatch = text.match(shortRegex)
+    if (shortMatch) return shortMatch[1].trim()
+
+    return ''
+  }
+
+  // Normalise les clés du nouveau format JSON (afaire, analyse) vers les
+  // clés canoniques utilisées dans le reste de l'app (a_faire, analyse_musicale)
+  function normalizeKeys(obj) {
+    if (!obj || typeof obj !== 'object') return obj
+    const out = { ...obj }
+    if (Array.isArray(out.afaire) && !out.a_faire) { out.a_faire = out.afaire; delete out.afaire }
+    if (Array.isArray(out.analyse) && !out.analyse_musicale) { out.analyse_musicale = out.analyse; delete out.analyse }
+    if (Array.isArray(out.remarques) && !out.conseils) { out.conseils = out.remarques; delete out.remarques }
+    return out
+  }
+
+  // 1. Tentative JSON (nouveau format) — extraction robuste
+  try {
+    const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) || raw.match(/(\{[\s\S]*\})/)
+    const jsonStr = jsonMatch ? jsonMatch[1] : raw
+    const parsed = JSON.parse(jsonStr)
+    if (parsed && typeof parsed === 'object') data = normalizeKeys(parsed)
+  } catch(e) { /* fallback XML ci-dessous */ }
+
+  // 2. Fallback XML : <cours>, <a_faire>, <conseils>, <analyse_musicale>
+  if (!data) {
+    const xmlKeys = ['cours', 'a_faire', 'conseils', 'analyse_musicale']
+    const xmlExtract = {}
+    let xmlFound = false
+    xmlKeys.forEach(key => {
+      const section = extractSection(raw, key)
+      if (section) {
+        xmlFound = true
+        const lines = section.split('\n')
+          .map(l => l.replace(/^\s*[-•*]\s*/, '').trim())
+          .filter(l => l.length > 0)
+        xmlExtract[key] = lines
+      } else {
+        xmlExtract[key] = []
+      }
+    })
+    if (xmlFound) data = xmlExtract
+  }
+
+  // 3. Rien trouvé → dumper brut dans Cours
+  if (!data) {
+    data = { cours: [raw.trim()], a_faire: [], conseils: [], analyse_musicale: [] }
+  }
+
+  const SECTIONS = [
+    { key: 'cours',            id: 'res-cours',    label: '🎹 Cours' },
+    { key: 'a_faire',          id: 'res-afaire',   label: '✅ À faire' },
+    { key: 'conseils',         id: 'res-conseils', label: '💡 Remarques' },
+    { key: 'analyse_musicale', id: 'res-musical',  label: '🎵 Analyse musicale' },
+  ]
+
+  const allLines = []
+
+  SECTIONS.forEach(({ key, id, label }) => {
+    const items = Array.isArray(data[key]) ? data[key] : []
+    const card  = document.getElementById(id)
+    const list  = document.getElementById(id + '-list')
+    if (items.length) {
+      list.innerHTML = '<ul>' + items.map(b => `<li contenteditable="true" spellcheck="false" style="outline:none;cursor:text;border-radius:4px;padding:2px 4px;transition:background .15s;" onmouseenter="this.style.background='rgba(139,111,232,0.08)'" onmouseleave="this.style.background=''" oninput="syncResultRaw()">${esc(b)}</li>`).join('') + '</ul>'
+      card.style.display = 'block'
+      allLines.push(label)
+      allLines.push(...items.map(b => '\t• ' + b))
+      allLines.push('')
+    } else {
+      card.style.display = 'none'
+    }
+  })
+
+  // ── Shorts ────────────────────────────────────────────────
+  const shortsCard = document.getElementById('res-shorts')
+  const shortsList = document.getElementById('res-shorts-list')
+  let shortsData = []
+  if (shortsRaw) {
+    try {
+      const sMatch = shortsRaw.match(/```(?:json)?\s*([\s\S]*?)```/) || shortsRaw.match(/(\[[\s\S]*\])/)
+      shortsData = JSON.parse(sMatch ? sMatch[1] : shortsRaw)
+    } catch(e) { shortsData = [] }
+  }
+  if (Array.isArray(shortsData) && shortsData.length) {
+    shortsList.innerHTML = shortsData.map((s, i) => {
+      const t = esc(s.type || 'Explication')
+      const tc = s.timecode ? `<div class="short-timecode">⏱ ${esc(s.timecode)}</div>` : ''
+      return `<div class="short-card" data-type="${t}">
+        <span class="short-badge" data-type="${t}">${t}</span>
+        <div class="short-title">${esc(s.titre || 'Short ' + (i+1))}</div>
+        ${tc}
+        <div class="short-passage" id="short-passage-${i}">${esc(s.passage || '')}</div>
+        <div class="short-reason">${esc(s.raison || '')}</div>
+        <button class="short-copy-btn" onclick="copyShortPassage(${i})">📋 Copier ce passage</button>
+      </div>`
+    }).join('')
+    shortsCard.style.display = 'block'
+    allLines.push('🎬 Shorts')
+    shortsData.forEach((s, i) => {
+      allLines.push(`  ${i+1}. [${s.type || ''}] ${s.titre || ''}`)
+      if (s.timecode) allLines.push(`     ⏱ ${s.timecode}`)
+      allLines.push(`     ${s.passage || ''}`)
+      allLines.push(`     → ${s.raison || ''}`)
+      allLines.push('')
+    })
+    data.shorts = shortsData
+  } else {
+    shortsCard.style.display = 'none'
+  }
+
+  // ── Titre pré-rempli avec le nom de fichier sans extension ─
+  const titleInput = document.getElementById('res-title')
+  titleInput.value = resultName.replace(/\.[^.]+$/, '')
+
+  // ── Nom fichier ───────────────────────────────────────────
+  document.getElementById('res-fname').textContent = resultName
+
+  // ── Texte brut pour copie/DL ──────────────────────────────
+  resultRaw = allLines.join('\n') +
+    '\n— Généré par Piano Key Transcripteur · Groq Whisper + Claude'
+
+  // ── Afficher ──────────────────────────────────────────────
+  document.getElementById('prog-card').style.display   = 'none'
+  document.getElementById('result-card').style.display = 'block'
+
+  // ── Sauvegarder dans l'historique ─────────────────────────
+  saveToHistory(resultName, data, resultRaw)
+}
+
+// ── Historique ────────────────────────────────────────────────
+async function saveToHistory(filename, summary, raw) {
+  try {
+    const key = 'history:' + Date.now()
+    currentHistoryKey = key
+    const title = document.getElementById('res-title').value.trim()
+    await fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
+      body: JSON.stringify({ key, data: { date: new Date().toISOString(), filename, title, summary, raw } })
+    })
+    loadHistory()
+  } catch(e) { console.warn('Historique non sauvegardé:', e) }
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch('/api/history', {
+      headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+    })
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    const items = await res.json()
+    renderHistory(items)
+  } catch(e) {
+    document.getElementById('history-list').innerHTML =
+      `<p style="color:var(--text3);font-size:13px;">Impossible de charger l'historique.</p>`
+  }
+}
+
+function renderHistory(items) {
+  const container = document.getElementById('history-list')
+  if (!items || !items.length) {
+    container.innerHTML = '<p style="color:var(--text3);font-size:13px;">Aucun historique pour l\'instant.</p>'
+    return
+  }
+  container.innerHTML = items.map(item => {
+    const d    = item.data || {}
+    const date = d.date ? new Date(d.date).toLocaleString('fr-FR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    }) : '—'
+    const previewLines = Object.values(d.summary || {}).flat().slice(0, 3)
+      .map(l => `<li style="font-size:12px;color:var(--text2);">${esc(l)}</li>`).join('')
+    const safeKey = (item.key || '').replace(/'/g, "\\'")
+    historyRegistry[item.key] = d
+    const encodedKey = encodeURIComponent(item.key || '')
+    return `
+<div class="hist-entry" style="border:1px solid var(--border1);border-radius:8px;margin-bottom:8px;overflow:hidden;">
+  <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:var(--bg2);"
+       onclick="window.location.href='/admin/transcription.html?key=' + encodeURIComponent('${safeKey}')">
+    <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;flex-shrink:0;">${esc(date)}</span>
+    <span style="font-size:13px;color:var(--text1);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.title || d.filename || '—')}</span>
+    <span style="font-size:11px;color:var(--v);">Charger ↗</span>
+  </div>
+  <div style="display:flex;gap:8px;padding:6px 12px 10px;border-top:1px solid var(--border1);background:var(--bg2);">
+    <button class="btn-secondary" onclick="deleteHistory('${safeKey}')" style="font-size:11px;padding:4px 10px;">🗑️ Supprimer</button>
+  </div>
+</div>`
+  }).join('')
+}
+
+async function loadFromHistory(key) {
+  const d = historyRegistry[key]
+  if (!d) return
+  currentHistoryKey = key
+  resultName = d.filename || '—'
+  if (d.summary) {
+    renderResults(JSON.stringify(d.summary), d.filename)
+  } else if (d.raw) {
+    resultRaw = d.raw
+    document.getElementById('prog-card').style.display   = 'none'
+    document.getElementById('result-card').style.display = 'block'
+    document.getElementById('res-fname').textContent = resultName
+  }
+}
+
+async function deleteHistory(key) {
+  if (!confirm('Supprimer cette entrée de l\'historique ?')) return
+  try {
+    await fetch('/api/history?key=' + encodeURIComponent(key), {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+    })
+    loadHistory()
+  } catch(e) {
+    alert('Erreur lors de la suppression.')
+  }
+}
+
+// ── Copier ────────────────────────────────────────────────────
+let _saveTimer = null
+let _titleTimer = null
+function onTitleEdit() {
+  syncResultRaw()
+  clearTimeout(_titleTimer)
+  _titleTimer = setTimeout(async () => {
+    if (!currentHistoryKey) return
+    const title = document.getElementById('res-title').value.trim()
+    try {
+      // Reconstruire le summary depuis le DOM
+      const summary = {}
+      const SEC = [
+        { key: 'cours', id: 'res-cours' }, { key: 'a_faire', id: 'res-afaire' },
+        { key: 'conseils', id: 'res-conseils' }, { key: 'analyse_musicale', id: 'res-musical' },
+        { key: 'shorts', id: 'res-shorts' },
+      ]
+      SEC.forEach(({ key, id }) => {
+        const card = document.getElementById(id)
+        if (!card || card.style.display === 'none') return
+        const items = [...card.querySelectorAll('li')].map(li => li.textContent.trim()).filter(Boolean)
+        if (items.length) summary[key] = items
+      })
+      await fetch('/api/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
+        body: JSON.stringify({ key: currentHistoryKey, data: { date: new Date().toISOString(), filename: resultName, title, summary, raw: resultRaw } })
+      })
+      loadHistory()
+    } catch(e) { console.warn('Auto-save titre échoué:', e) }
+  }, 2000)
+}
+// ── Copier un passage Short ──────────────────────────────────
+async function copyShortPassage(index) {
+  const el = document.getElementById('short-passage-' + index)
+  if (!el) return
+  const text = el.textContent
+  try { await navigator.clipboard.writeText(text) }
+  catch {
+    const t = document.createElement('textarea')
+    t.value = text
+    document.body.appendChild(t); t.select()
+    document.execCommand('copy')
+    document.body.removeChild(t)
+  }
+  const btn = el.parentElement.querySelector('.short-copy-btn')
+  if (btn) { btn.textContent = '✓ Copié !'; setTimeout(() => { btn.textContent = '📋 Copier ce passage' }, 1500) }
+}
+
+function syncResultRaw() {
+  const SECTIONS = [
+    { id: 'res-cours',    label: 'Cours' },
+    { id: 'res-afaire',   label: 'À faire' },
+    { id: 'res-conseils', label: 'Remarques' },
+    { id: 'res-musical',  label: 'Analyse musicale' },
+  ]
+  const allLines = []
+  SECTIONS.forEach(({ id, label }) => {
+    const card = document.getElementById(id)
+    if (!card || card.style.display === 'none') return
+    const items = card.querySelectorAll('li')
+    if (!items.length) return
+    allLines.push(label + ' :')
+    items.forEach(li => {
+      const t = li.textContent.trim()
+      if (t) allLines.push('    • ' + t)
+    })
+    allLines.push('')
+  })
+  // Inclure les Shorts dans le texte brut
+  const shortsCard = document.getElementById('res-shorts')
+  if (shortsCard && shortsCard.style.display !== 'none') {
+    const cards = shortsCard.querySelectorAll('.short-card')
+    if (cards.length) {
+      allLines.push('Shorts :')
+      cards.forEach((c, i) => {
+        const title = c.querySelector('.short-title')
+        const passage = c.querySelector('.short-passage')
+        const reason = c.querySelector('.short-reason')
+        const badge = c.querySelector('.short-badge')
+        allLines.push(`  ${i+1}. [${badge ? badge.textContent : ''}] ${title ? title.textContent : ''}`)
+        allLines.push(`     ${passage ? passage.textContent : ''}`)
+        allLines.push(`     → ${reason ? reason.textContent : ''}`)
+        allLines.push('')
+      })
+    }
+  }
+  allLines.push('─────────────────────────')
+  allLines.push('Généré par PianoKey · Groq Whisper + Claude')
+  resultRaw = allLines.join('\n')
+  // Auto-save dans KV après 2s d'inactivité
+  clearTimeout(_saveTimer)
+  _saveTimer = setTimeout(async () => {
+    if (!currentHistoryKey) return
+    try {
+      await fetch('/api/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
+        body: JSON.stringify({ key: currentHistoryKey, data: { date: new Date().toISOString(), filename: resultName, title: document.getElementById('res-title').value.trim(), raw: resultRaw } })
+      })
+    } catch(e) { console.warn('Auto-save échoué:', e) }
+  }, 2000)
+}
+
+async function copyAll() {
+  try { await navigator.clipboard.writeText(resultRaw) }
+  catch {
+    const t = document.createElement('textarea')
+    t.value = resultRaw
+    document.body.appendChild(t); t.select()
+    document.execCommand('copy')
+    document.body.removeChild(t)
+  }
+  const fb = document.getElementById('copy-ok')
+  fb.classList.add('on')
+  setTimeout(() => fb.classList.remove('on'), 2200)
+}
+
+// ── Télécharger ───────────────────────────────────────────────
+function downloadTxt() {
+  const blob = new Blob([resultRaw], { type: 'text/plain;charset=utf-8' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url
+  a.download = 'transcription-' + resultName.replace(/\.[^.]+$/, '') + '.txt'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+</script>
+
+</body>
+</html>
