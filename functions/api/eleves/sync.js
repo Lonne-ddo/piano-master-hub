@@ -1,5 +1,5 @@
 // ─── Sync élèves depuis Google Docs ──────────────────────────────
-// POST /api/eleves/sync — parse les docs texte, résumé via Gemini, merge KV
+// POST /api/eleves/sync — parse les docs, résumé via Gemini → Groq, merge KV
 // Auth : header x-admin-secret requis
 
 const CORS_HEADERS = {
@@ -19,7 +19,6 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-// Map élève → Google Doc ID
 const DOCS = {
   japhet: '19xGdQoE2k2tSFYp_MykzDL-7vxIz5HYr4DR3wRuQ3TM',
   messon: '1LovxCWAtCaJeLjBvLVsnG-jz-PGRETNfdm8C4BZRqJI',
@@ -27,16 +26,96 @@ const DOCS = {
   tara:   '1EKB8q-NeC4C3qt6xhOfS3QN27Ip4zpAU-X4-yWUIjxY',
 };
 
-// Champs saisis manuellement → jamais écrasés par le sync
 const PROTECTED_FIELDS = [
-  'premier_cours',
-  'fin_prevue',
-  'statut',
-  'programme',
-  'notes',
-  'manualDates',
+  'premier_cours', 'fin_prevue', 'statut', 'programme', 'notes', 'manualDates',
 ];
 
+// ─── LLM providers (Gemini → Groq fallback) ──────────────────────
+function isRetryableError(error) {
+  const msg = String(error?.message || '');
+  return /\b(429|500|502|503|504|UNAVAILABLE|timeout|network|fetch failed)\b/i.test(msg);
+}
+
+async function callGemini(prompt, apiKey, { maxTokens = 4096, temperature = 0.2 } = {}) {
+  if (!apiKey) throw new Error('GEMINI_API_KEY manquante');
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey.trim()}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: maxTokens, temperature },
+      }),
+    }
+  );
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Gemini HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Gemini: réponse vide');
+  return text;
+}
+
+async function callGroq(prompt, apiKey, { maxTokens = 4096, temperature = 0.2 } = {}) {
+  if (!apiKey) throw new Error('GROQ_API_KEY manquante');
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey.trim()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      temperature,
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Groq HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error('Groq: réponse vide');
+  return text;
+}
+
+async function callLLM(prompt, env, opts) {
+  try {
+    return await callGemini(prompt, env.GEMINI_API_KEY, opts);
+  } catch (e) {
+    console.log('[callLLM] Gemini failed:', e.message);
+    if (!isRetryableError(e)) throw e;
+  }
+  try {
+    return await callGroq(prompt, env.GROQ_API_KEY, opts);
+  } catch (e) {
+    console.log('[callLLM] Groq failed:', e.message);
+    throw e;
+  }
+}
+
+function extractJSON(text) {
+  let s = String(text).trim();
+  s = s.replace(/^```(?:json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
+  if (s.startsWith('{') && s.endsWith('}')) return s;
+  const first = s.indexOf('{');
+  const last = s.lastIndexOf('}');
+  if (first >= 0 && last > first) return s.slice(first, last + 1);
+  return s;
+}
+
+// ─── POST /api/eleves/sync ───────────────────────────────────────
+// Comportement :
+//  - Itère sur les 4 élèves
+//  - Chaque élève avec LLM OK → put KV mis à jour
+//  - Chaque élève avec LLM qui casse (Gemini + Groq KO) → tracké dans llmFailed, KV inchangé
+//  - Si au moins un LLM failed → 503 avec { error, failed: [...], results }
+//  - Sinon → 200 avec { success: true, results }
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -46,6 +125,7 @@ export async function onRequestPost(context) {
   }
 
   const results = {};
+  const llmFailed = [];
 
   for (const [name, docId] of Object.entries(DOCS)) {
     try {
@@ -56,15 +136,21 @@ export async function onRequestPost(context) {
         continue;
       }
       const text = await res.text();
-
       const parsed = parseStudentDoc(text, name);
 
-      // Résumer les 5 séances les plus récentes via Gemini
-      const toSummarize = parsed.seances.slice(-5);
+      // Résumé des 5 séances les plus récentes via LLM chain
+      let summarized;
+      try {
+        const toSummarize = parsed.seances.slice(-5);
+        summarized = await Promise.all(
+          toSummarize.map(s => summarizeSession(s, env))
+        );
+      } catch (llmErr) {
+        llmFailed.push(name);
+        results[name] = { error: `LLM unavailable: ${llmErr.message}` };
+        continue;
+      }
       const older = parsed.seances.slice(0, -5);
-      const summarized = await Promise.all(
-        toSummarize.map(s => summarizeSession(s, env))
-      );
       const allSeances = [...older, ...summarized];
 
       const cacheKey = `eleve:${name}`;
@@ -106,10 +192,13 @@ export async function onRequestPost(context) {
     }
   }
 
+  if (llmFailed.length > 0) {
+    return jsonResponse({ error: 'LLM unavailable', failed: llmFailed, results }, 503);
+  }
   return jsonResponse({ success: true, results });
 }
 
-// ─── RÉSUMÉ VIA GEMINI FLASH ─────────────────────────────────────
+// ─── RÉSUMÉ SÉANCE via LLM chain ─────────────────────────────────
 async function summarizeSession(session, env) {
   const contentLines = [
     session.contenu?.length  ? 'Contenu : ' + session.contenu.join(' / ')  : '',
@@ -120,10 +209,6 @@ async function summarizeSession(session, env) {
 
   if (!contentLines.trim()) return session;
 
-  if (!env.GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY manquante');
-  }
-
   const prompt = `Voici les notes d'une séance de piano du ${session.date}.
 Résume en 2-4 points courts sans redites, en français, style télégraphique.
 Sépare contenu travaillé et devoirs s'ils sont distincts.
@@ -132,26 +217,8 @@ Retourne UNIQUEMENT un JSON : { "contenu": ["...", "..."], "devoirs": ["...", ".
 Notes brutes :
 ${contentLines}`;
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY.trim()}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 300, temperature: 0.3 },
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(`Gemini HTTP ${res.status}: ${errText.slice(0, 200)}`);
-  }
-
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  const clean = text.replace(/```json|```/g, '').trim();
+  const text = await callLLM(prompt, env, { maxTokens: 300, temperature: 0.3 });
+  const clean = extractJSON(text);
   const summary = JSON.parse(clean);
 
   return {

@@ -6,6 +6,11 @@ const STUDENT_REGISTRY = {
   tara:   { id: "tara",   nom: "Tara",   programme: "Piano Master", statut: "actif", docId: "1EKB8q-NeC4C3qt6xhOfS3QN27Ip4zpAU-X4-yWUIjxY" },
 };
 
+// Champs saisis manuellement → jamais écrasés par un re-sync LLM
+const PROTECTED_FIELDS = [
+  'premier_cours', 'fin_prevue', 'statut', 'programme', 'notes', 'manualDates',
+];
+
 // ─── CORS ────────────────────────────────────────────────────────
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -33,22 +38,22 @@ function requireAuth(request, env) {
   return null;
 }
 
-// ─── LLM (Gemini Flash uniquement) ───────────────────────────────
-async function callGemini(env, systemPrompt, userMessage) {
-  if (!env.GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY manquante');
-  }
+// ─── LLM providers (Gemini → Groq fallback) ──────────────────────
+function isRetryableError(error) {
+  const msg = String(error?.message || '');
+  return /\b(429|500|502|503|504|UNAVAILABLE|timeout|network|fetch failed)\b/i.test(msg);
+}
+
+async function callGemini(prompt, apiKey, { maxTokens = 4096, temperature = 0.2 } = {}) {
+  if (!apiKey) throw new Error('GEMINI_API_KEY manquante');
   const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${env.GEMINI_API_KEY.trim()}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey.trim()}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: systemPrompt ? `${systemPrompt}\n\n${userMessage}` : userMessage,
-          }],
-        }],
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: maxTokens, temperature },
       }),
     }
   );
@@ -58,13 +63,66 @@ async function callGemini(env, systemPrompt, userMessage) {
   }
   const data = await resp.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error('Gemini: réponse vide');
-  }
+  if (!text) throw new Error('Gemini: réponse vide');
   return text;
 }
 
-// ─── PARSING via Gemini ──────────────────────────────────────────
+async function callGroq(prompt, apiKey, { maxTokens = 4096, temperature = 0.2 } = {}) {
+  if (!apiKey) throw new Error('GROQ_API_KEY manquante');
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey.trim()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      temperature,
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Groq HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error('Groq: réponse vide');
+  return text;
+}
+
+async function callLLM(prompt, env, opts) {
+  // 1. Gemini first
+  try {
+    return await callGemini(prompt, env.GEMINI_API_KEY, opts);
+  } catch (e) {
+    console.log('[callLLM] Gemini failed:', e.message);
+    // Non-retryable (4xx autres que 429) → propagation immédiate
+    if (!isRetryableError(e)) throw e;
+  }
+  // 2. Groq fallback
+  try {
+    return await callGroq(prompt, env.GROQ_API_KEY, opts);
+  } catch (e) {
+    console.log('[callLLM] Groq failed:', e.message);
+    throw e; // Caller décide (cache stale vs 503)
+  }
+}
+
+function extractJSON(text) {
+  let s = String(text).trim();
+  // Strip ```json fences
+  s = s.replace(/^```(?:json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
+  if (s.startsWith('{') && s.endsWith('}')) return s;
+  // Fallback : balanced first-to-last { ... }
+  const first = s.indexOf('{');
+  const last = s.lastIndexOf('}');
+  if (first >= 0 && last > first) return s.slice(first, last + 1);
+  return s;
+}
+
+// ─── PARSING via LLM ─────────────────────────────────────────────
 async function parseDoc(docText, student, env) {
   const systemPrompt = `Tu es un assistant qui extrait des données structurées depuis des notes de cours de piano.
 Retourne UNIQUEMENT un objet JSON valide, sans markdown, sans backticks, sans commentaires.
@@ -111,37 +169,23 @@ Notes de cours :
 ${docText.slice(0, 6000)}
 ---`;
 
-  const text = await callGemini(env, systemPrompt, userPrompt);
-  const clean = text.trim().replace(/^```(?:json)?\n?/m, '').replace(/\n?```$/m, '').trim();
+  const text = await callLLM(`${systemPrompt}\n\n${userPrompt}`, env);
+  const clean = extractJSON(text);
   const parsed = JSON.parse(clean);
   parsed.id = student.id;
   parsed.doc_url = `https://docs.google.com/document/d/${student.docId}/edit`;
   return parsed;
 }
 
-// ─── STALE-WHILE-REVALIDATE ──────────────────────────────────────
-async function refreshIfNeeded(cacheKey, student, env) {
-  try {
-    const cached = await env.MASTERHUB_STUDENTS.get(cacheKey);
-    if (cached) {
-      const data = JSON.parse(cached);
-      const age = Date.now() - (data._cachedAt || 0);
-      if (age < 50 * 60 * 1000) return;
-    }
-    if (!student.docId) return;
-    const docRes = await fetch(`https://docs.google.com/document/d/${student.docId}/export?format=txt`);
-    if (!docRes.ok) return;
-    const docText = await docRes.text();
-    const parsed = await parseDoc(docText, student, env);
-    parsed._cachedAt = Date.now();
-    await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(parsed), { expirationTtl: 3600 });
-  } catch (e) {
-    console.warn('Background refresh failed:', e.message);
-  }
-}
-
 // ─── GET /api/eleves/{id} ────────────────────────────────────────
-export async function onRequestGet({ params, request, env, waitUntil: ctx }) {
+// Flux :
+//  1. Cache KV présent + pas de ?sync=true       → { ...data, source: 'fresh' }
+//  2. Cache absent ou ?sync=true :
+//     a. Gemini OK                                → put KV + { ...data, source: 'fresh' }
+//     b. Gemini fail → Groq OK                    → put KV + { ...data, source: 'fresh' }
+//     c. Tous fail + cache existe                 → { ...cached, source: 'stale', error: 'LLM unavailable' }
+//     d. Tous fail + pas de cache                 → 503
+export async function onRequestGet({ params, request, env }) {
   const authErr = requireAuth(request, env);
   if (authErr) return authErr;
 
@@ -153,32 +197,51 @@ export async function onRequestGet({ params, request, env, waitUntil: ctx }) {
   if (!student) return jsonResponse({ error: 'Élève introuvable' }, 404);
 
   const cacheKey = `eleve:${id}`;
+  const cachedRaw = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'text' });
+  const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
 
-  const cached = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'text' });
+  // 1. Cache frais (TTL KV géré nativement)
   if (cached && !forceSync) {
-    const parsed = JSON.parse(cached);
-    if (ctx) ctx(refreshIfNeeded(cacheKey, student, env));
-    else refreshIfNeeded(cacheKey, student, env).catch(() => {});
-    return jsonResponse(parsed);
+    return jsonResponse({ ...cached, source: 'fresh' });
   }
 
+  // 2. Fetch Google Doc
   let docText;
   try {
     const docRes = await fetch(`https://docs.google.com/document/d/${student.docId}/export?format=txt`);
     if (!docRes.ok) throw new Error(`HTTP ${docRes.status}`);
     docText = await docRes.text();
   } catch (e) {
+    if (cached) {
+      return jsonResponse({ ...cached, source: 'stale', error: `Doc fetch failed: ${e.message}` });
+    }
     return jsonResponse({
       error: "Impossible d'accéder au Google Doc. Vérifie que le partage est activé (lecture — quiconque avec le lien).",
       details: e.message,
     }, 502);
   }
 
+  // 3. Parsing via LLM chain (Gemini → Groq)
   let parsed;
   try {
     parsed = await parseDoc(docText, student, env);
   } catch (e) {
-    return jsonResponse({ error: 'Erreur de parsing Gemini', details: e.message }, 500);
+    if (cached) {
+      return jsonResponse({ ...cached, source: 'stale', error: 'LLM unavailable', details: e.message });
+    }
+    return jsonResponse({
+      error: 'All LLM providers failed and no cache available',
+      details: e.message,
+    }, 503);
+  }
+
+  // 4. Merge PROTECTED_FIELDS depuis le cache existant
+  if (cached) {
+    for (const field of PROTECTED_FIELDS) {
+      if (cached[field] !== undefined) {
+        parsed[field] = cached[field];
+      }
+    }
   }
 
   parsed._cachedAt = Date.now();
@@ -186,7 +249,7 @@ export async function onRequestGet({ params, request, env, waitUntil: ctx }) {
     await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(parsed), { expirationTtl: 3600 });
   } catch (_) {}
 
-  return jsonResponse(parsed);
+  return jsonResponse({ ...parsed, source: 'fresh' });
 }
 
 // ─── PATCH /api/eleves/{id} ──────────────────────────────────────

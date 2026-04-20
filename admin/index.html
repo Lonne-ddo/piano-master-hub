@@ -177,6 +177,15 @@
     .sync-btn.syncing .icon {
       animation: spin 1s linear infinite;
     }
+    @keyframes stalePulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(240, 180, 41, 0); }
+      50%      { transform: scale(1.06); box-shadow: 0 0 0 6px rgba(240, 180, 41, 0.18); }
+    }
+    .sync-btn.stale-pulse {
+      animation: stalePulse 1.1s ease-in-out 2;
+      border-color: var(--amber);
+      color: var(--amber);
+    }
 
     @media (max-width: 500px) {
       .sync-btn .label { display: none; }
@@ -262,6 +271,22 @@
     .ctx-bar .sep {
       color: var(--text3);
       margin: 0 6px;
+    }
+    .ctx-stale-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      background: rgba(240, 180, 41, 0.1);
+      color: var(--amber);
+      border: 1px solid var(--amber);
+      border-radius: 999px;
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-left: 8px;
+      cursor: help;
     }
 
     /* ── Progression bar ───────────────────────────────────── */
@@ -751,12 +776,25 @@ function renderCtx(s) {
   const sessionCount = s.sessionCount || seances.length;
   const debut = fmtDateShort(s.premier_cours);
   const fin = fmtDateShort(s.fin_prevue);
+  const staleBadge = s.source === 'stale'
+    ? '<span class="ctx-stale-badge" title="Gemini et Groq sont indisponibles. Données de la dernière synchronisation.">● cache périmé</span>'
+    : '';
   ctx.innerHTML = `
     <strong>${escapeHtml(s.nom)}</strong>
     <span class="sep">·</span> ${sessionCount} cours
     <span class="sep">·</span> début ${escapeHtml(debut)}
     <span class="sep">·</span> fin ${escapeHtml(fin)}
+    ${staleBadge}
   `;
+}
+
+function triggerStalePulse() {
+  const btn = document.getElementById('syncAllBtn');
+  if (!btn) return;
+  btn.classList.remove('stale-pulse');
+  void btn.offsetWidth; // force reflow
+  btn.classList.add('stale-pulse');
+  setTimeout(() => btn.classList.remove('stale-pulse'), 2400);
 }
 
 function renderEmpty() {
@@ -990,9 +1028,12 @@ async function selectStudent(id, forceSync = false) {
       headers: authHeaders()
     });
     const data = await res.json();
-    if (!res.ok || data.error) { showError(data.error || `Erreur ${res.status}`, data.details); return; }
+    // En mode 'stale', le worker renvoie 200 avec source:'stale' + error — on affiche le profil, pas d'erreur bloquante
+    if (!res.ok && data.source !== 'stale') { showError(data.error || `Erreur ${res.status}`, data.details); return; }
+    if (!data || (data.error && data.source !== 'stale')) { showError(data.error || `Erreur ${res.status}`, data.details); return; }
     clientCache[id] = data;
     renderProfile(data);
+    if (data.source === 'stale') triggerStalePulse();
   } catch (e) {
     showError('Erreur réseau. Vérifie ta connexion et réessaie.', e.message);
   }
