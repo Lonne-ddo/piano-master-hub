@@ -408,10 +408,65 @@
     }
     .short-copy-btn:hover { color: var(--v); border-color: var(--v); }
 
+    /* ── Master Hub mini-header (remplace la nav.js Piano Key) ── */
+    .mh-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg0);
+    }
+    .mh-back {
+      color: var(--text2);
+      text-decoration: none;
+      font-size: 14px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .mh-back:hover { background: var(--bg2); color: var(--text1); }
+    .mh-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text1);
+    }
+    .mh-logout {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .mh-logout:hover { background: var(--bg2); color: var(--text1); }
+
+    @media (max-width: 500px) {
+      .mh-header { padding: 12px 16px; }
+      .mh-title { font-size: 16px; }
+      .mh-logout { font-size: 12px; padding: 4px 10px; }
+    }
+
+    /* Neutralise la compensation .layout/.main pour la topbar/sidebar fixes
+       (qui étaient injectées par nav.js — maintenant absentes) */
+    .layout { padding-top: 0; }
+    .main   { margin-left: 0; }
+
   </style>
 </head>
 <body>
 
+<!-- ══ MINI-HEADER MASTER HUB ══════════════════════════════ -->
+<header class="mh-header">
+  <a href="/admin/outils.html" class="mh-back">&larr; Outils</a>
+  <h1 class="mh-title">Transcripteur</h1>
+  <button class="mh-logout" type="button" onclick="localStorage.removeItem('mh_admin'); window.location.replace('/admin/');">Se d&eacute;connecter</button>
+</header>
 
 <!-- ══ LAYOUT ══════════════════════════════════════════════ -->
 <div class="layout">
@@ -614,7 +669,6 @@
 </div>
 
 <!-- ══ SCRIPT ════════════════════════════════════════════════ -->
-<script src="/assets/js/nav.js?v=4"></script>
 <script>
 // ─────────────────────────────────────────────────────────────
 // Piano Key — Transcripteur · Groq Whisper + Claude
