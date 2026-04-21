@@ -10,7 +10,7 @@ export const config = {
   runtime: 'edge',
 };
 
-const MODEL = "whisper-large-v3-turbo";
+const MODEL = "whisper-large-v3";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin":  "*",
@@ -68,6 +68,11 @@ export async function onRequest(context) {
   groqForm.append("model", MODEL);
   groqForm.append("response_format", "verbose_json");
   groqForm.append("timestamp_granularities[]", "segment");
+  // Prompt initial pour biaiser Whisper vers le vocabulaire musical des cours Estelon
+  groqForm.append(
+    "prompt",
+    "Cours de piano en français avec Estelon, coach piano. Vocabulaire technique : accords (majeur, mineur, maj7, min7, min9, maj9, dim, sus2, sus4), voicings, renversements, tritons, tensions et résolutions, degrés (I II V I), gammes (majeure, mineure, harmonique, mélodique, pentatonique), tonalités, modulations, arpèges, ear training, tonedear, métronome, répertoire : Amazing Grace, Abrite-moi, Can't Help Falling in Love."
+  );
   // Pas de 'language' : détection automatique (meilleur pour contenu mixte)
 
   // ── Réponse en streaming SSE avec heartbeats ──

@@ -333,81 +333,6 @@
     .res-title-input::placeholder { color: var(--text3); }
     .res-title-input:focus { border-color: var(--v); }
 
-    /* ── Shorts cards ── */
-    .short-card {
-      border: 1px solid var(--border1);
-      border-radius: 10px;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-      background: var(--bg2);
-      border-left: 4px solid var(--v);
-    }
-    .short-card[data-type="Explication"] { border-left-color: #8B6FE8; }
-    .short-card[data-type="Q&R"]        { border-left-color: #5b8def; }
-    .short-card[data-type="Conseil"]     { border-left-color: #3dd68c; }
-    .short-card[data-type="Démonstration"] { border-left-color: #e8a43b; }
-    .short-card[data-type="Anecdote"]    { border-left-color: #e86b8a; }
-
-    .short-timecode {
-      font-family: var(--mono, 'DM Mono', monospace);
-      font-size: 0.8rem;
-      color: var(--v);
-      margin-bottom: 8px;
-    }
-
-    .short-badge {
-      display: inline-block;
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .06em;
-      padding: 2px 8px;
-      border-radius: 4px;
-      margin-bottom: 8px;
-    }
-    .short-badge[data-type="Explication"] { background: rgba(139,111,232,.15); color: #a48ff0; }
-    .short-badge[data-type="Q&R"]        { background: rgba(91,141,239,.15);  color: #5b8def; }
-    .short-badge[data-type="Conseil"]     { background: rgba(61,214,140,.15);  color: #3dd68c; }
-    .short-badge[data-type="Démonstration"] { background: rgba(232,164,59,.15); color: #e8a43b; }
-    .short-badge[data-type="Anecdote"]    { background: rgba(232,107,138,.15); color: #e86b8a; }
-
-    .short-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text1);
-      margin-bottom: 8px;
-    }
-    .short-passage {
-      background: var(--bg3);
-      border: 1px solid var(--border1);
-      border-radius: 6px;
-      padding: 10px 12px;
-      font-family: 'DM Mono', monospace;
-      font-size: 0.85rem;
-      line-height: 1.6;
-      color: var(--text1);
-      max-height: 160px;
-      overflow-y: auto;
-      margin-bottom: 8px;
-    }
-    .short-reason {
-      font-size: 12px;
-      color: var(--text2);
-      font-style: italic;
-      margin-bottom: 8px;
-    }
-    .short-copy-btn {
-      background: none;
-      border: 1px solid var(--border1);
-      border-radius: 6px;
-      color: var(--text2);
-      font-size: 12px;
-      padding: 4px 10px;
-      cursor: pointer;
-      transition: color .15s, border-color .15s;
-    }
-    .short-copy-btn:hover { color: var(--v); border-color: var(--v); }
-
     /* ── Master Hub mini-header (remplace la nav.js Piano Key) ── */
     .mh-header {
       display: flex;
@@ -595,26 +520,31 @@
              placeholder="Ajouter un titre…"
              oninput="onTitleEdit()">
 
-      <!-- 4 catégories -->
-      <div id="res-cours" style="display:none;margin-bottom:1rem;">
-        <div class="res-section-title">🎹 Cours</div>
-        <div class="res-bullets" id="res-cours-list"></div>
+      <!-- Badge pour entrées d'historique en ancien format -->
+      <div id="res-oldformat" style="display:none;margin-bottom:1rem;padding:8px 12px;background:rgba(232,164,59,0.08);border:1px solid rgba(232,164,59,0.3);border-radius:8px;color:#e8a43b;font-size:12px;">
+        ⚠️ Ancien format (avant v2). Seule la transcription brute est conservée.
       </div>
-      <div id="res-afaire" style="display:none;margin-bottom:1rem;">
-        <div class="res-section-title">✅ À faire</div>
-        <div class="res-bullets" id="res-afaire-list"></div>
+
+      <!-- 5 sections (perspective Estelon) -->
+      <div id="res-objectifs" style="display:none;margin-bottom:1rem;">
+        <div class="res-section-title">🎯 Objectifs de la séance</div>
+        <div class="res-bullets" id="res-objectifs-list"></div>
+      </div>
+      <div id="res-enseignements" style="display:none;margin-bottom:1rem;">
+        <div class="res-section-title">📚 Points enseignés</div>
+        <div class="res-bullets" id="res-enseignements-list"></div>
       </div>
       <div id="res-conseils" style="display:none;margin-bottom:1rem;">
-        <div class="res-section-title">💡 Remarques</div>
+        <div class="res-section-title">💡 Conseils donnés</div>
         <div class="res-bullets" id="res-conseils-list"></div>
       </div>
-      <div id="res-musical" style="display:none;margin-bottom:1rem;">
-        <div class="res-section-title">🎵 Analyse musicale</div>
-        <div class="res-bullets" id="res-musical-list"></div>
+      <div id="res-devoirs" style="display:none;margin-bottom:1rem;">
+        <div class="res-section-title">✅ Devoirs / À travailler</div>
+        <div class="res-bullets" id="res-devoirs-list"></div>
       </div>
-      <div id="res-shorts" style="display:none;margin-bottom:1rem;">
-        <div class="res-section-title">🎬 Shorts</div>
-        <div id="res-shorts-list"></div>
+      <div id="res-observations" style="display:none;margin-bottom:1rem;">
+        <div class="res-section-title">👤 Observations sur l'élève</div>
+        <div class="res-bullets" id="res-observations-list"></div>
       </div>
 
       <!-- Actions -->
@@ -1307,44 +1237,44 @@ async function startJob() {
     let analysisResult
     try {
       analysisResult = await streamClaude({
-        system: `Tu es un assistant qui prend des notes de cours de piano.
-Tu reçois une transcription brute d'une vraie séance.
+        system: `Tu es un assistant qui structure les transcripts de cours de piano d'Estelon, coach piano.
 
-MISSION : extraire uniquement ce qui a été EXPLICITEMENT dit par le professeur. Jamais inventer, jamais généraliser.
+PERSPECTIVE CRITIQUE : tu rédiges DU POINT DE VUE D'ESTELON (le coach, pas l'élève, pas un observateur). Utilise la 2e personne pour parler à Estelon ("Tu as expliqué...", "Tu as demandé à l'élève...") OU la 1re personne ("J'ai expliqué...", "J'ai donné..."). Choisis UNE des deux et garde-la sur tout le résumé.
 
-RÈGLES CRITIQUES :
-- Chaque point doit être une idée SPÉCIFIQUE tirée du cours
-- INTERDIT : conseils évidents ("pratiquer régulièrement", "écouter de la musique", "comprendre les bases")
-- INTERDIT : reformuler en généralités ce qui était précis
-- Si le prof a dit quelque chose de spécifique → garde la précision (ex: "les notes de la mélodie sont souvent dans la gamme du morceau" et non "comprendre la gamme")
-- Maximum 4 bullets par section, 0 répétition
-- Style : note de cours dense, pas rédactionnel
+RÈGLE ABSOLUE D'EXHAUSTIVITÉ : Extraire TOUT ce qui est pédagogiquement utile. AUCUNE limite d'items. Si un cours contient 20 conseils, liste les 20. Le résumé sera envoyé à l'élève comme trace du cours, donc ne rien perdre d'important.
 
-SECTIONS :
+RÈGLE ABSOLUE DE FIDÉLITÉ : Aucune invention. Si ce n'est pas dans le transcript, ne pas l'ajouter. Préserver la terminologie musicale exacte (noms d'accords, gammes, techniques) sans paraphraser.
 
-"cours" → Ce qui a été enseigné/expliqué pendant la séance. Concepts, techniques, théorie abordés. Spécifique.
+DISTINCTION COACH / ÉLÈVE : Quand c'est l'élève qui parle, pose une question ou réagit, ça va UNIQUEMENT dans "observations". Quand c'est toi (Estelon) qui expliques, conseilles, démontres ou donnes un devoir, ça va dans les sections correspondantes.
 
-"afaire" → Devoirs et exercices précis donnés par le prof. Avec le titre du morceau si mentionné.
+STRUCTURE IMPOSÉE — 5 sections :
 
-"remarques" → Observations pertinentes du prof sur le jeu de l'élève, insights musicaux notables, liens entre concepts (ex: "accords de la grille = accords diatoniques de la tonalité"). Uniquement si dit explicitement.
+1. "objectifs" — Ce que la séance visait à travailler (déduis du début du cours ou de ce que tu as annoncé explicitement). 1 à 3 items courts.
 
-"analyse" → Points théoriques ou musicaux avancés soulevés (harmonie, structure, tonalité, style). Spécifique au cours.
+2. "enseignements" — Tout ce que tu as ENSEIGNÉ en profondeur : règles théoriques, démonstrations, principes techniques, concepts musicaux expliqués. Exhaustif.
 
-STRUCTURE JSON (strict, sans markdown) :
+3. "conseils" — Les recommandations précises que tu as données à l'élève ("essaye de...", "attention à...", "plutôt comme ça...", "évite de..."). Différent des enseignements : c'est personnel, orienté pratique immédiate. Exhaustif.
+
+4. "devoirs" — Ce que tu as demandé à l'élève de travailler d'ici la prochaine séance. Formulation impérative ("travailler les min7 chromatiquement", "faire 15 min de Tonedear par jour"). Exhaustif.
+
+5. "observations" — Ce que tu as remarqué sur l'élève pendant la séance : ses progrès, ses blocages, ses questions, ses réactions, sa posture, ses difficultés. Si l'élève a posé une question ou partagé quelque chose, ça va ici. Exhaustif.
+
+FORMAT JSON STRICT (aucun texte hors JSON) :
 {
-  "cours": ["...", "..."],
-  "afaire": ["...", "..."],
-  "remarques": ["...", "..."],
-  "analyse": ["...", "..."]
+  "objectifs": ["...", "..."],
+  "enseignements": ["...", "..."],
+  "conseils": ["...", "..."],
+  "devoirs": ["...", "..."],
+  "observations": ["...", "..."]
 }
 
-Maximum 4 items par tableau. Si rien de pertinent dans une section → tableau vide [].`,
+Chaque item : une phrase claire et complète, pas un fragment. Si une section est vide (ex: pas de devoirs explicites), retourner un tableau vide, pas l'omettre.`,
         messages: [{
           role: 'user',
           content: `Voici la transcription de la séance :\n\n${fullTranscript}`
         }],
         temperature: 0.2,
-        max_tokens: 600
+        max_tokens: 4096
       }, signal)
     } catch (e) {
       throw new Error(`Analyse : ${e.message}`)
@@ -1352,52 +1282,13 @@ Maximum 4 items par tableau. Si rien de pertinent dans une section → tableau v
     const aData = { result: analysisResult }
 
     step('analyze', 'ok', 'Analyse terminée !')
-    pg('Recherche de Shorts…', 90, true)
-
-    // ── Second appel Claude : identification de Shorts ────
-    let shortsRaw = ''
-    try {
-      const shortsPrompt = `Tu es un créateur de contenu spécialisé dans les Shorts YouTube et TikTok (format vertical, max 60 secondes).
-
-Analyse la transcription et identifie entre 2 et 5 passages qui feraient d'excellents Shorts. Critères de sélection :
-- Une explication claire et autonome d'un concept musical (ex: "la différence entre majeur et mineur c'est...")
-- Une question d'élève suivie d'une réponse du prof, naturelle et pédagogique
-- Un moment "aha!" ou une démonstration frappante
-- Un conseil pratique immédiatement applicable
-- Une anecdote ou métaphore mémorable sur la musique
-
-Pour chaque passage identifié, fournis :
-1. Un titre accrocheur (max 60 caractères, style YouTube)
-2. Le timecode de début et de fin au format MM:SS → MM:SS (utilise les timestamps fournis pour trouver le moment exact)
-3. Le passage textuel exact (mot pour mot, ~100-150 mots pour couvrir 45-60 secondes)
-4. Pourquoi ce passage est pertinent pour un Short (1 phrase)
-5. Le type : "Explication" | "Q&R" | "Conseil" | "Démonstration" | "Anecdote"
-
-Si aucun passage ne convient vraiment, dis-le clairement plutôt que de forcer.
-
-Réponds UNIQUEMENT avec un tableau JSON valide, sans texte avant ni après, sans balises markdown, sans backticks. Format exact :
-[
-  { "titre": "...", "timecode": "12:34 → 13:45", "passage": "...", "raison": "...", "type": "Explication" }
-]
-
-Transcription :
-${fullTranscript}`
-
-      shortsRaw = await streamClaude({
-        transcript: shortsPrompt,
-        segments: allSegments,
-        temperature: 0.5,
-        max_tokens: 4096
-      }, signal)
-    } catch(e) { console.warn('Shorts non générés:', e) }
-
     pg('Terminé !', 100)
 
     const filename = totalFiles > 1
       ? `${totalFiles} fichiers (${selectedFiles.map(f => f.name).join(', ')})`
       : selectedFiles[0].name
 
-    setTimeout(() => renderResults(aData.result, filename, shortsRaw), 350)
+    setTimeout(() => renderResults(aData.result, filename), 350)
 
   } catch (err) {
     if (err.name === 'AbortError') return
@@ -1412,76 +1303,33 @@ ${fullTranscript}`
 }
 
 // ── Afficher les résultats ────────────────────────────────────
-function renderResults(raw, filename, shortsRaw) {
+function renderResults(raw, filename) {
   resultName = filename || resultName
 
-  // Parser la réponse — XML balisé (Groq) en priorité, sinon JSON, sinon brut
+  // Masquer le badge "ancien format" si présent d'un reload précédent
+  const oldFmt = document.getElementById('res-oldformat')
+  if (oldFmt) oldFmt.style.display = 'none'
+
+  // Parser la réponse — JSON strict attendu du nouveau prompt
   let data = null
-
-  // Extraction robuste : tag exact, puis tag tronqué (Groq génère parfois
-  // <a_f>...</a_f> au lieu de <a_faire>...</a_faire>)
-  function extractSection(text, tag) {
-    const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i')
-    const match = text.match(regex)
-    if (match) return match[1].trim()
-
-    const shortTag = tag.substring(0, 4)
-    const shortRegex = new RegExp(`<${shortTag}[^>]*>([\\s\\S]*?)<\\/${shortTag}[^>]*>`, 'i')
-    const shortMatch = text.match(shortRegex)
-    if (shortMatch) return shortMatch[1].trim()
-
-    return ''
-  }
-
-  // Normalise les clés du nouveau format JSON (afaire, analyse) vers les
-  // clés canoniques utilisées dans le reste de l'app (a_faire, analyse_musicale)
-  function normalizeKeys(obj) {
-    if (!obj || typeof obj !== 'object') return obj
-    const out = { ...obj }
-    if (Array.isArray(out.afaire) && !out.a_faire) { out.a_faire = out.afaire; delete out.afaire }
-    if (Array.isArray(out.analyse) && !out.analyse_musicale) { out.analyse_musicale = out.analyse; delete out.analyse }
-    if (Array.isArray(out.remarques) && !out.conseils) { out.conseils = out.remarques; delete out.remarques }
-    return out
-  }
-
-  // 1. Tentative JSON (nouveau format) — extraction robuste
   try {
     const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) || raw.match(/(\{[\s\S]*\})/)
     const jsonStr = jsonMatch ? jsonMatch[1] : raw
     const parsed = JSON.parse(jsonStr)
-    if (parsed && typeof parsed === 'object') data = normalizeKeys(parsed)
-  } catch(e) { /* fallback XML ci-dessous */ }
+    if (parsed && typeof parsed === 'object') data = parsed
+  } catch(e) { /* fallback ci-dessous */ }
 
-  // 2. Fallback XML : <cours>, <a_faire>, <conseils>, <analyse_musicale>
+  // Fallback minimal : si parsing JSON échoue, tout mettre dans "enseignements"
   if (!data) {
-    const xmlKeys = ['cours', 'a_faire', 'conseils', 'analyse_musicale']
-    const xmlExtract = {}
-    let xmlFound = false
-    xmlKeys.forEach(key => {
-      const section = extractSection(raw, key)
-      if (section) {
-        xmlFound = true
-        const lines = section.split('\n')
-          .map(l => l.replace(/^\s*[-•*]\s*/, '').trim())
-          .filter(l => l.length > 0)
-        xmlExtract[key] = lines
-      } else {
-        xmlExtract[key] = []
-      }
-    })
-    if (xmlFound) data = xmlExtract
-  }
-
-  // 3. Rien trouvé → dumper brut dans Cours
-  if (!data) {
-    data = { cours: [raw.trim()], a_faire: [], conseils: [], analyse_musicale: [] }
+    data = { objectifs: [], enseignements: [raw.trim()], conseils: [], devoirs: [], observations: [] }
   }
 
   const SECTIONS = [
-    { key: 'cours',            id: 'res-cours',    label: '🎹 Cours' },
-    { key: 'a_faire',          id: 'res-afaire',   label: '✅ À faire' },
-    { key: 'conseils',         id: 'res-conseils', label: '💡 Remarques' },
-    { key: 'analyse_musicale', id: 'res-musical',  label: '🎵 Analyse musicale' },
+    { key: 'objectifs',     id: 'res-objectifs',     label: '🎯 OBJECTIFS DE LA SÉANCE' },
+    { key: 'enseignements', id: 'res-enseignements', label: '📚 POINTS ENSEIGNÉS' },
+    { key: 'conseils',      id: 'res-conseils',      label: '💡 CONSEILS DONNÉS' },
+    { key: 'devoirs',       id: 'res-devoirs',       label: '✅ DEVOIRS / À TRAVAILLER' },
+    { key: 'observations',  id: 'res-observations',  label: '👤 OBSERVATIONS SUR L\'ÉLÈVE' },
   ]
 
   const allLines = []
@@ -1490,53 +1338,19 @@ function renderResults(raw, filename, shortsRaw) {
     const items = Array.isArray(data[key]) ? data[key] : []
     const card  = document.getElementById(id)
     const list  = document.getElementById(id + '-list')
+    card.style.display = 'block'
     if (items.length) {
       list.innerHTML = '<ul>' + items.map(b => `<li contenteditable="true" spellcheck="false" style="outline:none;cursor:text;border-radius:4px;padding:2px 4px;transition:background .15s;" onmouseenter="this.style.background='rgba(139,111,232,0.08)'" onmouseleave="this.style.background=''" oninput="syncResultRaw()">${esc(b)}</li>`).join('') + '</ul>'
-      card.style.display = 'block'
       allLines.push(label)
-      allLines.push(...items.map(b => '\t• ' + b))
+      allLines.push(...items.map(b => '    • ' + b))
       allLines.push('')
     } else {
-      card.style.display = 'none'
+      list.innerHTML = '<p style="color:var(--text3);font-size:12px;font-style:italic;padding:4px 0;">Aucun</p>'
+      allLines.push(label)
+      allLines.push('    • Aucun')
+      allLines.push('')
     }
   })
-
-  // ── Shorts ────────────────────────────────────────────────
-  const shortsCard = document.getElementById('res-shorts')
-  const shortsList = document.getElementById('res-shorts-list')
-  let shortsData = []
-  if (shortsRaw) {
-    try {
-      const sMatch = shortsRaw.match(/```(?:json)?\s*([\s\S]*?)```/) || shortsRaw.match(/(\[[\s\S]*\])/)
-      shortsData = JSON.parse(sMatch ? sMatch[1] : shortsRaw)
-    } catch(e) { shortsData = [] }
-  }
-  if (Array.isArray(shortsData) && shortsData.length) {
-    shortsList.innerHTML = shortsData.map((s, i) => {
-      const t = esc(s.type || 'Explication')
-      const tc = s.timecode ? `<div class="short-timecode">⏱ ${esc(s.timecode)}</div>` : ''
-      return `<div class="short-card" data-type="${t}">
-        <span class="short-badge" data-type="${t}">${t}</span>
-        <div class="short-title">${esc(s.titre || 'Short ' + (i+1))}</div>
-        ${tc}
-        <div class="short-passage" id="short-passage-${i}">${esc(s.passage || '')}</div>
-        <div class="short-reason">${esc(s.raison || '')}</div>
-        <button class="short-copy-btn" onclick="copyShortPassage(${i})">📋 Copier ce passage</button>
-      </div>`
-    }).join('')
-    shortsCard.style.display = 'block'
-    allLines.push('🎬 Shorts')
-    shortsData.forEach((s, i) => {
-      allLines.push(`  ${i+1}. [${s.type || ''}] ${s.titre || ''}`)
-      if (s.timecode) allLines.push(`     ⏱ ${s.timecode}`)
-      allLines.push(`     ${s.passage || ''}`)
-      allLines.push(`     → ${s.raison || ''}`)
-      allLines.push('')
-    })
-    data.shorts = shortsData
-  } else {
-    shortsCard.style.display = 'none'
-  }
 
   // ── Titre pré-rempli avec le nom de fichier sans extension ─
   const titleInput = document.getElementById('res-title')
@@ -1547,7 +1361,7 @@ function renderResults(raw, filename, shortsRaw) {
 
   // ── Texte brut pour copie/DL ──────────────────────────────
   resultRaw = allLines.join('\n') +
-    '\n— Généré par Piano Key Transcripteur · Groq Whisper + Claude'
+    '\n— Généré par Master Hub Transcripteur · Groq Whisper + Gemini'
 
   // ── Afficher ──────────────────────────────────────────────
   document.getElementById('prog-card').style.display   = 'none'
@@ -1623,13 +1437,22 @@ async function loadFromHistory(key) {
   if (!d) return
   currentHistoryKey = key
   resultName = d.filename || '—'
-  if (d.summary) {
+  const isOldFormat = d.summary && !d.summary.objectifs && !d.summary.enseignements
+  if (d.summary && !isOldFormat) {
     renderResults(JSON.stringify(d.summary), d.filename)
-  } else if (d.raw) {
-    resultRaw = d.raw
+  } else {
+    // Ancien format (ou pas de summary) : afficher transcription brute + badge
+    resultRaw = d.raw || ''
     document.getElementById('prog-card').style.display   = 'none'
     document.getElementById('result-card').style.display = 'block'
     document.getElementById('res-fname').textContent = resultName
+    // Masquer les 5 sections nouvelles (pas de data compatible)
+    ;['res-objectifs','res-enseignements','res-conseils','res-devoirs','res-observations'].forEach(id => {
+      const c = document.getElementById(id)
+      if (c) c.style.display = 'none'
+    })
+    const oldFmt = document.getElementById('res-oldformat')
+    if (oldFmt) oldFmt.style.display = isOldFormat ? 'block' : 'none'
   }
 }
 
@@ -1659,9 +1482,11 @@ function onTitleEdit() {
       // Reconstruire le summary depuis le DOM
       const summary = {}
       const SEC = [
-        { key: 'cours', id: 'res-cours' }, { key: 'a_faire', id: 'res-afaire' },
-        { key: 'conseils', id: 'res-conseils' }, { key: 'analyse_musicale', id: 'res-musical' },
-        { key: 'shorts', id: 'res-shorts' },
+        { key: 'objectifs',     id: 'res-objectifs' },
+        { key: 'enseignements', id: 'res-enseignements' },
+        { key: 'conseils',      id: 'res-conseils' },
+        { key: 'devoirs',       id: 'res-devoirs' },
+        { key: 'observations',  id: 'res-observations' },
       ]
       SEC.forEach(({ key, id }) => {
         const card = document.getElementById(id)
@@ -1678,63 +1503,32 @@ function onTitleEdit() {
     } catch(e) { console.warn('Auto-save titre échoué:', e) }
   }, 2000)
 }
-// ── Copier un passage Short ──────────────────────────────────
-async function copyShortPassage(index) {
-  const el = document.getElementById('short-passage-' + index)
-  if (!el) return
-  const text = el.textContent
-  try { await navigator.clipboard.writeText(text) }
-  catch {
-    const t = document.createElement('textarea')
-    t.value = text
-    document.body.appendChild(t); t.select()
-    document.execCommand('copy')
-    document.body.removeChild(t)
-  }
-  const btn = el.parentElement.querySelector('.short-copy-btn')
-  if (btn) { btn.textContent = '✓ Copié !'; setTimeout(() => { btn.textContent = '📋 Copier ce passage' }, 1500) }
-}
-
 function syncResultRaw() {
   const SECTIONS = [
-    { id: 'res-cours',    label: 'Cours' },
-    { id: 'res-afaire',   label: 'À faire' },
-    { id: 'res-conseils', label: 'Remarques' },
-    { id: 'res-musical',  label: 'Analyse musicale' },
+    { id: 'res-objectifs',     label: '🎯 OBJECTIFS DE LA SÉANCE' },
+    { id: 'res-enseignements', label: '📚 POINTS ENSEIGNÉS' },
+    { id: 'res-conseils',      label: '💡 CONSEILS DONNÉS' },
+    { id: 'res-devoirs',       label: '✅ DEVOIRS / À TRAVAILLER' },
+    { id: 'res-observations',  label: '👤 OBSERVATIONS SUR L\'ÉLÈVE' },
   ]
   const allLines = []
   SECTIONS.forEach(({ id, label }) => {
     const card = document.getElementById(id)
     if (!card || card.style.display === 'none') return
     const items = card.querySelectorAll('li')
-    if (!items.length) return
-    allLines.push(label + ' :')
-    items.forEach(li => {
-      const t = li.textContent.trim()
-      if (t) allLines.push('    • ' + t)
-    })
-    allLines.push('')
-  })
-  // Inclure les Shorts dans le texte brut
-  const shortsCard = document.getElementById('res-shorts')
-  if (shortsCard && shortsCard.style.display !== 'none') {
-    const cards = shortsCard.querySelectorAll('.short-card')
-    if (cards.length) {
-      allLines.push('Shorts :')
-      cards.forEach((c, i) => {
-        const title = c.querySelector('.short-title')
-        const passage = c.querySelector('.short-passage')
-        const reason = c.querySelector('.short-reason')
-        const badge = c.querySelector('.short-badge')
-        allLines.push(`  ${i+1}. [${badge ? badge.textContent : ''}] ${title ? title.textContent : ''}`)
-        allLines.push(`     ${passage ? passage.textContent : ''}`)
-        allLines.push(`     → ${reason ? reason.textContent : ''}`)
-        allLines.push('')
+    allLines.push(label)
+    if (!items.length) {
+      allLines.push('    • Aucun')
+    } else {
+      items.forEach(li => {
+        const t = li.textContent.trim()
+        if (t) allLines.push('    • ' + t)
       })
     }
-  }
+    allLines.push('')
+  })
   allLines.push('─────────────────────────')
-  allLines.push('Généré par PianoKey · Groq Whisper + Claude')
+  allLines.push('Généré par Master Hub Transcripteur · Groq Whisper + Gemini')
   resultRaw = allLines.join('\n')
   // Auto-save dans KV après 2s d'inactivité
   clearTimeout(_saveTimer)
