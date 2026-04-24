@@ -1,12 +1,13 @@
 // ─── Sync élèves depuis Google Docs ──────────────────────────────
 // POST /api/eleves/sync — pour chaque élève :
 //  1. Fetch Google Doc (export plain text)
-//  2. 1 appel LLM (Gemini 2.5 Flash → Groq Llama 3.3 fallback)
-//     qui extrait uniquement la DERNIÈRE SÉANCE sous forme
-//     { date, titre, devoirs[], resume[] }
+//  2. Cascade LLM avec mode JSON natif :
+//       Gemini 2.5 Flash (responseMimeType=application/json)
+//     → Groq Llama 3.3 (response_format=json_object)
+//     → Claude Sonnet 4.6 (si ANTHROPIC_API_KEY dispo, sinon skip)
+//     → cache KV stale (si présent) ou 503 avec détails
 //  3. Merge avec KV existant (préserve theorie/progression/canaux/repertoire
-//     injectés par [id].js + PROTECTED_FIELDS pour les éditions manuelles)
-//  4. En cas d'échec LLM : cache KV préservé, élève listé dans llmFailed
+//     de [id].js + PROTECTED_FIELDS pour les éditions manuelles)
 // Auth : header x-admin-secret requis.
 
 const CORS_HEADERS = {
@@ -33,7 +34,6 @@ const DOCS = {
   tara:   '1EKB8q-NeC4C3qt6xhOfS3QN27Ip4zpAU-X4-yWUIjxY',
 };
 
-// Champs jamais écrasés par un re-sync (éditions manuelles via PATCH)
 const PROTECTED_FIELDS = [
   'premier_cours', 'fin_prevue', 'statut', 'programme', 'notes', 'manualDates',
 ];
@@ -42,13 +42,50 @@ function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// ─── LLM providers (Gemini → Groq fallback) ──────────────────────
-function isRetryableError(error) {
-  const msg = String(error?.message || '');
-  return /\b(429|500|502|503|504|UNAVAILABLE|timeout|network|fetch failed)\b/i.test(msg);
+// ─── Prompt ──────────────────────────────────────────────────────
+// Séparé system/user car Gemini utilise systemInstruction et Groq utilise
+// messages[role=system]. Le mot "JSON" apparaît plusieurs fois dans le
+// system (requis par Groq avec response_format=json_object).
+function buildPrompt(studentName) {
+  const currentYear = new Date().getFullYear();
+  const system = `Tu es un extracteur structuré pour les docs Google de suivi d'élèves de piano. Le doc contient un historique de séances séparées par des titres "# DD/MM" ou "# DD/MM/YYYY". Chaque séance peut être formatée différemment : Markdown gras (**Notions enseignées**), émoji + bullets (🎹 résumé du cours :), ou texte libre (A faire :).
+
+Ta tâche : identifier la SÉANCE LA PLUS RÉCENTE et en extraire :
+- date (au format YYYY-MM-DD si l'année est explicite dans le doc, sinon YYYY = année courante ${currentYear})
+- titre court (1-3 mots qui résument le thème principal)
+- devoirs (array de 3-8 strings concis et actionnables)
+- resume (array de 5-8 strings synthétisant les notions enseignées + conseils donnés, fusionnés)
+
+RÈGLES :
+- Reformule de façon SYNTHÉTIQUE (max 12 mots par bullet)
+- Fusionne notions + conseils dans "resume" (pas de doublon)
+- Dans "devoirs" : reformule en impératif court
+- IGNORE les sections "Observations sur l'élève" — elles ne doivent PAS apparaître dans le JSON (notes privées coach)
+- IGNORE l'organisation générale, les accès Telegram/Bonzai/Discord
+- Si la dernière séance n'a pas de devoirs explicites, devoirs = []
+- Si tu vois plusieurs formats dans le même doc, prends quand même UNIQUEMENT la séance la plus récente (date la plus haute)
+- Préserve la terminologie musicale exacte (Maj7, min7, Cmaj7, voicings, gammes relatives, etc.)
+
+FORMAT JSON STRICT — Tu dois répondre UNIQUEMENT avec un objet JSON valide respectant cette structure exacte :
+{
+  "date": "${currentYear}-04-22",
+  "titre": "accords enrichis",
+  "devoirs": ["...", "..."],
+  "resume": ["...", "..."]
 }
 
-async function callGemini(prompt, apiKey, { maxTokens = 1500, temperature = 0.2 } = {}) {
+AUCUN texte hors JSON. Pas de markdown, pas de backticks, pas d'explication.`;
+  const buildUser = (docText) => `Élève : ${studentName}
+
+Contenu du doc :
+---
+${docText.slice(0, 12000)}
+---`;
+  return { system, buildUser };
+}
+
+// ─── LLM providers (JSON natif forcé) ────────────────────────────
+async function callGemini(systemPrompt, userMessage, apiKey, opts = {}) {
   if (!apiKey) throw new Error('GEMINI_API_KEY manquante');
   const resp = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey.trim()}`,
@@ -56,8 +93,13 @@ async function callGemini(prompt, apiKey, { maxTokens = 1500, temperature = 0.2 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: maxTokens, temperature },
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: opts.temperature ?? 0.2,
+          maxOutputTokens: opts.maxTokens || 4000,
+        },
       }),
     }
   );
@@ -71,7 +113,7 @@ async function callGemini(prompt, apiKey, { maxTokens = 1500, temperature = 0.2 
   return text;
 }
 
-async function callGroq(prompt, apiKey, { maxTokens = 1500, temperature = 0.2 } = {}) {
+async function callGroq(systemPrompt, userMessage, apiKey, opts = {}) {
   if (!apiKey) throw new Error('GROQ_API_KEY manquante');
   const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -81,9 +123,13 @@ async function callGroq(prompt, apiKey, { maxTokens = 1500, temperature = 0.2 } 
     },
     body: JSON.stringify({
       model: 'llama-3.3-70b-versatile',
-      temperature,
-      max_tokens: maxTokens,
-      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: opts.temperature ?? 0.2,
+      max_tokens: opts.maxTokens || 4000,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user',   content: userMessage },
+      ],
     }),
   });
   if (!resp.ok) {
@@ -96,86 +142,178 @@ async function callGroq(prompt, apiKey, { maxTokens = 1500, temperature = 0.2 } 
   return text;
 }
 
-async function callLLM(prompt, env, opts, eleveId) {
-  // Gemini primary
-  try {
-    console.log(`[sync.js] eleve=${eleveId} llm=gemini-2.5-flash attempt=1`);
-    return { text: await callGemini(prompt, env.GEMINI_API_KEY, opts), provider: 'gemini-2.5-flash' };
-  } catch (e) {
-    console.log(`[sync.js] eleve=${eleveId} gemini_failed: ${e.message}`);
-    if (!isRetryableError(e)) throw e;
+async function callClaude(systemPrompt, userMessage, apiKey, opts = {}) {
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY manquante');
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey.trim(),
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: opts.maxTokens || 4000,
+      temperature: opts.temperature ?? 0.2,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Claude HTTP ${resp.status}: ${errText.slice(0, 200)}`);
   }
-  // Groq fallback
-  console.log(`[sync.js] eleve=${eleveId} llm=llama-3.3-70b-versatile attempt=2`);
-  return { text: await callGroq(prompt, env.GROQ_API_KEY, opts), provider: 'groq-llama-3.3' };
+  const data = await resp.json();
+  const text = data?.content?.[0]?.text;
+  if (!text) throw new Error('Claude: réponse vide');
+  return text;
 }
 
-// Robust JSON extraction : strip ```json fences, fallback to balanced {...},
-// final sanitization (retire trailing commas)
-function extractJSON(text) {
-  let s = String(text || '').trim();
-  // 1. Strip markdown fences
-  s = s.replace(/^```(?:json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
-  // 2. If balanced {...}, return as-is
-  if (s.startsWith('{') && s.endsWith('}')) return sanitize(s);
-  // 3. Fallback : first '{' to last '}'
+// ─── extractJSON : parsing progressif à 3 niveaux ────────────────
+// 1. JSON.parse direct
+// 2. strip markdown fences + extraction du {...} équilibré
+// 3. sanitize (trailing commas, guillemets typo, commentaires)
+// En cas d'échec total : throw avec head/tail pour debug
+function extractJSON(rawText) {
+  if (!rawText) throw new Error('extractJSON: empty input');
+  const original = String(rawText);
+  let s = original.trim();
+
+  // Niveau 1 : parse direct (cas normal avec JSON natif)
+  try { return JSON.parse(s); } catch (_) {}
+
+  // Niveau 1.5 : retirer les fences markdown
+  const fence = s.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/);
+  if (fence) {
+    try { return JSON.parse(fence[1].trim()); } catch (_) {}
+    s = fence[1].trim();
+  } else {
+    // Fences non closes
+    s = s.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
+  }
+
+  // Niveau 2 : extraire le premier {...} équilibré (ignore texte avant/après)
+  const balanced = extractBalancedJson(s);
+  if (balanced) {
+    try { return JSON.parse(balanced); } catch (_) {}
+    // Niveau 3 : sanitize puis reparse
+    try { return JSON.parse(sanitizeJson(balanced)); } catch (_) {}
+  }
+
+  // Niveau 3b : sanitize sur s direct
+  try { return JSON.parse(sanitizeJson(s)); } catch (_) {}
+
+  // Échec total : erreur explicite avec head/tail pour diagnostic
+  const head = original.slice(0, 200).replace(/\n/g, ' ');
+  const tail = original.length > 200 ? original.slice(-200).replace(/\n/g, ' ') : '';
+  throw new Error(`JSON parse failed after 3 levels. length=${original.length} head="${head}" tail="${tail}"`);
+}
+
+// Extrait le premier bloc {...} équilibré (ignore strings contenant { ou })
+function extractBalancedJson(s) {
   const first = s.indexOf('{');
-  const last = s.lastIndexOf('}');
-  if (first >= 0 && last > first) return sanitize(s.slice(first, last + 1));
-  return s;
+  if (first < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = first; i < s.length; i++) {
+    const c = s[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\') { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === '{') depth++;
+    else if (c === '}') {
+      depth--;
+      if (depth === 0) return s.slice(first, i + 1);
+    }
+  }
+  return null;
 }
 
-function sanitize(s) {
-  // Retire trailing commas (courant avec Groq)
-  return s.replace(/,(\s*[\]}])/g, '$1');
+// Sanitization avant 2e tentative de parse
+function sanitizeJson(s) {
+  let out = s;
+  // 1. Retire les commentaires // (fin de ligne) et /* */
+  out = out.replace(/\/\/[^\n\r]*/g, '');
+  out = out.replace(/\/\*[\s\S]*?\*\//g, '');
+  // 2. Guillemets typographiques → droits
+  out = out.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+  // 3. Trailing commas avant } ou ]
+  out = out.replace(/,(\s*[\]}])/g, '$1');
+  return out;
 }
 
-function safeJsonParse(text) {
-  // Tente parse direct, puis avec sanitization supplémentaire si échec
-  try { return JSON.parse(text); } catch (_) {}
-  try { return JSON.parse(sanitize(text)); } catch (_) {}
-  throw new Error('JSON parse failed after sanitization');
-}
-
-// ─── Extraction : dernière séance uniquement ─────────────────────
+// ─── Cascade LLM : Gemini → Groq → Claude ────────────────────────
 async function extractLatestSession(docText, eleveId, studentName, env) {
-  const currentYear = new Date().getFullYear();
-  const prompt = `Tu es un extracteur structuré pour les docs Google de suivi d'élèves de piano. Le doc contient un historique de séances séparées par des titres "# DD/MM" ou "# DD/MM/YYYY". Chaque séance peut être formatée différemment : Markdown gras (**Notions enseignées**), émoji + bullets (🎹 résumé du cours :), ou texte libre (A faire :).
+  const { system, buildUser } = buildPrompt(studentName);
+  const userMessage = buildUser(docText);
+  const opts = { maxTokens: 4000, temperature: 0.2 };
+  const tried = [];
+  const errors = [];
 
-Ta tâche : identifier la SÉANCE LA PLUS RÉCENTE et en extraire :
-- date (au format YYYY-MM-DD si l'année est explicite dans le doc, sinon YYYY = année courante ${currentYear})
-- titre court (1-3 mots qui résument le thème principal)
-- devoirs (array de 3-8 strings concis et actionnables)
-- resume (array de 5-8 strings synthétisant les notions enseignées + conseils donnés, fusionnés)
+  // Tentative 1 : Gemini (responseMimeType=application/json)
+  if (env.GEMINI_API_KEY) {
+    tried.push('gemini');
+    const t0 = Date.now();
+    let raw = null;
+    try {
+      console.log(`[sync.js] eleve=${eleveId} provider=gemini attempt=start`);
+      raw = await callGemini(system, userMessage, env.GEMINI_API_KEY, opts);
+      console.log(`[sync.js] eleve=${eleveId} provider=gemini raw_response_first200="${raw.slice(0, 200).replace(/\s+/g, ' ')}"`);
+      const parsed = extractJSON(raw);
+      console.log(`[sync.js] eleve=${eleveId} provider=gemini parse=ok duration=${Date.now()-t0}ms`);
+      return { parsed, provider: 'gemini-2.5-flash' };
+    } catch (e) {
+      const detail = raw ? ` raw_response_chars=${raw.length}` : '';
+      console.error(`[sync.js] eleve=${eleveId} provider=gemini error="${e.message}"${detail} duration=${Date.now()-t0}ms`);
+      errors.push({ provider: 'gemini', message: e.message, lastRaw: raw?.slice(0, 200) });
+    }
+  }
 
-RÈGLES :
-- Reformule de façon SYNTHÉTIQUE (max 12 mots par bullet)
-- Fusionne notions + conseils dans "resume" (pas de doublon)
-- Dans "devoirs" : reformule en impératif court
-- IGNORE les sections "Observations sur l'élève" — elles ne doivent PAS apparaître dans le JSON (ce sont des notes privées coach)
-- IGNORE l'organisation générale, les accès Telegram/Bonzai/Discord
-- Si la dernière séance n'a pas de devoirs explicites, devoirs = []
-- Si tu vois plusieurs formats dans le même doc, prends quand même UNIQUEMENT la séance la plus récente (date la plus haute)
-- Préserve la terminologie musicale exacte (Maj7, min7, Cmaj7, voicings, gammes relatives, etc.)
+  // Tentative 2 : Groq (response_format=json_object)
+  if (env.GROQ_API_KEY) {
+    tried.push('groq');
+    const t0 = Date.now();
+    let raw = null;
+    try {
+      console.log(`[sync.js] eleve=${eleveId} provider=groq attempt=start`);
+      raw = await callGroq(system, userMessage, env.GROQ_API_KEY, opts);
+      console.log(`[sync.js] eleve=${eleveId} provider=groq raw_response_first200="${raw.slice(0, 200).replace(/\s+/g, ' ')}"`);
+      const parsed = extractJSON(raw);
+      console.log(`[sync.js] eleve=${eleveId} provider=groq parse=ok duration=${Date.now()-t0}ms`);
+      return { parsed, provider: 'groq-llama-3.3' };
+    } catch (e) {
+      const detail = raw ? ` raw_response_chars=${raw.length}` : '';
+      console.error(`[sync.js] eleve=${eleveId} provider=groq error="${e.message}"${detail} duration=${Date.now()-t0}ms`);
+      errors.push({ provider: 'groq', message: e.message, lastRaw: raw?.slice(0, 200) });
+    }
+  }
 
-FORMAT JSON STRICT — AUCUN TEXTE HORS JSON :
-{
-  "date": "${currentYear}-04-22",
-  "titre": "accords enrichis",
-  "devoirs": ["...", "..."],
-  "resume": ["...", "..."]
-}
+  // Tentative 3 : Claude Sonnet 4.6 (optionnel)
+  if (env.ANTHROPIC_API_KEY) {
+    tried.push('claude');
+    const t0 = Date.now();
+    let raw = null;
+    try {
+      console.log(`[sync.js] eleve=${eleveId} provider=claude attempt=start`);
+      raw = await callClaude(system, userMessage, env.ANTHROPIC_API_KEY, opts);
+      console.log(`[sync.js] eleve=${eleveId} provider=claude raw_response_first200="${raw.slice(0, 200).replace(/\s+/g, ' ')}"`);
+      const parsed = extractJSON(raw);
+      console.log(`[sync.js] eleve=${eleveId} provider=claude parse=ok duration=${Date.now()-t0}ms`);
+      return { parsed, provider: 'claude-sonnet-4-6' };
+    } catch (e) {
+      const detail = raw ? ` raw_response_chars=${raw.length}` : '';
+      console.error(`[sync.js] eleve=${eleveId} provider=claude error="${e.message}"${detail} duration=${Date.now()-t0}ms`);
+      errors.push({ provider: 'claude', message: e.message, lastRaw: raw?.slice(0, 200) });
+    }
+  }
 
-Élève : ${studentName}
-
-Contenu du doc :
----
-${docText.slice(0, 12000)}
----`;
-
-  const { text } = await callLLM(prompt, env, { maxTokens: 1500, temperature: 0.2 }, eleveId);
-  const clean = extractJSON(text);
-  return safeJsonParse(clean);
+  // Tous ont échoué
+  const err = new Error(`All LLM providers failed (${tried.join(' → ')})`);
+  err.tried = tried;
+  err.errors = errors;
+  throw err;
 }
 
 // ─── POST /api/eleves/sync ───────────────────────────────────────
@@ -197,20 +335,33 @@ export async function onRequestPost(context) {
       const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
       const res = await fetch(exportUrl);
       if (!res.ok) {
-        results[name] = { error: `HTTP ${res.status}` };
+        results[name] = { ok: false, error: `HTTP ${res.status}` };
         console.log(`[sync.js] eleve=${name} step=doc_fetch status=${res.status}`);
         continue;
       }
       const docText = await res.text();
 
-      // 2. LLM extraction (Gemini → Groq fallback)
-      let derniere_seance;
+      // 2. LLM cascade (Gemini → Groq → Claude)
+      let extracted;
       try {
-        derniere_seance = await extractLatestSession(docText, name, capitalize(name), env);
+        extracted = await extractLatestSession(docText, name, capitalize(name), env);
       } catch (llmErr) {
-        llmFailed.push(name);
-        results[name] = { error: `LLM unavailable: ${llmErr.message}` };
-        console.log(`[sync.js] eleve=${name} step=llm status=failed duration=${Date.now()-startMs}ms error=${llmErr.message}`);
+        // Tous les LLM ont échoué → ne pas toucher le cache existant (stale préservé)
+        const cacheKey = `eleve:${name}`;
+        const existing = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'json' });
+        llmFailed.push({
+          eleve: name,
+          providers_tried: llmErr.tried || [],
+          errors: (llmErr.errors || []).map(e => ({ provider: e.provider, message: e.message })),
+          has_stale_cache: !!existing,
+        });
+        results[name] = {
+          ok: false,
+          error: 'All LLM providers failed',
+          providers_tried: llmErr.tried || [],
+          stale_cache_available: !!existing,
+        };
+        console.error(`[sync.js] eleve=${name} step=llm_cascade status=all_failed providers=${(llmErr.tried || []).join(',')} stale=${!!existing}`);
         continue;
       }
 
@@ -220,19 +371,19 @@ export async function onRequestPost(context) {
       const docUrl = `https://docs.google.com/document/d/${docId}/edit`;
 
       const updated = {
-        // Préserve tout ce qui existe (theorie, progression, canaux, repertoire, etc.)
+        // Préserve les champs injectés par [id].js (theorie, progression, canaux, etc.)
         ...existing,
-        // Override avec les champs canoniques (une seule fois chacun)
+        // Override canonique (une seule fois chacun)
         id: name,
         nom: capitalize(name),
         doc_id: docId,
         doc_url: docUrl,
-        derniere_seance,
+        derniere_seance: extracted.parsed,
         _syncedAt: new Date().toISOString(),
         _cachedAt: Date.now(),
       };
 
-      // PROTECTED_FIELDS : préserver les éditions manuelles au-dessus de tout
+      // PROTECTED_FIELDS : préserver les éditions manuelles
       for (const field of PROTECTED_FIELDS) {
         if (existing[field] !== undefined) {
           updated[field] = existing[field];
@@ -240,20 +391,30 @@ export async function onRequestPost(context) {
       }
 
       await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated), { expirationTtl: 3600 });
-      results[name] = { ok: true, date: derniere_seance?.date, titre: derniere_seance?.titre };
-      console.log(`[sync.js] eleve=${name} step=done status=ok duration=${Date.now()-startMs}ms date=${derniere_seance?.date}`);
+      results[name] = {
+        ok: true,
+        provider: extracted.provider,
+        date: extracted.parsed?.date,
+        titre: extracted.parsed?.titre,
+      };
+      console.log(`[sync.js] eleve=${name} step=done provider=${extracted.provider} duration=${Date.now()-startMs}ms`);
 
     } catch (e) {
-      results[name] = { error: e.message };
-      console.log(`[sync.js] eleve=${name} unexpected_error=${e.message}`);
+      results[name] = { ok: false, error: e.message };
+      console.error(`[sync.js] eleve=${name} unexpected_error="${e.message}"`);
     }
   }
 
   if (llmFailed.length > 0) {
     return jsonResponse({
       ok: false,
-      error: 'LLM unavailable for some students',
+      error: 'Tous les fournisseurs LLM ont échoué pour certains élèves',
       failed: llmFailed,
+      providers_available: [
+        env.GEMINI_API_KEY ? 'gemini' : null,
+        env.GROQ_API_KEY ? 'groq' : null,
+        env.ANTHROPIC_API_KEY ? 'claude' : null,
+      ].filter(Boolean),
       results,
     }, 503);
   }
