@@ -1,13 +1,15 @@
 // ─── Sync élèves depuis Google Docs ──────────────────────────────
 // POST /api/eleves/sync — pour chaque élève :
 //  1. Fetch Google Doc (export plain text)
-//  2. Cascade LLM avec mode JSON natif :
+//  2. Calcul stats globales par regex (nb_cours, date_debut, date_fin_prevue,
+//     progression_pct) — indépendant du LLM
+//  3. Cascade LLM avec mode JSON natif pour extraire `derniere_seance` :
 //       Gemini 2.5 Flash (responseMimeType=application/json)
 //     → Groq Llama 3.3 (response_format=json_object)
 //     → Claude Sonnet 4.6 (si ANTHROPIC_API_KEY dispo, sinon skip)
 //     → cache KV stale (si présent) ou 503 avec détails
-//  3. Merge avec KV existant (préserve theorie/progression/canaux/repertoire
-//     de [id].js + PROTECTED_FIELDS pour les éditions manuelles)
+//  4. Merge avec KV existant. Dates (premier_cours/fin_prevue) override par le
+//     calcul regex SAUF si existing.manualDates === true (édition manuelle).
 // Auth : header x-admin-secret requis.
 
 const CORS_HEADERS = {
@@ -34,12 +36,91 @@ const DOCS = {
   tara:   '1EKB8q-NeC4C3qt6xhOfS3QN27Ip4zpAU-X4-yWUIjxY',
 };
 
-const PROTECTED_FIELDS = [
-  'premier_cours', 'fin_prevue', 'statut', 'programme', 'notes', 'manualDates',
-];
+// Champs préservés par le `...existing` spread lors du merge (statut, programme,
+// notes, manualDates, theorie, progression calculée, canaux, repertoire, etc.).
+// Les dates (premier_cours, fin_prevue) sont gérées séparément : override par le
+// calcul regex SAUF si existing.manualDates === true (édition manuelle via PATCH).
 
 function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// ─── Stats globales via regex (ne dépend pas du LLM) ─────────────
+// Matche les titres de séance : "# 08/03", "08/03", "22/04/2024", "## 8/3/24"
+// Rejette : "Onglet 1", "Général", "PRATIQUE", "Tab 1" (pas au format JJ/MM)
+const SESSION_TITLE_RE = /^[\s#]*(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s*$/gm;
+
+function parseSessionTitles(docText) {
+  const currentYear = new Date().getFullYear();
+  const out = [];
+  // Reset lastIndex au cas où la regex serait réutilisée (elle a /g)
+  SESSION_TITLE_RE.lastIndex = 0;
+  let m;
+  while ((m = SESSION_TITLE_RE.exec(docText)) !== null) {
+    const jour = parseInt(m[1], 10);
+    const mois = parseInt(m[2], 10);
+    let annee = m[3] ? parseInt(m[3], 10) : currentYear;
+    if (annee < 100) annee += 2000; // "24" → 2024, "26" → 2026
+    if (jour >= 1 && jour <= 31 && mois >= 1 && mois <= 12 && annee >= 2020 && annee <= 2100) {
+      out.push({ jour, mois, annee });
+    }
+  }
+  return out;
+}
+
+const MONTHS_LONG = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+];
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function computeStats(sessions) {
+  if (!sessions.length) {
+    return {
+      nb_cours: 0,
+      date_debut: null,
+      date_debut_label: '—',
+      date_debut_slash: null,
+      date_fin_prevue: null,
+      date_fin_prevue_label: '—',
+      date_fin_prevue_slash: null,
+      progression_pct: 0,
+    };
+  }
+  // Tri chronologique croissant (plus ancienne = première)
+  const sorted = [...sessions].sort((a, b) => {
+    if (a.annee !== b.annee) return a.annee - b.annee;
+    if (a.mois !== b.mois) return a.mois - b.mois;
+    return a.jour - b.jour;
+  });
+  const first = sorted[0];
+  const start = new Date(first.annee, first.mois - 1, first.jour);
+  // Fin prévue = début + 60 jours (programme Piano Master = 2 mois)
+  const end = new Date(start);
+  end.setDate(end.getDate() + 60);
+
+  const isoOf = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const slashOf = d => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+  const labelOf = d => `${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
+
+  const today = new Date();
+  const msPerDay = 86400000;
+  const joursEcoules = Math.floor((today - start) / msPerDay);
+  let progression = Math.round((joursEcoules / 60) * 100);
+  if (progression < 0) progression = 0;
+  if (progression > 100) progression = 100;
+
+  return {
+    nb_cours: sessions.length,
+    date_debut: isoOf(start),
+    date_debut_label: labelOf(start),
+    date_debut_slash: slashOf(start),
+    date_fin_prevue: isoOf(end),
+    date_fin_prevue_label: labelOf(end),
+    date_fin_prevue_slash: slashOf(end),
+    progression_pct: progression,
+  };
 }
 
 // ─── Prompt ──────────────────────────────────────────────────────
@@ -341,7 +422,12 @@ export async function onRequestPost(context) {
       }
       const docText = await res.text();
 
-      // 2. LLM cascade (Gemini → Groq → Claude)
+      // 2. Stats globales via regex (ne dépend pas du LLM)
+      const sessionTitles = parseSessionTitles(docText);
+      const stats = computeStats(sessionTitles);
+      console.log(`[sync.js] eleve=${name} step=stats nb_cours=${stats.nb_cours} debut=${stats.date_debut} progression=${stats.progression_pct}%`);
+
+      // 3. LLM cascade pour derniere_seance uniquement (Gemini → Groq → Claude)
       let extracted;
       try {
         extracted = await extractLatestSession(docText, name, capitalize(name), env);
@@ -365,37 +451,46 @@ export async function onRequestPost(context) {
         continue;
       }
 
-      // 3. Merge avec KV existant (préserve fields de [id].js + PROTECTED_FIELDS)
+      // 4. Merge avec KV existant
       const cacheKey = `eleve:${name}`;
       const existing = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'json' }) || {};
       const docUrl = `https://docs.google.com/document/d/${docId}/edit`;
 
       const updated = {
-        // Préserve les champs injectés par [id].js (theorie, progression, canaux, etc.)
+        // Préserve tout l'existant (theorie, canaux, repertoire, notes, statut, etc.)
         ...existing,
-        // Override canonique (une seule fois chacun)
+        // Overrides canoniques
         id: name,
         nom: capitalize(name),
         doc_id: docId,
         doc_url: docUrl,
         derniere_seance: extracted.parsed,
+        // Bloc stats complet (schéma nouveau)
+        stats,
+        // Clés top-level pour compat avec le client actuel (bandeau ctx-bar)
+        sessionCount: stats.nb_cours,
+        progression: stats.progression_pct,
         _syncedAt: new Date().toISOString(),
         _cachedAt: Date.now(),
       };
 
-      // PROTECTED_FIELDS : préserver les éditions manuelles
-      for (const field of PROTECTED_FIELDS) {
-        if (existing[field] !== undefined) {
-          updated[field] = existing[field];
-        }
+      // Dates : override par le calcul regex SAUF si l'utilisateur a édité
+      // manuellement via la date-picker UI (flag manualDates === true).
+      // En l'absence de sessions détectées, on conserve les valeurs existantes.
+      if (existing.manualDates !== true) {
+        if (stats.date_debut_slash)      updated.premier_cours = stats.date_debut_slash;
+        if (stats.date_fin_prevue_slash) updated.fin_prevue = stats.date_fin_prevue_slash;
       }
 
       await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated), { expirationTtl: 3600 });
       results[name] = {
         ok: true,
         provider: extracted.provider,
-        date: extracted.parsed?.date,
-        titre: extracted.parsed?.titre,
+        nb_cours: stats.nb_cours,
+        date_debut: stats.date_debut,
+        progression: stats.progression_pct,
+        derniere_seance_date: extracted.parsed?.date,
+        derniere_seance_titre: extracted.parsed?.titre,
       };
       console.log(`[sync.js] eleve=${name} step=done provider=${extracted.provider} duration=${Date.now()-startMs}ms`);
 
