@@ -1,6 +1,13 @@
 // ─── Sync élèves depuis Google Docs ──────────────────────────────
-// POST /api/eleves/sync — parse les docs, résumé via Gemini → Groq, merge KV
-// Auth : header x-admin-secret requis
+// POST /api/eleves/sync — pour chaque élève :
+//  1. Fetch Google Doc (export plain text)
+//  2. 1 appel LLM (Gemini 2.5 Flash → Groq Llama 3.3 fallback)
+//     qui extrait uniquement la DERNIÈRE SÉANCE sous forme
+//     { date, titre, devoirs[], resume[] }
+//  3. Merge avec KV existant (préserve theorie/progression/canaux/repertoire
+//     injectés par [id].js + PROTECTED_FIELDS pour les éditions manuelles)
+//  4. En cas d'échec LLM : cache KV préservé, élève listé dans llmFailed
+// Auth : header x-admin-secret requis.
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -26,9 +33,14 @@ const DOCS = {
   tara:   '1EKB8q-NeC4C3qt6xhOfS3QN27Ip4zpAU-X4-yWUIjxY',
 };
 
+// Champs jamais écrasés par un re-sync (éditions manuelles via PATCH)
 const PROTECTED_FIELDS = [
   'premier_cours', 'fin_prevue', 'statut', 'programme', 'notes', 'manualDates',
 ];
+
+function capitalize(s) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 // ─── LLM providers (Gemini → Groq fallback) ──────────────────────
 function isRetryableError(error) {
@@ -36,7 +48,7 @@ function isRetryableError(error) {
   return /\b(429|500|502|503|504|UNAVAILABLE|timeout|network|fetch failed)\b/i.test(msg);
 }
 
-async function callGemini(prompt, apiKey, { maxTokens = 4096, temperature = 0.2 } = {}) {
+async function callGemini(prompt, apiKey, { maxTokens = 1500, temperature = 0.2 } = {}) {
   if (!apiKey) throw new Error('GEMINI_API_KEY manquante');
   const resp = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey.trim()}`,
@@ -59,7 +71,7 @@ async function callGemini(prompt, apiKey, { maxTokens = 4096, temperature = 0.2 
   return text;
 }
 
-async function callGroq(prompt, apiKey, { maxTokens = 4096, temperature = 0.2 } = {}) {
+async function callGroq(prompt, apiKey, { maxTokens = 1500, temperature = 0.2 } = {}) {
   if (!apiKey) throw new Error('GROQ_API_KEY manquante');
   const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -84,38 +96,89 @@ async function callGroq(prompt, apiKey, { maxTokens = 4096, temperature = 0.2 } 
   return text;
 }
 
-async function callLLM(prompt, env, opts) {
+async function callLLM(prompt, env, opts, eleveId) {
+  // Gemini primary
   try {
-    return await callGemini(prompt, env.GEMINI_API_KEY, opts);
+    console.log(`[sync.js] eleve=${eleveId} llm=gemini-2.5-flash attempt=1`);
+    return { text: await callGemini(prompt, env.GEMINI_API_KEY, opts), provider: 'gemini-2.5-flash' };
   } catch (e) {
-    console.log('[callLLM] Gemini failed:', e.message);
+    console.log(`[sync.js] eleve=${eleveId} gemini_failed: ${e.message}`);
     if (!isRetryableError(e)) throw e;
   }
-  try {
-    return await callGroq(prompt, env.GROQ_API_KEY, opts);
-  } catch (e) {
-    console.log('[callLLM] Groq failed:', e.message);
-    throw e;
-  }
+  // Groq fallback
+  console.log(`[sync.js] eleve=${eleveId} llm=llama-3.3-70b-versatile attempt=2`);
+  return { text: await callGroq(prompt, env.GROQ_API_KEY, opts), provider: 'groq-llama-3.3' };
 }
 
+// Robust JSON extraction : strip ```json fences, fallback to balanced {...},
+// final sanitization (retire trailing commas)
 function extractJSON(text) {
-  let s = String(text).trim();
+  let s = String(text || '').trim();
+  // 1. Strip markdown fences
   s = s.replace(/^```(?:json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
-  if (s.startsWith('{') && s.endsWith('}')) return s;
+  // 2. If balanced {...}, return as-is
+  if (s.startsWith('{') && s.endsWith('}')) return sanitize(s);
+  // 3. Fallback : first '{' to last '}'
   const first = s.indexOf('{');
   const last = s.lastIndexOf('}');
-  if (first >= 0 && last > first) return s.slice(first, last + 1);
+  if (first >= 0 && last > first) return sanitize(s.slice(first, last + 1));
   return s;
 }
 
+function sanitize(s) {
+  // Retire trailing commas (courant avec Groq)
+  return s.replace(/,(\s*[\]}])/g, '$1');
+}
+
+function safeJsonParse(text) {
+  // Tente parse direct, puis avec sanitization supplémentaire si échec
+  try { return JSON.parse(text); } catch (_) {}
+  try { return JSON.parse(sanitize(text)); } catch (_) {}
+  throw new Error('JSON parse failed after sanitization');
+}
+
+// ─── Extraction : dernière séance uniquement ─────────────────────
+async function extractLatestSession(docText, eleveId, studentName, env) {
+  const currentYear = new Date().getFullYear();
+  const prompt = `Tu es un extracteur structuré pour les docs Google de suivi d'élèves de piano. Le doc contient un historique de séances séparées par des titres "# DD/MM" ou "# DD/MM/YYYY". Chaque séance peut être formatée différemment : Markdown gras (**Notions enseignées**), émoji + bullets (🎹 résumé du cours :), ou texte libre (A faire :).
+
+Ta tâche : identifier la SÉANCE LA PLUS RÉCENTE et en extraire :
+- date (au format YYYY-MM-DD si l'année est explicite dans le doc, sinon YYYY = année courante ${currentYear})
+- titre court (1-3 mots qui résument le thème principal)
+- devoirs (array de 3-8 strings concis et actionnables)
+- resume (array de 5-8 strings synthétisant les notions enseignées + conseils donnés, fusionnés)
+
+RÈGLES :
+- Reformule de façon SYNTHÉTIQUE (max 12 mots par bullet)
+- Fusionne notions + conseils dans "resume" (pas de doublon)
+- Dans "devoirs" : reformule en impératif court
+- IGNORE les sections "Observations sur l'élève" — elles ne doivent PAS apparaître dans le JSON (ce sont des notes privées coach)
+- IGNORE l'organisation générale, les accès Telegram/Bonzai/Discord
+- Si la dernière séance n'a pas de devoirs explicites, devoirs = []
+- Si tu vois plusieurs formats dans le même doc, prends quand même UNIQUEMENT la séance la plus récente (date la plus haute)
+- Préserve la terminologie musicale exacte (Maj7, min7, Cmaj7, voicings, gammes relatives, etc.)
+
+FORMAT JSON STRICT — AUCUN TEXTE HORS JSON :
+{
+  "date": "${currentYear}-04-22",
+  "titre": "accords enrichis",
+  "devoirs": ["...", "..."],
+  "resume": ["...", "..."]
+}
+
+Élève : ${studentName}
+
+Contenu du doc :
+---
+${docText.slice(0, 12000)}
+---`;
+
+  const { text } = await callLLM(prompt, env, { maxTokens: 1500, temperature: 0.2 }, eleveId);
+  const clean = extractJSON(text);
+  return safeJsonParse(clean);
+}
+
 // ─── POST /api/eleves/sync ───────────────────────────────────────
-// Comportement :
-//  - Itère sur les 4 élèves
-//  - Chaque élève avec LLM OK → put KV mis à jour
-//  - Chaque élève avec LLM qui casse (Gemini + Groq KO) → tracké dans llmFailed, KV inchangé
-//  - Si au moins un LLM failed → 503 avec { error, failed: [...], results }
-//  - Sinon → 200 avec { success: true, results }
 export async function onRequestPost(context) {
   const { request, env } = context;
 
@@ -128,56 +191,48 @@ export async function onRequestPost(context) {
   const llmFailed = [];
 
   for (const [name, docId] of Object.entries(DOCS)) {
+    const startMs = Date.now();
     try {
+      // 1. Fetch doc
       const exportUrl = `https://docs.google.com/document/d/${docId}/export?format=txt`;
       const res = await fetch(exportUrl);
       if (!res.ok) {
         results[name] = { error: `HTTP ${res.status}` };
+        console.log(`[sync.js] eleve=${name} step=doc_fetch status=${res.status}`);
         continue;
       }
-      const text = await res.text();
-      const parsed = parseStudentDoc(text, name);
+      const docText = await res.text();
 
-      // Résumé des 5 séances les plus récentes via LLM chain
-      let summarized;
+      // 2. LLM extraction (Gemini → Groq fallback)
+      let derniere_seance;
       try {
-        const toSummarize = parsed.seances.slice(-5);
-        summarized = await Promise.all(
-          toSummarize.map(s => summarizeSession(s, env))
-        );
+        derniere_seance = await extractLatestSession(docText, name, capitalize(name), env);
       } catch (llmErr) {
         llmFailed.push(name);
         results[name] = { error: `LLM unavailable: ${llmErr.message}` };
+        console.log(`[sync.js] eleve=${name} step=llm status=failed duration=${Date.now()-startMs}ms error=${llmErr.message}`);
         continue;
       }
-      const older = parsed.seances.slice(0, -5);
-      const allSeances = [...older, ...summarized];
 
+      // 3. Merge avec KV existant (préserve fields de [id].js + PROTECTED_FIELDS)
       const cacheKey = `eleve:${name}`;
       const existing = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'json' }) || {};
+      const docUrl = `https://docs.google.com/document/d/${docId}/edit`;
 
       const updated = {
-        id: name,
-        nom: capitalize(name),
-        programme: 'Piano Master',
-        statut: 'actif',
-        doc_url: `https://docs.google.com/document/d/${docId}/edit`,
-        ...parsed,
+        // Préserve tout ce qui existe (theorie, progression, canaux, repertoire, etc.)
         ...existing,
+        // Override avec les champs canoniques (une seule fois chacun)
         id: name,
         nom: capitalize(name),
-        doc_url: `https://docs.google.com/document/d/${docId}/edit`,
-        sessions: parsed.sessions,
-        seances: allSeances,
-        sessionCount: parsed.sessions.length,
-        lastSession: parsed.sessions[0]?.date || existing.lastSession || null,
-        theoryCovered: parsed.theoryCovered,
-        theorie: parsed.theorie,
-        progression: parsed.progression,
+        doc_id: docId,
+        doc_url: docUrl,
+        derniere_seance,
         _syncedAt: new Date().toISOString(),
         _cachedAt: Date.now(),
       };
 
+      // PROTECTED_FIELDS : préserver les éditions manuelles au-dessus de tout
       for (const field of PROTECTED_FIELDS) {
         if (existing[field] !== undefined) {
           updated[field] = existing[field];
@@ -185,154 +240,22 @@ export async function onRequestPost(context) {
       }
 
       await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated), { expirationTtl: 3600 });
-      results[name] = { ok: true, sessions: parsed.sessions.length };
+      results[name] = { ok: true, date: derniere_seance?.date, titre: derniere_seance?.titre };
+      console.log(`[sync.js] eleve=${name} step=done status=ok duration=${Date.now()-startMs}ms date=${derniere_seance?.date}`);
 
     } catch (e) {
       results[name] = { error: e.message };
+      console.log(`[sync.js] eleve=${name} unexpected_error=${e.message}`);
     }
   }
 
   if (llmFailed.length > 0) {
-    return jsonResponse({ error: 'LLM unavailable', failed: llmFailed, results }, 503);
+    return jsonResponse({
+      ok: false,
+      error: 'LLM unavailable for some students',
+      failed: llmFailed,
+      results,
+    }, 503);
   }
-  return jsonResponse({ success: true, results });
-}
-
-// ─── RÉSUMÉ SÉANCE via LLM chain ─────────────────────────────────
-async function summarizeSession(session, env) {
-  const contentLines = [
-    session.contenu?.length  ? 'Contenu : ' + session.contenu.join(' / ')  : '',
-    session.devoirs?.length  ? 'Devoirs : ' + session.devoirs.join(' / ')  : '',
-    session.conseils?.length ? 'Conseils : ' + session.conseils.join(' / ') : '',
-    session.rappels?.length  ? 'Rappels : ' + session.rappels.join(' / ')  : '',
-  ].filter(Boolean).join('\n');
-
-  if (!contentLines.trim()) return session;
-
-  const prompt = `Voici les notes d'une séance de piano du ${session.date}.
-Résume en 2-4 points courts sans redites, en français, style télégraphique.
-Sépare contenu travaillé et devoirs s'ils sont distincts.
-Retourne UNIQUEMENT un JSON : { "contenu": ["...", "..."], "devoirs": ["...", "..."] }
-
-Notes brutes :
-${contentLines}`;
-
-  const text = await callLLM(prompt, env, { maxTokens: 300, temperature: 0.3 });
-  const clean = extractJSON(text);
-  const summary = JSON.parse(clean);
-
-  return {
-    ...session,
-    focus: summary.contenu?.[0] || session.focus,
-    contenu: summary.contenu || session.contenu,
-    devoirs: summary.devoirs || session.devoirs,
-    summarized: true,
-  };
-}
-
-// ─── PARSER ──────────────────────────────────────────────────────
-function parseStudentDoc(text, studentName) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  const sessionRegex = /^(\d{1,2}\/\d{2}|Tab\s+\d+)$/i;
-
-  const sessions = [];
-  let currentSession = null;
-  let currentSection = null;
-
-  for (const line of lines) {
-    if (sessionRegex.test(line)) {
-      if (currentSession) sessions.push(currentSession);
-      currentSession = {
-        date: line,
-        devoirs: [],
-        conseils: [],
-        rappels: [],
-        contenu: [],
-        raw: [],
-      };
-      currentSection = null;
-      continue;
-    }
-
-    if (!currentSession) continue;
-
-    const lower = line.toLowerCase();
-    if (lower.startsWith('a faire') || lower.startsWith('à faire')) {
-      currentSection = 'devoirs';
-      continue;
-    }
-    if (lower.startsWith('conseils')) {
-      currentSection = 'conseils';
-      continue;
-    }
-    if (lower.startsWith('rappels')) {
-      currentSection = 'rappels';
-      continue;
-    }
-
-    if (line.startsWith('Général') || line.startsWith('PRATIQUE')) {
-      currentSection = null;
-      continue;
-    }
-
-    if (currentSection && (line.startsWith('-') || line.startsWith('•') || line.startsWith('*'))) {
-      const item = line.replace(/^[-•*]\s*/, '').trim();
-      if (item) currentSession[currentSection].push(item);
-    } else if (currentSection) {
-      currentSession[currentSection].push(line);
-    } else {
-      if (line.startsWith('-') || line.startsWith('•') || line.startsWith('*')) {
-        const item = line.replace(/^[-•*]\s*/, '').trim();
-        if (item) currentSession.contenu.push(item);
-      }
-    }
-  }
-
-  if (currentSession) sessions.push(currentSession);
-
-  sessions.reverse();
-
-  const seances = sessions.map(s => ({
-    date: s.date,
-    focus: s.contenu[0] || s.devoirs[0] || s.date,
-    contenu: s.contenu.length ? s.contenu : [...s.conseils, ...s.rappels],
-    devoirs: s.devoirs,
-  }));
-
-  // ─── THÉORIE COUVERTE ──────────────────────────────────────────
-  const fullText = text.toLowerCase();
-  const THEORY_MILESTONES = [
-    { key: 'posture',       label: 'Posture & installation',       keywords: ['posture', 'position'] },
-    { key: 'notes',         label: 'Lecture de notes',             keywords: ['notes', 'lecture', 'module 1', 'module 2'] },
-    { key: 'gammes',        label: 'Gammes majeures / mineures',  keywords: ['gamme', 'gammes', 'module 3'] },
-    { key: 'intervalles',   label: 'Intervalles',                  keywords: ['intervalle', 'intervalles', 'module 4'] },
-    { key: 'degres',        label: 'Système des degrés',          keywords: ['degrés', 'degre', 'degré', 'module 4'] },
-    { key: 'accords',       label: 'Accords & grilles',           keywords: ['accord', 'triade', 'grille', 'module 5'] },
-    { key: 'renversements', label: "Renversements d'accords",     keywords: ['renversement', 'module 5'] },
-    { key: 'enrichis',      label: 'Accords enrichis',            keywords: ['enrichi', 'maj7', 'min7', 'dom7', 'module 6'] },
-    { key: 'eartraining',   label: 'Ear training',                keywords: ['ear training', 'oreille', 'tonedear'] },
-    { key: 'arpeges',       label: 'Arpèges',                     keywords: ['arpège', 'arpege', 'arpèges'] },
-  ];
-
-  const theoryCovered = {};
-  let coveredCount = 0;
-  const theorie = [];
-
-  for (const milestone of THEORY_MILESTONES) {
-    const found = milestone.keywords.some(kw => fullText.includes(kw));
-    theoryCovered[milestone.key] = found;
-    if (found) coveredCount++;
-    theorie.push({
-      label: milestone.label,
-      statut: found ? 'done' : 'todo',
-    });
-  }
-
-  const progression = Math.round((coveredCount / THEORY_MILESTONES.length) * 100);
-
-  return { sessions, seances: seances.reverse(), theoryCovered, theorie, progression };
-}
-
-function capitalize(s) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
+  return jsonResponse({ ok: true, success: true, results });
 }

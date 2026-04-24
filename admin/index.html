@@ -414,35 +414,58 @@
       margin-bottom: 2px;
     }
 
-    /* ── Session head (card 1) ─────────────────────────────── */
-    .session-head {
-      display: flex;
-      align-items: baseline;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: -4px;
-    }
-    .session-date {
-      font-size: 12.5px;
+    /* ── Carte Dernière séance ─────────────────────────────── */
+    .ds-date-pill {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--text3);
       font-family: 'DM Mono', monospace;
-      color: var(--text3);
-      text-transform: uppercase;
-      letter-spacing: .04em;
-      flex-shrink: 0;
+      text-transform: none;
+      letter-spacing: 0;
+      font-weight: 500;
     }
-    .session-sep {
-      color: var(--text3);
-    }
-    .session-focus {
-      font-size: 17px;
-      font-weight: 600;
+    .ds-title {
+      font-size: 18px;
+      font-weight: 700;
       color: var(--text1);
       line-height: 1.3;
+      margin-top: 2px;
+      margin-bottom: 2px;
     }
-    @media (max-width: 500px) {
-      .session-head { flex-direction: column; align-items: flex-start; gap: 2px; }
-      .session-sep { display: none; }
+    .ds-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
     }
+    .ds-section-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .ds-section.devoirs .ds-section-label { color: var(--green); }
+    .ds-doc-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 14px;
+      padding: 8px 14px;
+      border: 1px solid var(--v);
+      border-radius: 8px;
+      color: var(--v);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      align-self: flex-start;
+      transition: background .15s;
+    }
+    .ds-doc-btn:hover { background: var(--v-dim); }
 
     .bullets {
       list-style: none;
@@ -470,55 +493,6 @@
       font-size: 12.5px;
       color: var(--text3);
       font-style: italic;
-    }
-
-    /* ── Toggle previous sessions ──────────────────────────── */
-    .toggle-link {
-      align-self: flex-start;
-      margin-top: 4px;
-      color: var(--v);
-      font-size: 12.5px;
-      cursor: pointer;
-      text-decoration: none;
-      background: none;
-      border: none;
-      font-family: inherit;
-      padding: 0;
-    }
-    .toggle-link:hover { color: var(--v-soft); text-decoration: underline; }
-
-    .previous-sessions {
-      margin-top: 6px;
-      padding-top: 14px;
-      border-top: 1px solid var(--border);
-      display: none;
-      flex-direction: column;
-      gap: 16px;
-    }
-    .previous-sessions.open { display: flex; }
-
-    .prev-session-item {
-      display: flex;
-      gap: 12px;
-    }
-    .prev-session-item .dot {
-      width: 24px; height: 24px; border-radius: 50%;
-      background: var(--bg3);
-      border: 1.5px solid var(--border);
-      display: grid; place-items: center;
-      color: var(--text3);
-      font-size: 10px; font-family: 'DM Mono', monospace;
-      flex-shrink: 0;
-    }
-    .prev-session-item .body { flex: 1; min-width: 0; }
-    .prev-session-item .date {
-      font-size: 11.5px; color: var(--text3);
-      font-family: 'DM Mono', monospace;
-      margin-bottom: 4px;
-    }
-    .prev-session-item .focus {
-      font-size: 13px; color: var(--text1);
-      font-weight: 600; margin-bottom: 6px;
     }
 
     /* ── Théorie grid ──────────────────────────────────────── */
@@ -830,6 +804,27 @@ function showError(message, details) {
   `;
 }
 
+function fmtSessionDate(raw) {
+  if (!raw) return '—';
+  // ISO : YYYY-MM-DD
+  const mIso = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (mIso) {
+    const [, y, m, d] = mIso;
+    const mi = parseInt(m, 10) - 1;
+    if (mi < 0 || mi > 11) return raw;
+    return `${parseInt(d, 10)} ${MONTHS_SHORT[mi]} ${y}`;
+  }
+  // JJ/MM/YYYY
+  const mSlash = String(raw).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (mSlash) {
+    const [, d, m, y] = mSlash;
+    const mi = parseInt(m, 10) - 1;
+    if (mi < 0 || mi > 11) return raw;
+    return `${parseInt(d, 10)} ${MONTHS_SHORT[mi]} ${y}`;
+  }
+  return raw;
+}
+
 function renderProfile(s) {
   renderCtx(s);
 
@@ -837,17 +832,23 @@ function renderProfile(s) {
   const theorie = s.theorie || [];
   const repertoire = s.repertoire || [];
 
-  // Dernière séance = dernier index (seances triées ancienne → récente par les workers)
-  const lastIdx = seances.length - 1;
-  const last = lastIdx >= 0 ? seances[lastIdx] : null;
-  const lastDateRaw = last ? String(last.date || '') : '';
-  const lastDateDisplay = /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(lastDateRaw) ? fmtDateLong(lastDateRaw) : (lastDateRaw || '—');
-  const lastContenu = last ? (last.contenu || []) : [];
-  const previousSeances = lastIdx > 0 ? seances.slice(0, lastIdx) : [];
+  // Dernière séance : priorité au champ `derniere_seance` (sync.js v2),
+  // fallback sur seances[last] (ancien schéma [id].js)
+  let ds = s.derniere_seance || null;
+  if (!ds && seances.length) {
+    const last = seances[seances.length - 1];
+    ds = {
+      date: last?.date || '',
+      titre: last?.focus || '',
+      devoirs: Array.isArray(last?.devoirs) ? last.devoirs : [],
+      resume: Array.isArray(last?.contenu) ? last.contenu : [],
+    };
+  }
+  const docUrl = s.doc_url || '';
 
   // À préparer
   const theorieInProgress = theorie.filter(t => t.statut === 'in-progress');
-  const lastDevoirs = last && Array.isArray(last.devoirs) ? last.devoirs : [];
+  const lastDevoirs = Array.isArray(ds?.devoirs) ? ds.devoirs : [];
   const devoirsRecurrents = lastDevoirs.length > 0 ? lastDevoirs : ['Tonedear (ear training)'];
   const repertoireActif = repertoire.filter(r => r.statut === 'en-cours');
 
@@ -881,30 +882,27 @@ function renderProfile(s) {
     <div class="card-grid">
       <!-- ══ CARD 1 : DERNIÈRE SÉANCE ═══════════════════════════ -->
       <div class="card">
-        <div class="card-title">📋 Dernière séance</div>
-        <div class="session-head">
-          <span class="session-date">${escapeHtml(lastDateDisplay)}</span>
-          ${last && last.focus ? `<span class="session-sep">·</span><span class="session-focus">${escapeHtml(last.focus)}</span>` : ''}
+        <div class="card-title">
+          📋 Dernière séance
+          ${ds?.date ? `<span class="ds-date-pill">${escapeHtml(fmtSessionDate(ds.date))}</span>` : ''}
         </div>
-        ${lastContenu.length === 0
-          ? '<p class="empty-note">Aucun contenu renseigné.</p>'
-          : `<ul class="bullets">${lastContenu.map(c => `<li>${escapeHtml(c)}</li>`).join('')}</ul>`
-        }
-        ${previousSeances.length > 0 ? `
-          <button type="button" class="toggle-link" id="togglePrevBtn" onclick="togglePreviousSessions()">voir ${previousSeances.length} séances précédentes ↓</button>
-          <div class="previous-sessions" id="previousSessions">
-            ${[...previousSeances].reverse().map((sess, i) => `
-              <div class="prev-session-item">
-                <div class="dot">${previousSeances.length - i}</div>
-                <div class="body">
-                  <div class="date">${escapeHtml(sess.date || '')}</div>
-                  ${sess.focus ? `<div class="focus">${escapeHtml(sess.focus)}</div>` : ''}
-                  ${(sess.contenu && sess.contenu.length) ? `<ul class="bullets muted">${sess.contenu.map(c => `<li>${escapeHtml(c)}</li>`).join('')}</ul>` : ''}
-                </div>
-              </div>
-            `).join('')}
+        ${ds?.titre ? `<div class="ds-title">${escapeHtml(ds.titre)}</div>` : ''}
+        ${(ds?.devoirs && ds.devoirs.length) ? `
+          <div class="ds-section devoirs">
+            <div class="ds-section-label">✅ Devoirs</div>
+            <ul class="bullets">${ds.devoirs.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>
           </div>
         ` : ''}
+        ${(ds?.resume && ds.resume.length) ? `
+          <div class="ds-section resume">
+            <div class="ds-section-label">📚 Résumé du cours</div>
+            <ul class="bullets">${ds.resume.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
+          </div>
+        ` : ''}
+        ${!ds || (!ds.devoirs?.length && !ds.resume?.length && !ds.titre)
+          ? '<p class="empty-note">Pas encore de séance synchronisée — clique sur 🔄 Sync All.</p>'
+          : ''}
+        ${docUrl ? `<a href="${escapeHtml(docUrl)}" target="_blank" rel="noopener" class="ds-doc-btn">📄 Voir le doc complet ↗</a>` : ''}
       </div>
 
       <!-- ══ CARD 2 : À PRÉPARER ═══════════════════════════════ -->
@@ -1002,15 +1000,6 @@ function renderProfile(s) {
   });
 }
 
-function togglePreviousSessions() {
-  const el = document.getElementById('previousSessions');
-  const btn = document.getElementById('togglePrevBtn');
-  if (!el || !btn) return;
-  const open = el.classList.toggle('open');
-  const n = el.querySelectorAll('.prev-session-item').length;
-  btn.innerHTML = open ? 'masquer les séances précédentes ↑' : `voir ${n} séances précédentes ↓`;
-}
-window.togglePreviousSessions = togglePreviousSessions;
 
 async function selectStudent(id, forceSync = false) {
   activeId = id;
