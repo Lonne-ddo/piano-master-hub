@@ -333,6 +333,62 @@
     .res-title-input::placeholder { color: var(--text3); }
     .res-title-input:focus { border-color: var(--v); }
 
+    /* ── Per-file progress bars (transcription parallèle) ── */
+    .pf-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+    .pf-name {
+      flex: 0 0 auto;
+      max-width: 40%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text2);
+      font-family: 'DM Mono', monospace;
+    }
+    .pf-track {
+      flex: 1;
+      height: 4px;
+      background: var(--bg3);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .pf-fill {
+      height: 100%;
+      background: var(--v);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .pf-fill.ok   { background: #3dd68c; }
+    .pf-fill.fail { background: #e05c6b; }
+    .pf-status {
+      flex: 0 0 auto;
+      font-size: 11px;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      min-width: 90px;
+      text-align: right;
+    }
+    .pf-retry {
+      background: none;
+      border: 1px solid var(--border1);
+      color: var(--text2);
+      font-size: 10.5px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 4px;
+    }
+    .pf-retry:hover { border-color: var(--v); color: var(--v); }
+
+    /* ── Section dynamique (sections adaptatives) ── */
+    .res-section { margin-bottom: 1rem; }
+
     /* ── Master Hub mini-header (remplace la nav.js Piano Key) ── */
     .mh-header {
       display: flex;
@@ -481,7 +537,10 @@
         </div>
       </div>
 
-      <!-- Barre -->
+      <!-- Barres par fichier (multi-upload uniquement) -->
+      <div id="per-file-bars" style="display:none;margin-bottom:12px;"></div>
+
+      <!-- Barre globale -->
       <div class="pg-head">
         <span class="pg-label" id="pg-label">Initialisation…</span>
         <span class="pg-pct"   id="pg-pct">0 %</span>
@@ -520,32 +579,18 @@
              placeholder="Ajouter un titre…"
              oninput="onTitleEdit()">
 
-      <!-- Badge pour entrées d'historique en ancien format -->
+      <!-- Badge pour entrées d'historique en ancien format (pré-v2) -->
       <div id="res-oldformat" style="display:none;margin-bottom:1rem;padding:8px 12px;background:rgba(232,164,59,0.08);border:1px solid rgba(232,164,59,0.3);border-radius:8px;color:#e8a43b;font-size:12px;">
         ⚠️ Ancien format (avant v2). Seule la transcription brute est conservée.
       </div>
 
-      <!-- 5 sections (perspective Estelon) -->
-      <div id="res-objectifs" style="display:none;margin-bottom:1rem;">
-        <div class="res-section-title">🎯 Objectifs de la séance</div>
-        <div class="res-bullets" id="res-objectifs-list"></div>
+      <!-- Badge multi-parts -->
+      <div id="res-multiparts" style="display:none;margin-bottom:1rem;padding:6px 10px;background:rgba(139,111,232,0.1);border:1px solid rgba(139,111,232,0.3);border-radius:8px;color:var(--v);font-size:11px;font-family:'DM Mono',monospace;">
+        <span id="res-multiparts-label"></span>
       </div>
-      <div id="res-enseignements" style="display:none;margin-bottom:1rem;">
-        <div class="res-section-title">📚 Points enseignés</div>
-        <div class="res-bullets" id="res-enseignements-list"></div>
-      </div>
-      <div id="res-conseils" style="display:none;margin-bottom:1rem;">
-        <div class="res-section-title">💡 Conseils donnés</div>
-        <div class="res-bullets" id="res-conseils-list"></div>
-      </div>
-      <div id="res-devoirs" style="display:none;margin-bottom:1rem;">
-        <div class="res-section-title">✅ Devoirs / À travailler</div>
-        <div class="res-bullets" id="res-devoirs-list"></div>
-      </div>
-      <div id="res-observations" style="display:none;margin-bottom:1rem;">
-        <div class="res-section-title">👤 Observations sur l'élève</div>
-        <div class="res-bullets" id="res-observations-list"></div>
-      </div>
+
+      <!-- Sections adaptatives (rendues dynamiquement) -->
+      <div id="res-sections"></div>
 
       <!-- Actions -->
       <div class="res-actions">
@@ -674,14 +719,17 @@ async function streamClaude(payload, signal) {
 const ADMIN_SECRET = '4697'
 
 // ── État ─────────────────────────────────────────────────────
-let selectedFiles   = []     // Fichiers sélectionnés
+let selectedFiles   = []     // Fichiers sélectionnés (triés par nom)
 let fileOffsets     = []     // Offsets cumulés (secondes) — lus depuis la durée audio
+let fileDurations   = []     // Durées individuelles (secondes)
+let totalDuration   = 0      // Durée totale cumulée (secondes)
 let offsetsReady    = false  // Flag : offsets calculés pour selectedFiles actuel
 let abortController = null   // AbortController (annulation)
 let currentStep     = null   // Étape courante pour marquage erreur
 let resultRaw       = ''     // Texte pour copie/DL
 let resultName      = ''     // Nom fichier courant
 let currentHistoryKey = null
+let renderMeta      = null   // { partsCount, partsNames, totalDurationSec, transcript }
 const historyRegistry = {}
 
 // ── MIME ─────────────────────────────────────────────────────
@@ -739,8 +787,9 @@ function handleFiles(fileList) {
     if (!dup) newFiles.push(f)
   }
 
-  // Ajout cumulatif (ne remplace plus la sélection précédente)
+  // Ajout cumulatif + tri automatique par nom (tri naturel : part02 < part10)
   selectedFiles = [...selectedFiles, ...newFiles]
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr', { numeric: true }))
   refreshFileUI()
   refreshOffsets()
 }
@@ -776,7 +825,9 @@ function refreshFileUI() {
     fi.style.display = 'flex'
     document.getElementById('file-emoji').textContent = fileEmoji(f.name)
     document.getElementById('file-name').textContent  = f.name
-    document.getElementById('file-size').textContent  = fmtSize(f.size)
+    const sizeStr = fmtSize(f.size)
+    const durStr  = offsetsReady && fileDurations[0] ? ` · ${formatTime(fileDurations[0])}` : ''
+    document.getElementById('file-size').textContent  = sizeStr + durStr
   } else {
     document.getElementById('drop-icon').textContent = '🎶'
     document.getElementById('drop-title').textContent = selectedFiles.length + ' fichiers sélectionnés'
@@ -785,8 +836,9 @@ function refreshFileUI() {
     fi.style.display = 'flex'
     document.getElementById('file-emoji').textContent = '🎶'
     document.getElementById('file-name').textContent  = selectedFiles.length + ' fichiers'
-    document.getElementById('file-size').textContent  =
-      fmtSize(selectedFiles.reduce((s, f) => s + f.size, 0)) + ' total'
+    const totalSize = fmtSize(selectedFiles.reduce((s, f) => s + f.size, 0))
+    const totalDurStr = offsetsReady && totalDuration > 0 ? ` · Durée totale ${formatTime(totalDuration)}` : ''
+    document.getElementById('file-size').textContent  = totalSize + ' total' + totalDurStr
   }
 
   renderFileList()
@@ -839,30 +891,34 @@ function clearFile() {
 }
 
 function checkReady() {
-  document.getElementById('btn-go').disabled = !selectedFiles.length
+  const btn = document.getElementById('btn-go')
+  btn.disabled = !selectedFiles.length
+  if (selectedFiles.length <= 1) {
+    btn.textContent = 'Analyser →'
+  } else {
+    btn.textContent = `Analyser ${selectedFiles.length} fichiers →`
+  }
 }
 
 // ── Transcription via Worker /api/transcribe ─────────────────
 // La clé Groq est lue côté serveur depuis env.GROQ_API_KEY (Cloudflare).
 // Ne jamais écrire la clé ici — tout appel audio passe par le proxy Worker.
 
-async function transcribeFile(file) {
+async function transcribeFile(file, onProgress = () => {}) {
   const ext = file.name.split('.').pop().toLowerCase()
   const validExts = ['mp3', 'mp4', 'm4a', 'wav', 'ogg', 'webm']
   if (!validExts.includes(ext)) {
-    throw new Error('Format non supporté. Utilise MP3, MP4, M4A, WAV ou OGG.')
+    throw new Error('Format non supporté. Utilise MP3, MP4, M4A, WAV, OGG ou WEBM.')
   }
   if (file.size > 200 * 1024 * 1024) {
-    throw new Error('Fichier trop grand (max 200MB).')
+    throw new Error('Fichier trop grand (max 200 MB).')
   }
-  step('transcribe', 'run', 'Préparation du fichier audio…')
-  pg('Préparation…', 20, true)
+  onProgress(10, 'Préparation…')
   let audioFile = file
   // Si MP4 ou webm → extraire l'audio en WAV via Web Audio API
   if (ext === 'mp4' || ext === 'webm') {
     try {
-      step('transcribe', 'run', 'Extraction audio du MP4…')
-      pg('Extraction audio…', 30, true)
+      onProgress(25, 'Extraction audio…')
       audioFile = await extractAudioFromVideo(file)
     } catch(e) {
       throw new Error('Impossible d\'extraire l\'audio : ' + e.message)
@@ -871,19 +927,34 @@ async function transcribeFile(file) {
   // Vérifier taille après extraction
   if (audioFile.size > 25 * 1024 * 1024) {
     throw new Error(
-      'Audio trop long (max ~90 min). ' +
-      'Découpe ton fichier en parties plus courtes.'
+      'Audio trop long (max ~90 min). Découpe en parties plus courtes.'
     )
   }
-  step('transcribe', 'run', 'Transcription en cours…')
-  pg('Transcription en cours…', 50, true)
+  onProgress(50, 'Transcription Groq…')
   const formData = new FormData()
   formData.append('file', audioFile,
     audioFile.name || file.name.replace(/\.[^.]+$/, '.wav'))
-  formData.append('model', 'whisper-large-v3-turbo')
+  formData.append('model', 'whisper-large-v3')
   formData.append('response_format', 'verbose_json')
   formData.append('language', 'fr')
-  return await transcribeWithRetry(formData)
+  return await transcribeWithFallback(formData, onProgress)
+}
+
+// Wrapper avec retry 2× + backoff 3s/6s avant de propager l'erreur.
+// Le fallback AssemblyAI (dans transcribeWithFallback) gère 429 sans retry.
+async function transcribeFileWithRetry(file, onProgress) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await transcribeFile(file, onProgress)
+    } catch (err) {
+      if (err.name === 'AbortError') throw err
+      const retryable = /timeout|network|fetch failed|503|504|ECONN|NetworkError/i.test(err.message)
+      if (!retryable || attempt === 3) throw err
+      const wait = attempt === 1 ? 3000 : 6000
+      onProgress(15, `Retry ${attempt}/2 dans ${wait / 1000}s…`)
+      await sleep(wait)
+    }
+  }
 }
 
 // ── Lecture du flux SSE renvoyé par /api/transcribe ──
@@ -930,10 +1001,11 @@ async function streamTranscribe(formData) {
   return result
 }
 
-// ── Tentative Groq unique, fallback immédiat sur AssemblyAI ─────
+// ── Tentative Groq avec fallback AssemblyAI ───────────────────────
 // Retourne { text, segments } — segments peut être [] si fallback AssemblyAI
-async function transcribeWithRetry(formData) {
+async function transcribeWithFallback(formData, onProgress = () => {}) {
   try {
+    onProgress(55, 'Groq Whisper…')
     const data = await streamTranscribe(formData)
 
     // Erreur applicative renvoyée dans l'event SSE final
@@ -941,7 +1013,7 @@ async function transcribeWithRetry(formData) {
       const msg = data.error
       if (msg.includes('429')) {
         console.log('Groq quota dépassé, bascule vers AssemblyAI…')
-        pg('Groq indisponible — AssemblyAI prend le relais…', 45, true)
+        onProgress(60, 'Fallback AssemblyAI…')
         const file = formData.get('file')
         return await transcribeWithAssemblyAI(file, file?.name)
       }
@@ -953,7 +1025,7 @@ async function transcribeWithRetry(formData) {
   } catch (err) {
     // Erreur réseau ou exception → on tente quand même AssemblyAI
     console.log('Groq erreur, bascule vers AssemblyAI:', err.message)
-    pg('Groq indisponible — AssemblyAI prend le relais…', 45, true)
+    onProgress(60, 'Fallback AssemblyAI…')
     const file = formData.get('file')
     return await transcribeWithAssemblyAI(file, file?.name)
   }
@@ -963,8 +1035,6 @@ async function transcribeWithRetry(formData) {
 // gère le français nativement, pas de restriction de langue mixte
 // Retourne { text, segments:[] } pour rester compatible avec l'appelant
 async function transcribeWithAssemblyAI(file, fileName) {
-  pg('AssemblyAI — upload en cours…', 45, true)
-
   const formData = new FormData()
   formData.append('file', file, fileName || 'audio.mp3')
 
@@ -1131,13 +1201,16 @@ function getAudioDuration(file) {
 
 async function computeOffsets(files) {
   const offsets = []
+  const durations = []
   let cumulative = 0
   for (const file of files) {
     offsets.push(cumulative)
     const duration = await getAudioDuration(file)
-    if (duration && !isNaN(duration)) cumulative += duration
+    const d = duration && !isNaN(duration) ? duration : 0
+    durations.push(d)
+    cumulative += d
   }
-  return offsets
+  return { offsets, durations, total: cumulative }
 }
 
 // Recalcule les offsets puis re-render la liste. Idempotent.
@@ -1146,16 +1219,107 @@ async function refreshOffsets() {
   const token = ++_offsetToken
   offsetsReady = false
   fileOffsets = []
+  fileDurations = []
+  totalDuration = 0
   if (!selectedFiles.length) { renderFileList(); return }
   const snap = [...selectedFiles]
   renderFileList('reading')
-  const offsets = await computeOffsets(snap)
+  const result = await computeOffsets(snap)
   // Si selectedFiles a changé pendant l'async, ignorer ce résultat
   if (token !== _offsetToken) return
-  fileOffsets = offsets
+  fileOffsets = result.offsets
+  fileDurations = result.durations
+  totalDuration = result.total
   offsetsReady = true
   renderFileList()
+  refreshFileUI() // rafraîchir le bloc "Durée totale"
 }
+
+// ── Per-file progress bars (multi-upload) ─────────────────────
+function renderPerFileBars(files) {
+  const container = document.getElementById('per-file-bars')
+  if (!container) return
+  if (files.length <= 1) {
+    container.style.display = 'none'
+    container.innerHTML = ''
+    return
+  }
+  container.style.display = 'block'
+  container.innerHTML = files.map((f, i) => `
+    <div class="pf-row" data-idx="${i}">
+      <span class="pf-name">${esc(f.name)}</span>
+      <div class="pf-track"><div class="pf-fill" id="pf-fill-${i}"></div></div>
+      <span class="pf-status" id="pf-status-${i}">En attente…</span>
+    </div>
+  `).join('')
+}
+
+function updatePerFileBar(idx, pct, status) {
+  const fill = document.getElementById('pf-fill-' + idx)
+  const stat = document.getElementById('pf-status-' + idx)
+  if (fill && !fill.classList.contains('ok') && !fill.classList.contains('fail')) {
+    fill.style.width = pct + '%'
+  }
+  if (stat) stat.textContent = status
+  updateGlobalBar()
+}
+
+function markPerFileDone(idx, ok, errMsg) {
+  const fill = document.getElementById('pf-fill-' + idx)
+  const stat = document.getElementById('pf-status-' + idx)
+  if (fill) {
+    fill.style.width = '100%'
+    fill.classList.add(ok ? 'ok' : 'fail')
+  }
+  if (stat) {
+    stat.textContent = ok ? 'Transcrit ✓' : ('❌ ' + (errMsg || 'erreur'))
+  }
+  updateGlobalBar()
+}
+
+function updateGlobalBar() {
+  const fills = document.querySelectorAll('.pf-fill')
+  if (!fills.length) return
+  let sum = 0
+  fills.forEach(f => {
+    const w = parseFloat(f.style.width) || 0
+    sum += w
+  })
+  const avg = sum / fills.length
+  // Phase transcription = 0-80 %, phase analyse = 80-100 %
+  const global = Math.round(avg * 0.8)
+  const bar = document.getElementById('pg-fill')
+  if (bar) {
+    bar.classList.remove('shimmer')
+    bar.style.width = global + '%'
+  }
+  const pct = document.getElementById('pg-pct')
+  if (pct) pct.textContent = global + ' %'
+}
+
+// Pour "Retenter ce fichier" après échec
+let _pendingRetryResolvers = {}
+
+async function retryFile(idx) {
+  const resolver = _pendingRetryResolvers[idx]
+  if (!resolver) return
+  const file = selectedFiles[idx]
+  if (!file) return
+  // Réinitialise la barre
+  const fill = document.getElementById('pf-fill-' + idx)
+  if (fill) { fill.classList.remove('fail'); fill.style.width = '0%' }
+  const stat = document.getElementById('pf-status-' + idx)
+  if (stat) stat.textContent = 'Retry manuel…'
+  try {
+    const result = await transcribeFileWithRetry(file, (p, s) => updatePerFileBar(idx, p, s))
+    markPerFileDone(idx, true)
+    resolver.resolve({ idx, file, result })
+  } catch (err) {
+    markPerFileDone(idx, false, err.message)
+    resolver.reject(err)
+  }
+}
+window.retryFile = retryFile
 
 // ── Job principal ─────────────────────────────────────────────
 async function startJob() {
@@ -1169,106 +1333,153 @@ async function startJob() {
   document.getElementById('err-card').style.display    = 'none'
   document.getElementById('btn-go').disabled = true
 
-  const totalFiles   = selectedFiles.length
-  const allTranscripts = []
-  const allSegments    = []
+  const snapshot   = [...selectedFiles]
+  const totalFiles = snapshot.length
 
-  // S'assurer que les offsets ont bien été lus depuis les durées audio.
-  // Normalement déjà fait dès la sélection — recalcul uniquement si nécessaire.
+  // S'assurer que les offsets ont bien été lus depuis les durées audio
   if (!offsetsReady || fileOffsets.length !== totalFiles) {
     pg('Lecture des durées audio…', 5, true)
-    fileOffsets = await computeOffsets(selectedFiles)
+    const result = await computeOffsets(snapshot)
+    fileOffsets = result.offsets
+    fileDurations = result.durations
+    totalDuration = result.total
     offsetsReady = true
   }
 
+  // Affiche les barres par fichier (si >1) et reset
+  renderPerFileBars(snapshot)
+  _pendingRetryResolvers = {}
+
+  currentStep = 'split'
+  step('split', 'ok', totalFiles > 1 ? `${totalFiles} fichiers prêts` : 'Fichier prêt')
+
   try {
-    for (let fi = 0; fi < totalFiles; fi++) {
-      const file = selectedFiles[fi]
-      const fileLabel = totalFiles > 1 ? `Fichier ${fi+1}/${totalFiles}` : ''
-      const chunkOffsetSeconds = fileOffsets[fi] || 0
-
-      currentStep = 'split'
-      step('split',      'run',  fileLabel ? `${fileLabel} — Préparation…` : 'Préparation du fichier…')
-      step('transcribe', 'wait', 'Transcription…')
-      step('analyze',    'wait', 'Analyse et structuration par Claude…')
-      pg(fileLabel ? `${fileLabel} — préparation…` : 'Préparation…', Math.round(fi / totalFiles * 80))
-
-      step('split', 'ok', fileLabel ? `${fileLabel} — Fichier prêt` : 'Fichier prêt')
-
-      currentStep = 'transcribe'
-      step('transcribe', 'run', fileLabel ? `${fileLabel} — Transcription…` : 'Transcription…')
-      pg(fileLabel ? `${fileLabel} — transcription…` : 'Transcription…', 35, true)
-
-      const result = await transcribeFile(file)
-      const text = result?.text || ''
-      const segments = result?.segments || []
-      if (!text || text.trim().length < 5)
-        throw new Error(`"${file.name}" : transcription vide.`)
-
-      allTranscripts.push(text)
-
-      // Accumuler les segments avec l'offset lu depuis la durée audio
-      if (segments.length) {
-        segments.forEach(seg => {
-          allSegments.push({
-            start: seg.start + chunkOffsetSeconds,
-            end:   seg.end   + chunkOffsetSeconds,
-            text:  seg.text
-          })
-        })
-      }
-
-      step('transcribe', 'ok', fileLabel ? `${fileLabel} — Transcrit ✓` : 'Transcription terminée')
-
-      if (fi < selectedFiles.length - 1) {
-        pg(`Pause 8s pour respecter les limites Groq… (avant fichier ${fi + 2}/${selectedFiles.length})`, Math.round((fi + 1) / totalFiles * 80))
-        await sleep(8000)
-      }
+    currentStep = 'transcribe'
+    step('transcribe', 'run', totalFiles > 1
+      ? `Transcription parallèle (${totalFiles} fichiers)…`
+      : 'Transcription…')
+    if (totalFiles === 1) {
+      pg('Transcription…', 20, true)
+    } else {
+      pg(`Transcription parallèle de ${totalFiles} parts…`, 0)
     }
 
-    // ── Analyser la transcription complète avec Claude ────
-    const fullTranscript = allTranscripts.join('\n\n---\n\n')
+    // Lance les N transcriptions EN PARALLÈLE
+    const transcribePromises = snapshot.map((file, idx) => {
+      return transcribeFileWithRetry(file, (p, s) => updatePerFileBar(idx, p, s))
+        .then(result => {
+          markPerFileDone(idx, true)
+          return { idx, file, result, ok: true }
+        })
+        .catch(err => {
+          if (err.name === 'AbortError') throw err
+          markPerFileDone(idx, false, err.message)
+          // Propose une retry manuelle : on attend que l'utilisateur clique
+          return new Promise((resolve, reject) => {
+            _pendingRetryResolvers[idx] = { resolve, reject }
+            const stat = document.getElementById('pf-status-' + idx)
+            if (stat) {
+              stat.innerHTML = `<button class="pf-retry" onclick="retryFile(${idx})">Retenter ce fichier</button>`
+            }
+            // Bloque jusqu'à retry manuel — ou propage si annulation globale
+            signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+          })
+        })
+    })
 
+    const results = await Promise.all(transcribePromises)
+
+    // Les résultats sont dans l'ordre original de snapshot (Promise.all garantit)
+    // Concat transcripts avec séparateur visible pour Gemini uniquement
+    const texts = results.map(r => r.result?.text || '')
+    if (texts.every(t => !t || t.trim().length < 5)) {
+      throw new Error('Toutes les transcriptions sont vides.')
+    }
+    const sep = totalFiles > 1 ? '\n\n[— part suivante —]\n\n' : '\n\n'
+    const fullTranscript = texts.filter(t => t && t.trim()).join(sep)
+
+    step('transcribe', 'ok', totalFiles > 1
+      ? `${totalFiles} fichiers transcrits ✓`
+      : 'Transcription terminée')
+
+    // ── Analyser la transcription consolidée avec Gemini ──
     currentStep = 'analyze'
-    step('analyze', 'run', 'Analyse et structuration par Claude…')
-    pg('Analyse et structuration par Claude…', 80, true)
+    step('analyze', 'run', 'Analyse et structuration par Gemini…')
+    pg('Analyse consolidée…', 85, true)
 
-    // Appel JSON à /api/claude (proxy Groq) — system + user prompt structuré
     let analysisResult
     try {
       analysisResult = await streamClaude({
-        system: `Tu es un assistant qui structure les transcripts de cours de piano d'Estelon, coach piano.
+        system: `Tu es un assistant qui structure le transcript d'un cours de piano d'Estelon, coach piano.
 
-PERSPECTIVE CRITIQUE : tu rédiges DU POINT DE VUE D'ESTELON (le coach, pas l'élève, pas un observateur). Utilise la 2e personne pour parler à Estelon ("Tu as expliqué...", "Tu as demandé à l'élève...") OU la 1re personne ("J'ai expliqué...", "J'ai donné..."). Choisis UNE des deux et garde-la sur tout le résumé.
+RÈGLE #1 — ZÉRO INVENTION :
+- Tout ce que tu écris doit être DIRECTEMENT issu du transcript.
+- Préfère la citation/reformulation proche du texte original à la paraphrase libre.
+- En cas de doute sur ce qui a été dit, NE PAS INCLURE plutôt qu'inventer.
+- Ne déduis rien, n'ajoute aucune généralité pédagogique qui n'est pas explicitement dans le transcript.
 
-RÈGLE ABSOLUE D'EXHAUSTIVITÉ : Extraire TOUT ce qui est pédagogiquement utile. AUCUNE limite d'items. Si un cours contient 20 conseils, liste les 20. Le résumé sera envoyé à l'élève comme trace du cours, donc ne rien perdre d'important.
+RÈGLE #2 — PERSPECTIVE ESTELON :
+- Le transcript est celui d'un cours où Estelon (coach, je/tu) enseigne à un élève.
+- Rédige comme si tu restituais le cours pour Estelon lui-même, à la 2e personne ("Tu as expliqué...", "Tu as demandé...").
+- Ce que DIT L'ÉLÈVE (questions, réactions, réponses) ne doit JAMAIS être dans les sections centrées sur l'enseignement : ça va uniquement dans "Observations".
 
-RÈGLE ABSOLUE DE FIDÉLITÉ : Aucune invention. Si ce n'est pas dans le transcript, ne pas l'ajouter. Préserver la terminologie musicale exacte (noms d'accords, gammes, techniques) sans paraphraser.
+RÈGLE #3 — STRUCTURE ADAPTATIVE :
+- Tu choisis les sections les plus pertinentes pour CE cours parmi celles-ci :
+  * "objectifs" (ce que la séance visait à travailler)
+  * "enseignements" (règles, concepts, démonstrations expliqués par Estelon)
+  * "conseils" (recommandations pratiques données à l'élève)
+  * "devoirs" (tâches à faire d'ici la prochaine séance)
+  * "observations" (ce que l'élève a fait, dit, demandé, ses blocages, ses progrès)
+  * "repertoire" (morceaux joués ou discutés spécifiquement)
+- INCLUS UNIQUEMENT les sections où tu as du contenu réel du transcript.
+- Tu peux en avoir 3, 4, 5, ou 6 selon ce que le cours contient.
+- Une section vide = tu ne l'inclus pas.
 
-DISTINCTION COACH / ÉLÈVE : Quand c'est l'élève qui parle, pose une question ou réagit, ça va UNIQUEMENT dans "observations". Quand c'est toi (Estelon) qui expliques, conseilles, démontres ou donnes un devoir, ça va dans les sections correspondantes.
+RÈGLE #4 — EXHAUSTIVITÉ DANS LES SECTIONS QUE TU INCLUS :
+- Aucune limite d'items.
+- Capture TOUT ce qui est dit sur chaque sujet.
+- Ne résume pas de façon trop agressive : le but est que l'élève puisse relire et retrouver chaque détail.
 
-STRUCTURE IMPOSÉE — 5 sections :
+RÈGLE #4bis — ZÉRO RÉPÉTITION :
+- Chaque information apparaît UNE SEULE FOIS dans le résumé final.
+- Ne répète pas la même idée formulée différemment dans deux sections.
+- Ne répète pas la même idée plusieurs fois dans une même section.
+- Si une idée pourrait aller dans deux sections, choisis la plus pertinente selon la priorité suivante (haut = prioritaire) : devoirs > conseils > enseignements > observations > objectifs > repertoire. L'item va dans UNE seule section.
+- Si Estelon répète la même explication à plusieurs moments du cours (pédagogie classique avec des rappels), compresse en UN SEUL item dans la bonne section sans perdre de substance ou de précision.
+- Si deux items traitent du même sujet mais avec des angles différents (ex: théorie + application), tu peux les garder séparés SEULEMENT si chacun apporte une information distincte. Sinon fusionne.
 
-1. "objectifs" — Ce que la séance visait à travailler (déduis du début du cours ou de ce que tu as annoncé explicitement). 1 à 3 items courts.
+RÈGLE #5 — TERMINOLOGIE EXACTE :
+- Préserve les noms d'accords, gammes, termes techniques tels qu'Estelon les a dits (min7, sus2, voicings, etc.).
+- Préserve les noms propres (morceaux, élèves, marques).
+- Si tu vois un marqueur "[— part suivante —]" dans le transcript, ignore-le : c'est une coupure technique, le cours est continu.
 
-2. "enseignements" — Tout ce que tu as ENSEIGNÉ en profondeur : règles théoriques, démonstrations, principes techniques, concepts musicaux expliqués. Exhaustif.
-
-3. "conseils" — Les recommandations précises que tu as données à l'élève ("essaye de...", "attention à...", "plutôt comme ça...", "évite de..."). Différent des enseignements : c'est personnel, orienté pratique immédiate. Exhaustif.
-
-4. "devoirs" — Ce que tu as demandé à l'élève de travailler d'ici la prochaine séance. Formulation impérative ("travailler les min7 chromatiquement", "faire 15 min de Tonedear par jour"). Exhaustif.
-
-5. "observations" — Ce que tu as remarqué sur l'élève pendant la séance : ses progrès, ses blocages, ses questions, ses réactions, sa posture, ses difficultés. Si l'élève a posé une question ou partagé quelque chose, ça va ici. Exhaustif.
-
-FORMAT JSON STRICT (aucun texte hors JSON) :
+FORMAT JSON STRICT — AUCUN TEXTE HORS JSON :
 {
-  "objectifs": ["...", "..."],
-  "enseignements": ["...", "..."],
-  "conseils": ["...", "..."],
-  "devoirs": ["...", "..."],
-  "observations": ["...", "..."]
+  "sections": [
+    {
+      "key": "enseignements",
+      "title": "📚 Points enseignés",
+      "items": ["...", "..."]
+    },
+    {
+      "key": "conseils",
+      "title": "💡 Conseils donnés",
+      "items": ["...", "..."]
+    }
+  ]
 }
 
-Chaque item : une phrase claire et complète, pas un fragment. Si une section est vide (ex: pas de devoirs explicites), retourner un tableau vide, pas l'omettre.`,
+L'ordre des sections dans l'array "sections" EST l'ordre d'affichage. Choisis un ordre logique (objectifs → enseignements → répertoire → conseils → devoirs → observations, mais adapte selon le cours).
+
+Mapping key → title + émoji :
+- objectifs → "🎯 Objectifs de la séance"
+- enseignements → "📚 Points enseignés"
+- repertoire → "🎵 Répertoire abordé"
+- conseils → "💡 Conseils donnés"
+- devoirs → "✅ Devoirs / À travailler"
+- observations → "👤 Observations sur l'élève"
+
+Tu peux créer une section custom si le cours a un contenu qui ne rentre dans aucune des catégories standards. Reste parcimonieux.`,
         messages: [{
           role: 'user',
           content: `Voici la transcription de la séance :\n\n${fullTranscript}`
@@ -1279,16 +1490,21 @@ Chaque item : une phrase claire et complète, pas un fragment. Si une section es
     } catch (e) {
       throw new Error(`Analyse : ${e.message}`)
     }
-    const aData = { result: analysisResult }
 
     step('analyze', 'ok', 'Analyse terminée !')
     pg('Terminé !', 100)
 
-    const filename = totalFiles > 1
-      ? `${totalFiles} fichiers (${selectedFiles.map(f => f.name).join(', ')})`
-      : selectedFiles[0].name
+    // Titre = nom du premier fichier sans extension (badge "(multi-parts, N)" via renderMeta)
+    const firstNameNoExt = snapshot[0].name.replace(/\.[^.]+$/, '')
+    const filename = snapshot[0].name
+    const meta = {
+      partsCount: totalFiles,
+      partsNames: snapshot.map(f => f.name),
+      totalDurationSec: totalDuration,
+      transcript: fullTranscript,
+    }
 
-    setTimeout(() => renderResults(aData.result, filename), 350)
+    setTimeout(() => renderResults(analysisResult, filename, meta, firstNameNoExt), 350)
 
   } catch (err) {
     if (err.name === 'AbortError') return
@@ -1296,19 +1512,72 @@ Chaque item : une phrase claire et complète, pas un fragment. Si une section es
     step(currentStep, 'fail')
     showError(
       err.message.includes('429') ? '❌ Quota API dépassé. Attends quelques minutes.'
-      : err.message.includes('413') ? '❌ Chunk trop volumineux (> 25 Mo).'
+      : err.message.includes('413') ? '❌ Fichier trop volumineux (> 25 Mo).'
       : '❌ ' + (err.message || 'Erreur inattendue.')
     )
   }
 }
 
-// ── Afficher les résultats ────────────────────────────────────
-function renderResults(raw, filename) {
-  resultName = filename || resultName
+// ── Normalisation des formats de summary vers un tableau de sections ──
+// Supporte : nouveau format { sections: [{key,title,items}] }
+//          : v2 5-fixes { objectifs, enseignements, conseils, devoirs, observations }
+function summaryToSections(summary) {
+  if (!summary) return []
+  if (Array.isArray(summary.sections)) {
+    return summary.sections.filter(s => s && Array.isArray(s.items) && s.items.length > 0)
+  }
+  // Format v2 : 5 sections fixes → convertir
+  const map = [
+    { key: 'objectifs',     title: '🎯 Objectifs de la séance' },
+    { key: 'enseignements', title: '📚 Points enseignés' },
+    { key: 'conseils',      title: '💡 Conseils donnés' },
+    { key: 'devoirs',       title: '✅ Devoirs / À travailler' },
+    { key: 'observations',  title: '👤 Observations sur l\'élève' },
+  ]
+  const sections = []
+  for (const { key, title } of map) {
+    const items = Array.isArray(summary[key]) ? summary[key].filter(Boolean) : []
+    if (items.length) sections.push({ key, title, items })
+  }
+  return sections
+}
 
-  // Masquer le badge "ancien format" si présent d'un reload précédent
+// Rendu dynamique des sections dans #res-sections
+function renderSections(sections) {
+  const container = document.getElementById('res-sections')
+  if (!container) return
+  container.innerHTML = sections.map(sec => {
+    const items = (sec.items || []).map(b =>
+      `<li contenteditable="true" spellcheck="false" style="outline:none;cursor:text;border-radius:4px;padding:2px 4px;transition:background .15s;" onmouseenter="this.style.background='rgba(139,111,232,0.08)'" onmouseleave="this.style.background=''" oninput="syncResultRaw()">${esc(b)}</li>`
+    ).join('')
+    return `
+      <div class="res-section" data-key="${esc(sec.key || '')}">
+        <div class="res-section-title">${esc(sec.title || sec.key || '')}</div>
+        <div class="res-bullets"><ul>${items}</ul></div>
+      </div>
+    `
+  }).join('')
+}
+
+// ── Afficher les résultats ────────────────────────────────────
+function renderResults(raw, filename, meta, titlePrefill) {
+  resultName = filename || resultName
+  renderMeta = meta || null
+
+  // Masquer badges "ancien format" / multi-parts
   const oldFmt = document.getElementById('res-oldformat')
   if (oldFmt) oldFmt.style.display = 'none'
+  const multiBadge = document.getElementById('res-multiparts')
+  const multiLabel = document.getElementById('res-multiparts-label')
+  if (meta && meta.partsCount > 1) {
+    if (multiBadge && multiLabel) {
+      const durStr = meta.totalDurationSec ? ` · ${formatTime(meta.totalDurationSec)}` : ''
+      multiLabel.textContent = `▶ Multi-parts : ${meta.partsCount} fichiers${durStr}`
+      multiBadge.style.display = 'block'
+    }
+  } else if (multiBadge) {
+    multiBadge.style.display = 'none'
+  }
 
   // Parser la réponse — JSON strict attendu du nouveau prompt
   let data = null
@@ -1319,68 +1588,61 @@ function renderResults(raw, filename) {
     if (parsed && typeof parsed === 'object') data = parsed
   } catch(e) { /* fallback ci-dessous */ }
 
-  // Fallback minimal : si parsing JSON échoue, tout mettre dans "enseignements"
+  // Fallback : si parsing échoue, tout mettre dans une section "enseignements"
   if (!data) {
-    data = { objectifs: [], enseignements: [raw.trim()], conseils: [], devoirs: [], observations: [] }
+    data = { sections: [{ key: 'enseignements', title: '📚 Points enseignés', items: [raw.trim()] }] }
   }
 
-  const SECTIONS = [
-    { key: 'objectifs',     id: 'res-objectifs',     label: '🎯 OBJECTIFS DE LA SÉANCE' },
-    { key: 'enseignements', id: 'res-enseignements', label: '📚 POINTS ENSEIGNÉS' },
-    { key: 'conseils',      id: 'res-conseils',      label: '💡 CONSEILS DONNÉS' },
-    { key: 'devoirs',       id: 'res-devoirs',       label: '✅ DEVOIRS / À TRAVAILLER' },
-    { key: 'observations',  id: 'res-observations',  label: '👤 OBSERVATIONS SUR L\'ÉLÈVE' },
-  ]
+  const sections = summaryToSections(data)
+  renderSections(sections)
 
+  // Lignes pour copie/DL
   const allLines = []
-
-  SECTIONS.forEach(({ key, id, label }) => {
-    const items = Array.isArray(data[key]) ? data[key] : []
-    const card  = document.getElementById(id)
-    const list  = document.getElementById(id + '-list')
-    card.style.display = 'block'
-    if (items.length) {
-      list.innerHTML = '<ul>' + items.map(b => `<li contenteditable="true" spellcheck="false" style="outline:none;cursor:text;border-radius:4px;padding:2px 4px;transition:background .15s;" onmouseenter="this.style.background='rgba(139,111,232,0.08)'" onmouseleave="this.style.background=''" oninput="syncResultRaw()">${esc(b)}</li>`).join('') + '</ul>'
-      allLines.push(label)
-      allLines.push(...items.map(b => '    • ' + b))
-      allLines.push('')
-    } else {
-      list.innerHTML = '<p style="color:var(--text3);font-size:12px;font-style:italic;padding:4px 0;">Aucun</p>'
-      allLines.push(label)
-      allLines.push('    • Aucun')
-      allLines.push('')
-    }
+  sections.forEach(sec => {
+    allLines.push((sec.title || '').toUpperCase())
+    sec.items.forEach(b => allLines.push('    • ' + b))
+    allLines.push('')
   })
 
-  // ── Titre pré-rempli avec le nom de fichier sans extension ─
+  // Titre pré-rempli (nom 1er fichier sans extension si multi, sinon basename)
   const titleInput = document.getElementById('res-title')
-  titleInput.value = resultName.replace(/\.[^.]+$/, '')
+  titleInput.value = titlePrefill || resultName.replace(/\.[^.]+$/, '')
 
-  // ── Nom fichier ───────────────────────────────────────────
   document.getElementById('res-fname').textContent = resultName
 
-  // ── Texte brut pour copie/DL ──────────────────────────────
   resultRaw = allLines.join('\n') +
     '\n— Généré par Master Hub Transcripteur · Groq Whisper + Gemini'
 
-  // ── Afficher ──────────────────────────────────────────────
   document.getElementById('prog-card').style.display   = 'none'
   document.getElementById('result-card').style.display = 'block'
 
-  // ── Sauvegarder dans l'historique ─────────────────────────
-  saveToHistory(resultName, data, resultRaw)
+  // Persister la version complète dans KV (avec transcript + meta)
+  saveToHistory(resultName, data, resultRaw, renderMeta)
 }
 
 // ── Historique ────────────────────────────────────────────────
-async function saveToHistory(filename, summary, raw) {
+async function saveToHistory(filename, summary, raw, meta) {
   try {
     const key = 'history:' + Date.now()
     currentHistoryKey = key
     const title = document.getElementById('res-title').value.trim()
+    const payload = {
+      date: new Date().toISOString(),
+      filename,
+      title,
+      summary,
+      raw,
+    }
+    if (meta) {
+      if (typeof meta.partsCount === 'number') payload.partsCount = meta.partsCount
+      if (Array.isArray(meta.partsNames))       payload.partsNames = meta.partsNames
+      if (typeof meta.totalDurationSec === 'number') payload.totalDurationSec = meta.totalDurationSec
+      if (typeof meta.transcript === 'string')  payload.transcript = meta.transcript
+    }
     await fetch('/api/history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
-      body: JSON.stringify({ key, data: { date: new Date().toISOString(), filename, title, summary, raw } })
+      body: JSON.stringify({ key, data: payload })
     })
     loadHistory()
   } catch(e) { console.warn('Historique non sauvegardé:', e) }
@@ -1412,17 +1674,17 @@ function renderHistory(items) {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     }) : '—'
-    const previewLines = Object.values(d.summary || {}).flat().slice(0, 3)
-      .map(l => `<li style="font-size:12px;color:var(--text2);">${esc(l)}</li>`).join('')
     const safeKey = (item.key || '').replace(/'/g, "\\'")
     historyRegistry[item.key] = d
-    const encodedKey = encodeURIComponent(item.key || '')
+    // Titre + badge multi-parts
+    const baseTitle = d.title || d.filename || '—'
+    const multiSuffix = (d.partsCount && d.partsCount > 1) ? ` (multi-parts, ${d.partsCount})` : ''
     return `
 <div class="hist-entry" style="border:1px solid var(--border1);border-radius:8px;margin-bottom:8px;overflow:hidden;">
   <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:var(--bg2);"
-       onclick="window.location.href='/admin/transcription.html?key=' + encodeURIComponent('${safeKey}')">
+       onclick="loadFromHistory('${safeKey}')">
     <span style="font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;flex-shrink:0;">${esc(date)}</span>
-    <span style="font-size:13px;color:var(--text1);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.title || d.filename || '—')}</span>
+    <span style="font-size:13px;color:var(--text1);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(baseTitle)}${esc(multiSuffix)}</span>
     <span style="font-size:11px;color:var(--v);">Charger ↗</span>
   </div>
   <div style="display:flex;gap:8px;padding:6px 12px 10px;border-top:1px solid var(--border1);background:var(--bg2);">
@@ -1437,24 +1699,36 @@ async function loadFromHistory(key) {
   if (!d) return
   currentHistoryKey = key
   resultName = d.filename || '—'
-  const isOldFormat = d.summary && !d.summary.objectifs && !d.summary.enseignements
-  if (d.summary && !isOldFormat) {
-    renderResults(JSON.stringify(d.summary), d.filename)
+  const meta = {
+    partsCount: d.partsCount,
+    partsNames: d.partsNames,
+    totalDurationSec: d.totalDurationSec,
+    transcript: d.transcript,
+  }
+  const sum = d.summary
+  // Formats supportés : nouveau (sections[]), v2 (5 clés fixes)
+  const hasNewFormat = sum && (
+    Array.isArray(sum.sections) ||
+    sum.objectifs !== undefined ||
+    sum.enseignements !== undefined
+  )
+  if (hasNewFormat) {
+    renderResults(JSON.stringify(sum), d.filename, meta, d.title)
   } else {
-    // Ancien format (ou pas de summary) : afficher transcription brute + badge
+    // Pré-v2 (cours/a_faire/conseils/analyse_musicale/shorts) ou summary absent
     resultRaw = d.raw || ''
     document.getElementById('prog-card').style.display   = 'none'
     document.getElementById('result-card').style.display = 'block'
     document.getElementById('res-fname').textContent = resultName
-    // Masquer les 5 sections nouvelles (pas de data compatible)
-    ;['res-objectifs','res-enseignements','res-conseils','res-devoirs','res-observations'].forEach(id => {
-      const c = document.getElementById(id)
-      if (c) c.style.display = 'none'
-    })
+    const container = document.getElementById('res-sections')
+    if (container) container.innerHTML = ''
     const oldFmt = document.getElementById('res-oldformat')
-    if (oldFmt) oldFmt.style.display = isOldFormat ? 'block' : 'none'
+    if (oldFmt) oldFmt.style.display = sum ? 'block' : 'none'
+    const multiBadge = document.getElementById('res-multiparts')
+    if (multiBadge) multiBadge.style.display = 'none'
   }
 }
+window.loadFromHistory = loadFromHistory
 
 async function deleteHistory(key) {
   if (!confirm('Supprimer cette entrée de l\'historique ?')) return
@@ -1472,76 +1746,70 @@ async function deleteHistory(key) {
 // ── Copier ────────────────────────────────────────────────────
 let _saveTimer = null
 let _titleTimer = null
+// Construit le payload complet {summary, raw, meta} à partir du DOM courant
+function currentPayload() {
+  const sections = [...document.querySelectorAll('.res-section')].map(sec => {
+    const title = (sec.querySelector('.res-section-title')?.textContent || '').trim()
+    const key = sec.getAttribute('data-key') || ''
+    const items = [...sec.querySelectorAll('li')].map(li => li.textContent.trim()).filter(Boolean)
+    return { key, title, items }
+  }).filter(s => s.items.length > 0)
+  return { sections }
+}
+
+async function persistCurrent() {
+  if (!currentHistoryKey) return
+  const summary = currentPayload()
+  const title = document.getElementById('res-title').value.trim()
+  const payload = {
+    date: new Date().toISOString(),
+    filename: resultName,
+    title,
+    summary,
+    raw: resultRaw,
+  }
+  if (renderMeta) {
+    if (typeof renderMeta.partsCount === 'number') payload.partsCount = renderMeta.partsCount
+    if (Array.isArray(renderMeta.partsNames))       payload.partsNames = renderMeta.partsNames
+    if (typeof renderMeta.totalDurationSec === 'number') payload.totalDurationSec = renderMeta.totalDurationSec
+    if (typeof renderMeta.transcript === 'string')  payload.transcript = renderMeta.transcript
+  }
+  try {
+    await fetch('/api/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
+      body: JSON.stringify({ key: currentHistoryKey, data: payload })
+    })
+    loadHistory()
+  } catch(e) { console.warn('Auto-save échoué:', e) }
+}
+
 function onTitleEdit() {
   syncResultRaw()
   clearTimeout(_titleTimer)
-  _titleTimer = setTimeout(async () => {
-    if (!currentHistoryKey) return
-    const title = document.getElementById('res-title').value.trim()
-    try {
-      // Reconstruire le summary depuis le DOM
-      const summary = {}
-      const SEC = [
-        { key: 'objectifs',     id: 'res-objectifs' },
-        { key: 'enseignements', id: 'res-enseignements' },
-        { key: 'conseils',      id: 'res-conseils' },
-        { key: 'devoirs',       id: 'res-devoirs' },
-        { key: 'observations',  id: 'res-observations' },
-      ]
-      SEC.forEach(({ key, id }) => {
-        const card = document.getElementById(id)
-        if (!card || card.style.display === 'none') return
-        const items = [...card.querySelectorAll('li')].map(li => li.textContent.trim()).filter(Boolean)
-        if (items.length) summary[key] = items
-      })
-      await fetch('/api/history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
-        body: JSON.stringify({ key: currentHistoryKey, data: { date: new Date().toISOString(), filename: resultName, title, summary, raw: resultRaw } })
-      })
-      loadHistory()
-    } catch(e) { console.warn('Auto-save titre échoué:', e) }
-  }, 2000)
+  _titleTimer = setTimeout(persistCurrent, 2000)
 }
+
 function syncResultRaw() {
-  const SECTIONS = [
-    { id: 'res-objectifs',     label: '🎯 OBJECTIFS DE LA SÉANCE' },
-    { id: 'res-enseignements', label: '📚 POINTS ENSEIGNÉS' },
-    { id: 'res-conseils',      label: '💡 CONSEILS DONNÉS' },
-    { id: 'res-devoirs',       label: '✅ DEVOIRS / À TRAVAILLER' },
-    { id: 'res-observations',  label: '👤 OBSERVATIONS SUR L\'ÉLÈVE' },
-  ]
   const allLines = []
-  SECTIONS.forEach(({ id, label }) => {
-    const card = document.getElementById(id)
-    if (!card || card.style.display === 'none') return
-    const items = card.querySelectorAll('li')
-    allLines.push(label)
-    if (!items.length) {
-      allLines.push('    • Aucun')
-    } else {
-      items.forEach(li => {
-        const t = li.textContent.trim()
-        if (t) allLines.push('    • ' + t)
-      })
-    }
+  const sections = document.querySelectorAll('.res-section')
+  sections.forEach(sec => {
+    const title = (sec.querySelector('.res-section-title')?.textContent || '').trim()
+    const items = sec.querySelectorAll('li')
+    if (!items.length) return
+    allLines.push(title.toUpperCase())
+    items.forEach(li => {
+      const t = li.textContent.trim()
+      if (t) allLines.push('    • ' + t)
+    })
     allLines.push('')
   })
   allLines.push('─────────────────────────')
   allLines.push('Généré par Master Hub Transcripteur · Groq Whisper + Gemini')
   resultRaw = allLines.join('\n')
-  // Auto-save dans KV après 2s d'inactivité
+  // Auto-save KV après 2s d'inactivité
   clearTimeout(_saveTimer)
-  _saveTimer = setTimeout(async () => {
-    if (!currentHistoryKey) return
-    try {
-      await fetch('/api/history', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
-        body: JSON.stringify({ key: currentHistoryKey, data: { date: new Date().toISOString(), filename: resultName, title: document.getElementById('res-title').value.trim(), raw: resultRaw } })
-      })
-    } catch(e) { console.warn('Auto-save échoué:', e) }
-  }, 2000)
+  _saveTimer = setTimeout(persistCurrent, 2000)
 }
 
 async function copyAll() {
