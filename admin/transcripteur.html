@@ -10,7 +10,7 @@
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Piano Key — Transcripteur</title>
+  <title>Master Hub — Transcripteur</title>
   <link rel="stylesheet" href="../assets/css/style.css">
   <link rel="manifest" href="../manifest.json">
   <link rel="icon" type="image/svg+xml" href="../favicon.svg">
@@ -459,7 +459,7 @@
     <div class="ph">
       <div class="ph-title">
         Transcripteur
-        <span class="badge b-adm">Groq + Claude</span>
+        <span class="badge b-adm">Groq + Claude Sonnet</span>
       </div>
       <p class="ph-desc">
         Dépose un fichier audio — MP3, MP4, M4A, WAV — jusqu'à ~90 min — pour obtenir
@@ -646,7 +646,7 @@
 <!-- ══ SCRIPT ════════════════════════════════════════════════ -->
 <script>
 // ─────────────────────────────────────────────────────────────
-// Piano Key — Transcripteur · Groq Whisper + Claude
+// Master Hub — Transcripteur · Groq Whisper + Claude Sonnet 4.6 (fallback Gemini → Groq)
 // Vanilla JS, aucune dépendance externe
 // Architecture : chunking client → /api/transcribe → /api/claude
 // ─────────────────────────────────────────────────────────────
@@ -1412,48 +1412,93 @@ async function startJob() {
       analysisResult = await streamClaude({
         system: `Tu es un assistant qui structure le transcript d'un cours de piano d'Estelon, coach piano.
 
-RÈGLE #1 — ZÉRO INVENTION :
+────────────────────────────────────────────
+RÈGLE #1 — ZÉRO INVENTION
+────────────────────────────────────────────
 - Tout ce que tu écris doit être DIRECTEMENT issu du transcript.
-- Préfère la citation/reformulation proche du texte original à la paraphrase libre.
+- Préfère la reformulation proche du texte original à la paraphrase libre.
 - En cas de doute sur ce qui a été dit, NE PAS INCLURE plutôt qu'inventer.
 - Ne déduis rien, n'ajoute aucune généralité pédagogique qui n'est pas explicitement dans le transcript.
 
-RÈGLE #2 — PERSPECTIVE ESTELON :
+────────────────────────────────────────────
+RÈGLE #2 — PERSPECTIVE ESTELON
+────────────────────────────────────────────
 - Le transcript est celui d'un cours où Estelon (coach, je/tu) enseigne à un élève.
-- Rédige comme si tu restituais le cours pour Estelon lui-même, à la 2e personne ("Tu as expliqué...", "Tu as demandé...").
-- Ce que DIT L'ÉLÈVE (questions, réactions, réponses) ne doit JAMAIS être dans les sections centrées sur l'enseignement : ça va uniquement dans "Observations".
+- Rédige comme si tu restituais le cours pour Estelon lui-même, à la 2e personne ("Tu as expliqué...", "Tu as démontré...").
+- Ce que DIT L'ÉLÈVE (questions, réactions, réponses) ne doit JAMAIS être dans les sections centrées sur l'enseignement : ça va uniquement dans "observations".
 
-RÈGLE #3 — STRUCTURE ADAPTATIVE :
-- Tu choisis les sections les plus pertinentes pour CE cours parmi celles-ci :
-  * "objectifs" (ce que la séance visait à travailler)
-  * "enseignements" (règles, concepts, démonstrations expliqués par Estelon)
-  * "conseils" (recommandations pratiques données à l'élève)
-  * "devoirs" (tâches à faire d'ici la prochaine séance)
-  * "observations" (ce que l'élève a fait, dit, demandé, ses blocages, ses progrès)
-  * "repertoire" (morceaux joués ou discutés spécifiquement)
-- INCLUS UNIQUEMENT les sections où tu as du contenu réel du transcript.
-- Tu peux en avoir 3, 4, 5, ou 6 selon ce que le cours contient.
+────────────────────────────────────────────
+RÈGLE #3 — STRUCTURE ADAPTATIVE
+────────────────────────────────────────────
+- Tu choisis les sections les plus pertinentes parmi :
+  * "objectifs" (annoncés explicitement par Estelon en début de séance)
+  * "enseignements" (règles théoriques, concepts, démonstrations expliqués par Estelon)
+  * "conseils" (recommandations pratiques actionnables, formulées comme des suggestions)
+  * "devoirs" (tâches à faire d'ici la prochaine séance, formulation impérative)
+  * "observations" (ce que l'élève fait, dit, demande, ses blocages, ses progrès)
+  * "repertoire" (UNIQUEMENT les morceaux travaillés ou cités par leur titre — JAMAIS des concepts théoriques ou des accords)
+- INCLUS UNIQUEMENT les sections où tu as du contenu réel et SPÉCIFIQUE.
 - Une section vide = tu ne l'inclus pas.
+- "objectifs" : à inclure SEULEMENT si Estelon les a annoncés explicitement. Sinon NE PAS l'inclure (ne pas deviner).
 
-RÈGLE #4 — EXHAUSTIVITÉ DANS LES SECTIONS QUE TU INCLUS :
-- Aucune limite d'items.
-- Capture TOUT ce qui est dit sur chaque sujet.
-- Ne résume pas de façon trop agressive : le but est que l'élève puisse relire et retrouver chaque détail.
+────────────────────────────────────────────
+RÈGLE #4 — ZÉRO TRIVIALITÉ (CRITIQUE)
+────────────────────────────────────────────
+INTERDIT : aucun item ne doit être une généralité applicable à n'importe quel cours de piano.
 
-RÈGLE #4bis — ZÉRO RÉPÉTITION :
-- Chaque information apparaît UNE SEULE FOIS dans le résumé final.
-- Ne répète pas la même idée formulée différemment dans deux sections.
-- Ne répète pas la même idée plusieurs fois dans une même section.
-- Si une idée pourrait aller dans deux sections, choisis la plus pertinente selon la priorité suivante (haut = prioritaire) : devoirs > conseils > enseignements > observations > objectifs > repertoire. L'item va dans UNE seule section.
-- Si Estelon répète la même explication à plusieurs moments du cours (pédagogie classique avec des rappels), compresse en UN SEUL item dans la bonne section sans perdre de substance ou de précision.
-- Si deux items traitent du même sujet mais avec des angles différents (ex: théorie + application), tu peux les garder séparés SEULEMENT si chacun apporte une information distincte. Sinon fusionne.
+EXEMPLES D'ITEMS À BANNIR (trivialités) :
+❌ "Faire des exercices pour améliorer la compréhension"
+❌ "L'élève doit pratiquer pour progresser"
+❌ "Travailler la technique"
+❌ "Continuer à s'entraîner régulièrement"
+❌ "L'élève a des difficultés à comprendre les accords"
+❌ "L'élève a besoin de pratiquer"
+❌ "Approfondir le sujet"
 
-RÈGLE #5 — TERMINOLOGIE EXACTE :
-- Préserve les noms d'accords, gammes, termes techniques tels qu'Estelon les a dits (min7, sus2, voicings, etc.).
-- Préserve les noms propres (morceaux, élèves, marques).
-- Si tu vois un marqueur "[— part suivante —]" dans le transcript, ignore-le : c'est une coupure technique, le cours est continu.
+EXEMPLES D'ITEMS ATTENDUS (spécifiques, actionnables, ancrés dans le cours) :
+✅ "Tu as expliqué que pour un C7, on prend la triade C-E-G et on ajoute la 7e mineure (Bb) — c'est-à-dire un ton sous l'octave"
+✅ "Tu as conseillé de se servir de la 5te comme repère visuel pour ne pas se tromper de tonalité"
+✅ "L'élève a buté plusieurs fois sur le passage en Am7, en jouant systématiquement Am au lieu d'ajouter le G"
+✅ "Tu as demandé de pratiquer C7, Am7, Cmaj7 dans toutes les tonalités d'ici la prochaine séance, en commençant par les tonalités blanches"
 
-FORMAT JSON STRICT — AUCUN TEXTE HORS JSON :
+RÈGLE D'OR : si un item pourrait apparaître dans le résumé d'un autre cours de piano avec un autre élève, c'est une trivialité. Supprime-le ou rends-le spécifique.
+
+────────────────────────────────────────────
+RÈGLE #5 — ZÉRO RÉPÉTITION (CRITIQUE)
+────────────────────────────────────────────
+- Chaque information apparaît UNE SEULE FOIS dans le résumé.
+- Ne répète JAMAIS la même idée formulée différemment dans deux sections.
+- Ne répète JAMAIS la même idée plusieurs fois dans une même section.
+- Si une idée pourrait aller dans deux sections, choisis selon la priorité (haut = prioritaire) :
+  devoirs > conseils > enseignements > observations > objectifs > repertoire
+- Si Estelon répète une explication à plusieurs moments du cours (pédagogie classique), compresse en UN SEUL item dans la bonne section.
+- VÉRIFICATION FINALE : avant de rendre le JSON, relis tous tes items. Si 2 items expriment la même chose, fusionne ou supprime le moins informatif.
+
+────────────────────────────────────────────
+RÈGLE #6 — EXHAUSTIVITÉ DANS LES SECTIONS RETENUES
+────────────────────────────────────────────
+- Aucune limite d'items par section.
+- Capture TOUT ce qui est dit de spécifique sur chaque sujet.
+- Mais : aucune trivialité, aucune répétition (règles #4 et #5 priment sur l'exhaustivité).
+- Mieux vaut 8 items précis que 15 dont la moitié sont vagues.
+
+────────────────────────────────────────────
+RÈGLE #7 — TERMINOLOGIE EXACTE
+────────────────────────────────────────────
+- Préserve les noms d'accords, gammes, termes techniques tels qu'Estelon les a dits (min7, sus2, voicings, C7, Am7, Cmaj7, etc.)
+- Préserve les noms propres (morceaux, élèves, marques)
+- Si tu vois un marqueur "[— part suivante —]" dans le transcript, ignore-le : c'est une coupure technique, le cours est continu
+
+────────────────────────────────────────────
+RÈGLE #8 — REPERTOIRE STRICT
+────────────────────────────────────────────
+La section "repertoire" contient UNIQUEMENT des morceaux par leur titre (ex: Amazing Grace, Can't Help Falling in Love, Abrite-moi).
+JAMAIS d'accords, de concepts, de gammes, de progressions abstraites.
+Si aucun morceau n'a été cité par son titre, NE PAS inclure cette section.
+
+────────────────────────────────────────────
+FORMAT JSON STRICT — AUCUN TEXTE HORS JSON
+────────────────────────────────────────────
 {
   "sections": [
     {
@@ -1469,7 +1514,9 @@ FORMAT JSON STRICT — AUCUN TEXTE HORS JSON :
   ]
 }
 
-L'ordre des sections dans l'array "sections" EST l'ordre d'affichage. Choisis un ordre logique (objectifs → enseignements → répertoire → conseils → devoirs → observations, mais adapte selon le cours).
+L'ordre des sections dans l'array EST l'ordre d'affichage. Ordre suggéré :
+objectifs → enseignements → repertoire → conseils → devoirs → observations
+(adapte selon le cours)
 
 Mapping key → title + émoji :
 - objectifs → "🎯 Objectifs de la séance"
@@ -1477,15 +1524,13 @@ Mapping key → title + émoji :
 - repertoire → "🎵 Répertoire abordé"
 - conseils → "💡 Conseils donnés"
 - devoirs → "✅ Devoirs / À travailler"
-- observations → "👤 Observations sur l'élève"
-
-Tu peux créer une section custom si le cours a un contenu qui ne rentre dans aucune des catégories standards. Reste parcimonieux.`,
+- observations → "👤 Observations sur l'élève"`,
         messages: [{
           role: 'user',
           content: `Voici la transcription de la séance :\n\n${fullTranscript}`
         }],
         temperature: 0.2,
-        max_tokens: 4096
+        max_tokens: 8000
       }, signal)
     } catch (e) {
       throw new Error(`Analyse : ${e.message}`)

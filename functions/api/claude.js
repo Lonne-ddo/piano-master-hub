@@ -1,4 +1,5 @@
-// Ordre de fallback : Gemini Flash → Groq → Cloudflare Workers AI
+// Pipeline LLM : Claude Sonnet 4.6 → Gemini 2.5 Flash → Groq Llama 3.3
+// Les 3 providers reçoivent le MÊME system prompt (cohérence des résultats).
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -6,111 +7,165 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type, x-admin-secret',
 };
 
-async function callLLM(env, systemPrompt, userMessage, opts = {}) {
-  const temperature = typeof opts.temperature === 'number' ? opts.temperature : 0.3;
-  const maxTokens   = typeof opts.max_tokens  === 'number' ? opts.max_tokens  : 600;
+// ── Helpers ──────────────────────────────────────────────────────
+function isRetryableError(error) {
+  const msg = String(error?.message || '');
+  return /\b(429|500|502|503|504|UNAVAILABLE|overloaded|timeout|network|fetch failed)\b/i.test(msg);
+}
 
-  // TENTATIVE 1 : Gemini Flash (contexte illimité — idéal pour longues transcriptions)
+// Normalise la sortie LLM : retire les fences markdown si présentes.
+// Le client fait ensuite son propre JSON.parse() avec fallback robuste.
+function extractJSON(text) {
+  if (!text) return '';
+  let s = String(text).trim();
+  s = s.replace(/^```(?:json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
+  return s;
+}
+
+// ── Providers ────────────────────────────────────────────────────
+async function callClaude(env, systemPrompt, userMessage, opts = {}) {
+  const apiKey = env.ANTHROPIC_API_KEY?.trim();
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY manquante');
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: opts.max_tokens || 8000,
+      temperature: typeof opts.temperature === 'number' ? opts.temperature : 0.2,
+      ...(systemPrompt ? { system: systemPrompt } : {}),
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Claude HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  const text = data?.content?.[0]?.text;
+  if (!text) throw new Error('Claude: réponse vide');
+  return text;
+}
+
+async function callGemini(env, systemPrompt, userMessage, opts = {}) {
+  const apiKey = env.GEMINI_API_KEY?.trim();
+  if (!apiKey) throw new Error('GEMINI_API_KEY manquante');
+
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: systemPrompt ? `${systemPrompt}\n\n${userMessage}` : userMessage,
+          }],
+        }],
+        generationConfig: {
+          maxOutputTokens: opts.max_tokens || 8000,
+          temperature: typeof opts.temperature === 'number' ? opts.temperature : 0.2,
+        },
+      }),
+    }
+  );
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Gemini HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Gemini: réponse vide');
+  return text;
+}
+
+async function callGroq(env, systemPrompt, userMessage, opts = {}) {
+  const apiKey = env.GROQ_API_KEY?.trim();
+  if (!apiKey) throw new Error('GROQ_API_KEY manquante');
+
+  // Groq context window plus petit → tronquer si nécessaire
+  const MAX_CHARS = 20000;
+  const truncated = userMessage.length > MAX_CHARS
+    ? userMessage.substring(0, MAX_CHARS) + '\n\n[Transcription tronquée — limite Groq]'
+    : userMessage;
+
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: Math.min(opts.max_tokens || 8000, 8000),
+      temperature: typeof opts.temperature === 'number' ? opts.temperature : 0.2,
+      messages: [
+        ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+        { role: 'user', content: truncated },
+      ],
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Groq HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error('Groq: réponse vide');
+  return text;
+}
+
+// ── Orchestrateur : Claude → Gemini → Groq ──────────────────────
+async function callLLM(env, systemPrompt, userMessage, opts = {}) {
+  let lastError = null;
+
+  // TENTATIVE 1 : Claude Sonnet 4.6 (moteur principal)
+  if (env.ANTHROPIC_API_KEY) {
+    try {
+      console.log('[claude.js] tentative claude-sonnet-4-6 (1)');
+      const text = await callClaude(env, systemPrompt, userMessage, opts);
+      return { text: extractJSON(text), provider: 'claude-sonnet-4-6' };
+    } catch (e) {
+      console.log('[claude.js] Claude failed:', e.message);
+      lastError = e;
+      if (!isRetryableError(e)) throw e;
+    }
+  }
+
+  // TENTATIVE 2 : Gemini 2.5 Flash (fallback 1)
   if (env.GEMINI_API_KEY) {
     try {
-      const gemResp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GEMINI_API_KEY?.trim()}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{ text: systemPrompt ? `${systemPrompt}\n\n${userMessage}` : userMessage }]
-            }],
-            generationConfig: { maxOutputTokens: maxTokens, temperature }
-          })
-        }
-      );
-      const gemData = await gemResp.json();
-      const text = gemData.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (gemResp.ok && text) {
-        return { text, provider: 'gemini' };
-      }
-      console.error('Gemini error:', gemResp.status, JSON.stringify(gemData).substring(0, 200));
+      console.log('[claude.js] tentative gemini-2.5-flash (2)');
+      const text = await callGemini(env, systemPrompt, userMessage, opts);
+      return { text: extractJSON(text), provider: 'gemini-2.5-flash' };
     } catch (e) {
-      console.error('Gemini exception:', e.message);
+      console.log('[claude.js] Gemini failed:', e.message);
+      lastError = e;
+      if (!isRetryableError(e)) throw e;
     }
   }
 
-  // TENTATIVE 2 : Groq (bon pour textes courts < 6000 tokens)
+  // TENTATIVE 3 : Groq Llama 3.3 (fallback 2 — dernier recours)
   if (env.GROQ_API_KEY) {
     try {
-      // Tronquer à 20 000 caractères pour Groq
-      const MAX_CHARS = 20000;
-      const truncated = userMessage.length > MAX_CHARS
-        ? userMessage.substring(0, MAX_CHARS) + '\n\n[Transcription tronquée]'
-        : userMessage;
-
-      const groqResp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${env.GROQ_API_KEY?.trim()}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: maxTokens,
-          temperature,
-          messages: [
-            ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-            { role: 'user', content: truncated }
-          ]
-        })
-      });
-
-      if (groqResp.status !== 429) {
-        const data = await groqResp.json();
-        const text = data.choices?.[0]?.message?.content;
-        if (groqResp.ok && text) {
-          return { text, provider: 'groq' };
-        }
-      }
+      console.log('[claude.js] tentative llama-3.3-70b-versatile (3)');
+      const text = await callGroq(env, systemPrompt, userMessage, opts);
+      return { text: extractJSON(text), provider: 'groq-llama-3.3' };
     } catch (e) {
-      console.error('Groq exception:', e.message);
+      console.log('[claude.js] Groq failed:', e.message);
+      lastError = e;
     }
   }
 
-  // TENTATIVE 3 : Cloudflare Workers AI
-  if (env.CLOUDFLARE_AI_TOKEN) {
-    try {
-      const MAX_CHARS = 10000;
-      const truncated = userMessage.length > MAX_CHARS
-        ? userMessage.substring(0, MAX_CHARS) + '\n\n[Transcription tronquée]'
-        : userMessage;
-
-      const cfResp = await fetch(
-        'https://api.cloudflare.com/client/v4/accounts/6d7a982a9e2c57373b33655968afc9b9/ai/run/@cf/meta/llama-3.1-8b-instruct',
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${env.CLOUDFLARE_AI_TOKEN?.trim()}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messages: [
-              ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-              { role: 'user', content: truncated }
-            ],
-            max_tokens: maxTokens,
-            temperature,
-          })
-        }
-      );
-      const data = await cfResp.json();
-      if (cfResp.ok && data.result?.response) {
-        return { text: data.result.response, provider: 'cloudflare' };
-      }
-    } catch (e) {
-      console.error('Cloudflare AI exception:', e.message);
-    }
-  }
-
-  throw new Error('Tous les services IA sont indisponibles. Réessaie dans quelques minutes.');
+  throw lastError || new Error('Aucun provider LLM configuré');
 }
 
 export async function onRequestOptions() {
@@ -127,7 +182,8 @@ export async function onRequest(context) {
 
     if (request.headers.get('x-admin-secret') !== env.ADMIN_SECRET) {
       return new Response(JSON.stringify({ error: 'Non autorisé' }), {
-        status: 401, headers: { ...CORS, 'Content-Type': 'application/json' }
+        status: 401,
+        headers: { ...CORS, 'Content-Type': 'application/json' },
       });
     }
 
@@ -140,8 +196,8 @@ export async function onRequest(context) {
       || body.transcript
       || '';
 
-    // Si des segments timestampés sont fournis, les annexer au userMessage
-    // pour permettre au modèle de retrouver les moments exacts.
+    // Annexer les segments timestampés au userMessage si fournis (utile pour
+    // retrouver des moments exacts du cours)
     function formatTime(seconds) {
       const m = Math.floor(seconds / 60);
       const s = Math.floor(seconds % 60);
@@ -155,23 +211,35 @@ export async function onRequest(context) {
       : '';
     const userMessage = baseUserMessage + segmentsText;
 
-    const result = await callLLM(env, systemPrompt, userMessage, {
-      temperature: typeof body.temperature === 'number' ? body.temperature : undefined,
-      max_tokens:  typeof body.max_tokens  === 'number' ? body.max_tokens  : undefined,
-    });
+    let result;
+    try {
+      result = await callLLM(env, systemPrompt, userMessage, {
+        temperature: typeof body.temperature === 'number' ? body.temperature : undefined,
+        max_tokens:  typeof body.max_tokens  === 'number' ? body.max_tokens  : undefined,
+      });
+    } catch (err) {
+      console.error('[claude.js] All providers failed:', err.message);
+      return new Response(JSON.stringify({
+        error: 'Tous les providers LLM sont indisponibles',
+        details: err.message,
+      }), {
+        status: 503,
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      });
+    }
 
     return new Response(JSON.stringify({
       content: [{ type: 'text', text: result.text }],
-      provider: result.provider
+      provider: result.provider,
     }), {
       status: 200,
-      headers: { ...CORS, 'Content-Type': 'application/json' }
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     });
 
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
-      headers: { ...CORS, 'Content-Type': 'application/json' }
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
 }
