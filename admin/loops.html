@@ -786,11 +786,52 @@ setTimeout(() => {
   }
 }, 10000);
 
+// Boucle requestAnimationFrame qui poll shifter.percentagePlayed (propriété
+// SoundTouchJS) pour animer le curseur waveform. Plus fiable que l'event 'play'
+// qui n'émet pas en continu sur toutes les versions du bundle.
+function startCursorLoop(loopId) {
+  if (!activePlayback || activePlayback.loopId !== loopId) return;
+  function tick() {
+    if (!activePlayback || activePlayback.loopId !== loopId || !activePlayback.shifter) return;
+    const sh = activePlayback.shifter;
+    if (typeof sh.percentagePlayed === 'number') {
+      const cursor = document.querySelector(`.waveform-cursor[data-id="${loopId}"]`);
+      if (cursor) {
+        const pct = Math.min(100, Math.max(0, sh.percentagePlayed));
+        cursor.style.left = pct + '%';
+      }
+    }
+    activePlayback.rafId = requestAnimationFrame(tick);
+  }
+  activePlayback.rafId = requestAnimationFrame(tick);
+}
+
 function stopPlayback() {
   if (!activePlayback) return;
-  const { shifter, loopId } = activePlayback;
-  try { shifter.disconnect(); } catch (_) {}
-  // Reset UI
+  const { shifter, gain, loopId, rafId } = activePlayback;
+
+  // 1. Stoppe la boucle d'animation du curseur
+  if (rafId) cancelAnimationFrame(rafId);
+
+  // 2. Fade-out 20 ms sur le gainNode pour éviter les "clics" audio à la coupure
+  const ctx = audioCtx;
+  if (gain && ctx && ctx.state !== 'closed') {
+    try {
+      const now = ctx.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.02);
+    } catch (_) {}
+    setTimeout(() => {
+      try { shifter.disconnect(); } catch (_) {}
+      try { gain.disconnect(); } catch (_) {}
+    }, 25);
+  } else {
+    try { shifter.disconnect(); } catch (_) {}
+    try { if (gain) gain.disconnect(); } catch (_) {}
+  }
+
+  // 3. Reset UI immédiatement
   const btn = document.querySelector(`.play-btn[data-id="${loopId}"]`);
   if (btn) { btn.classList.remove('playing'); btn.textContent = '▶'; }
   const cursor = document.querySelector(`.waveform-cursor[data-id="${loopId}"]`);
@@ -834,7 +875,10 @@ async function togglePlay(loopId) {
   if (rateSlider)   { rateSlider.value = '100';   updateTempoLabel(rateSlider); }
 
   // Pipeline : PitchShifter → GainNode (volume) → destination
-  const shifter = new PitchShifter(ctx, buffer, 1024);
+  // Buffer 16384 (recommandation officielle SoundTouchJS pour audio musical) :
+  // élimine les underruns / micro-clics que produisait le buffer 1024 sur certains CPU.
+  // Latence ~370 ms à 44.1 kHz, imperceptible en lecture de loop.
+  const shifter = new PitchShifter(ctx, buffer, 16384);
   shifter.tempo = 1.0;   // Slider tempo (70-130 %) — modifié en live via onRateChange
   shifter.pitch = 1.0;   // FIXÉ : on ne touche JAMAIS le pitch
 
@@ -844,14 +888,6 @@ async function togglePlay(loopId) {
   shifter.connect(gainNode);
   gainNode.connect(ctx.destination);
 
-  // Curseur waveform animé via l'event 'play' de PitchShifter
-  // (fournit detail.percentagePlayed à chaque buffer audio traité)
-  const cursor = document.querySelector(`.waveform-cursor[data-id="${loopId}"]`);
-  shifter.on('play', (detail) => {
-    if (!cursor) return;
-    const p = Number(detail?.percentagePlayed);
-    if (Number.isFinite(p)) cursor.style.left = Math.min(100, Math.max(0, p)) + '%';
-  });
   shifter.on('end', () => {
     if (activePlayback?.loopId === loopId) stopPlayback();
   });
@@ -860,7 +896,10 @@ async function togglePlay(loopId) {
   const btn = document.querySelector(`.play-btn[data-id="${loopId}"]`);
   if (btn) { btn.classList.add('playing'); btn.textContent = '■'; }
 
-  activePlayback = { loopId, shifter, gain: gainNode };
+  activePlayback = { loopId, shifter, gain: gainNode, rafId: null };
+
+  // Lance la boucle RAF qui anime le curseur waveform (lit shifter.percentagePlayed)
+  startCursorLoop(loopId);
 }
 
 // Live-update du gain (volume) pendant la lecture
