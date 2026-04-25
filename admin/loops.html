@@ -791,20 +791,52 @@ setTimeout(() => {
   }
 }, 10000);
 
+// ─── Slicing du buffer pour seek fiable ─────────────────────────
+// SoundTouchJS 0.1.26 (via Skypack) : le setter shifter.percentagePlayed = X
+// ne produit pas de seek fiable (position souvent reset à 0). Fix robuste :
+// slicer l'AudioBuffer à partir du sample correspondant au startRatio et
+// créer le PitchShifter sur ce buffer réduit. Le shifter joue alors de 0 à
+// 100 % du slice, et on reconstitue la position absolue via :
+//   positionRatio = startRatio + (1 - startRatio) * sliceProgress
+function sliceAudioBuffer(ctx, originalBuffer, startRatio) {
+  if (!startRatio || startRatio <= 0) return originalBuffer;
+  const clampedRatio = Math.min(0.9999, Math.max(0, startRatio));
+  const startSample = Math.floor(originalBuffer.length * clampedRatio);
+  const newLength = originalBuffer.length - startSample;
+  if (newLength <= 0) return originalBuffer;
+  const newBuffer = ctx.createBuffer(
+    originalBuffer.numberOfChannels,
+    newLength,
+    originalBuffer.sampleRate
+  );
+  for (let ch = 0; ch < originalBuffer.numberOfChannels; ch++) {
+    const src = originalBuffer.getChannelData(ch);
+    const dst = newBuffer.getChannelData(ch);
+    dst.set(src.subarray(startSample));
+  }
+  return newBuffer;
+}
+
+function createShifterAtPosition(ctx, audioBuffer, startRatio) {
+  const src = startRatio > 0 ? sliceAudioBuffer(ctx, audioBuffer, startRatio) : audioBuffer;
+  return new window.PitchShifter(ctx, src, 16384);
+}
+
 // Boucle requestAnimationFrame qui poll shifter.percentagePlayed (propriété
-// SoundTouchJS) pour animer le curseur waveform. Plus fiable que l'event 'play'
-// qui n'émet pas en continu sur toutes les versions du bundle.
+// SoundTouchJS) pour animer le curseur waveform. La progression du shifter
+// est relative au buffer slicé ; on reconstruit la position absolue avec
+// activePlayback.startRatio (position de départ dans le buffer original).
 function startCursorLoop(loopId) {
   if (!activePlayback || activePlayback.loopId !== loopId) return;
   function tick() {
     if (!activePlayback || activePlayback.loopId !== loopId || !activePlayback.shifter) return;
     const sh = activePlayback.shifter;
-    if (typeof sh.percentagePlayed === 'number') {
+    const startRatio = activePlayback.startRatio || 0;
+    if (typeof sh.percentagePlayed === 'number' && Number.isFinite(sh.percentagePlayed)) {
+      const sliceProgress = Math.min(1, Math.max(0, sh.percentagePlayed / 100));
+      const absoluteRatio = startRatio + (1 - startRatio) * sliceProgress;
       const cursor = document.querySelector(`.waveform-cursor[data-id="${loopId}"]`);
-      if (cursor) {
-        const pct = Math.min(100, Math.max(0, sh.percentagePlayed));
-        cursor.style.left = pct + '%';
-      }
+      if (cursor) cursor.style.left = (Math.min(1, Math.max(0, absoluteRatio)) * 100) + '%';
     }
     activePlayback.rafId = requestAnimationFrame(tick);
   }
@@ -820,14 +852,17 @@ let waveformDrag = null; // { loopId, wrap, wasPlayingBeforeDrag }
 
 function stopPlayback(opts = {}) {
   if (!activePlayback) return;
-  const { shifter, gain, loopId, rafId } = activePlayback;
+  const { shifter, gain, loopId, rafId, startRatio } = activePlayback;
 
-  // 0. CAPTURE la position avant tout (sauf reset explicite)
+  // 0. CAPTURE la position ABSOLUE avant tout (sauf reset explicite)
+  // Le shifter rapporte un % relatif au buffer slicé, on reconstruit l'absolu.
   if (opts.resetPosition) {
     lastPositions[loopId] = 0;
-  } else if (shifter && typeof shifter.percentagePlayed === 'number') {
-    const r = shifter.percentagePlayed / 100;
-    if (Number.isFinite(r)) lastPositions[loopId] = Math.min(1, Math.max(0, r));
+  } else if (shifter && typeof shifter.percentagePlayed === 'number' && Number.isFinite(shifter.percentagePlayed)) {
+    const sliceProgress = Math.min(1, Math.max(0, shifter.percentagePlayed / 100));
+    const sr = startRatio || 0;
+    const absoluteRatio = sr + (1 - sr) * sliceProgress;
+    lastPositions[loopId] = Math.min(1, Math.max(0, absoluteRatio));
   }
 
   // 1. Stoppe la boucle d'animation du curseur
@@ -894,28 +929,23 @@ async function togglePlay(loopId) {
   if (volumeSlider) { volumeSlider.value = '100'; updateVolumeLabel(volumeSlider); }
   if (rateSlider)   { rateSlider.value = '100';   updateTempoLabel(rateSlider); }
 
-  // Pipeline : PitchShifter → GainNode (volume) → destination
-  // Buffer 16384 (recommandation officielle SoundTouchJS pour audio musical) :
-  // élimine les underruns / micro-clics que produisait le buffer 1024 sur certains CPU.
-  // Latence ~370 ms à 44.1 kHz, imperceptible en lecture de loop.
-  const shifter = new PitchShifter(ctx, buffer, 16384);
+  // Pipeline : PitchShifter(buffer slicé au startRatio) → GainNode → destination
+  // Buffer 16384 (recommandation officielle SoundTouchJS) → élimine underruns.
+  // Seek : buffer slicé à partir du sample correspondant à startRatio
+  // (plus fiable que le setter shifter.percentagePlayed qui bug sur 0.1.26).
+  const startRatio = Math.min(0.9999, Math.max(0, lastPositions[loopId] || 0));
+  const shifter = createShifterAtPosition(ctx, buffer, startRatio);
   shifter.tempo = 1.0;   // Slider tempo (70-130 %) — modifié en live via onRateChange
   shifter.pitch = 1.0;   // FIXÉ : on ne touche JAMAIS le pitch
 
   const gainNode = ctx.createGain();
   gainNode.gain.value = 1.0;
 
-  // Seek à la position mémorisée (pause/drag) — setter natif de PitchShifter
-  const startRatio = Math.min(1, Math.max(0, lastPositions[loopId] || 0));
-  if (startRatio > 0 && startRatio < 1) {
-    try { shifter.percentagePlayed = startRatio * 100; } catch (_) {}
-  }
-
   shifter.connect(gainNode);
   gainNode.connect(ctx.destination);
 
   shifter.on('end', () => {
-    // Fin naturelle du loop : reset à 0 pour démarrer from scratch au prochain play
+    // Fin naturelle du slice : reset à 0 pour démarrer from scratch au prochain play
     if (activePlayback?.loopId === loopId) stopPlayback({ resetPosition: true });
   });
 
@@ -923,9 +953,10 @@ async function togglePlay(loopId) {
   const btn = document.querySelector(`.play-btn[data-id="${loopId}"]`);
   if (btn) { btn.classList.add('playing'); btn.textContent = '■'; }
 
-  activePlayback = { loopId, shifter, gain: gainNode, rafId: null };
+  activePlayback = { loopId, shifter, gain: gainNode, rafId: null, startRatio };
 
-  // Lance la boucle RAF qui anime le curseur waveform (lit shifter.percentagePlayed)
+  // Lance la boucle RAF qui anime le curseur waveform
+  // (calcule la position absolue = startRatio + (1 - startRatio) * sliceProgress)
   startCursorLoop(loopId);
 }
 
