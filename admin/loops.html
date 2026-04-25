@@ -199,7 +199,25 @@
       flex: 1; min-width: 0;
       font-size: 14px; font-weight: 600; color: var(--text1);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      cursor: text;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: opacity .15s, background .15s;
     }
+    .loop-name:hover { opacity: 0.7; background: var(--bg2); }
+    .loop-name input.name-edit {
+      width: 100%;
+      background: var(--bg2);
+      border: 1px solid var(--v);
+      color: var(--text1);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 1px 4px;
+      border-radius: 4px;
+      outline: none;
+    }
+    .loop-name input.name-edit:disabled { opacity: 0.5; cursor: wait; }
     .bpm-badge {
       font-size: 11px; font-family: 'DM Mono', monospace;
       color: var(--text2);
@@ -916,7 +934,7 @@ function renderLoops() {
     <div class="loop-card" data-id="${esc(loop.id)}">
       <div class="top">
         <button type="button" class="play-btn" data-id="${esc(loop.id)}" title="Lecture">▶</button>
-        <div class="loop-name" title="${esc(loop.filename)}">${esc(loop.filename)}</div>
+        <div class="loop-name" data-id="${esc(loop.id)}" title="${esc(loop.filename)} — clic pour renommer">${esc(loop.filename)}</div>
         <span class="bpm-badge ${loop.bpm == null ? 'unset' : ''}" data-id="${esc(loop.id)}" title="Modifier BPM">
           ♩ ${loop.bpm == null ? '-- BPM' : esc(loop.bpm) + ' BPM'}
         </span>
@@ -958,6 +976,9 @@ function renderLoops() {
   });
   container.querySelectorAll('.bpm-badge').forEach(b => {
     b.addEventListener('click', () => editBpm(b.dataset.id));
+  });
+  container.querySelectorAll('.loop-name').forEach(el => {
+    el.addEventListener('click', () => editLoopName(el.dataset.id, el));
   });
   container.querySelectorAll('.tags-area').forEach(b => {
     b.addEventListener('click', () => openTagEditor(b.dataset.id));
@@ -1005,6 +1026,82 @@ async function editBpm(id) {
     showToast('Erreur : ' + e.message, true);
   }
 }
+
+// ─── Édition inline du nom ─────────────────────────────────────
+async function editLoopName(loopId, el) {
+  if (!el || el.querySelector('input')) return; // déjà en édition
+  const loop = allLoops.find(l => l.id === loopId);
+  if (!loop) return;
+  const originalDisplay = loop.filename;
+  // Sépare l'extension .mp3 pour la rajouter automatiquement à la sauvegarde
+  const extMatch = originalDisplay.match(/\.mp3$/i);
+  const ext = extMatch ? extMatch[0] : '';
+  const baseName = ext ? originalDisplay.slice(0, -ext.length) : originalDisplay;
+
+  el.textContent = '';
+  el.classList.add('editing');
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'name-edit';
+  input.value = baseName;
+  input.maxLength = 200;
+  el.appendChild(input);
+  input.focus();
+  input.select();
+
+  let cancelled = false;
+  let settled = false;
+
+  function restore() {
+    el.classList.remove('editing');
+    el.textContent = originalDisplay;
+    el.title = `${originalDisplay} — clic pour renommer`;
+  }
+
+  async function commit() {
+    if (settled) return;
+    settled = true;
+    if (cancelled) { restore(); return; }
+    const newBase = input.value.trim();
+    if (newBase === '') {
+      restore();
+      showToast('Le nom ne peut pas être vide', true);
+      return;
+    }
+    // Reconstruit le filename : ajoute .mp3 si l'utilisateur n'a pas inclus une extension
+    const hasExt = /\.[a-z0-9]{2,5}$/i.test(newBase);
+    const newFilename = hasExt ? newBase : (newBase + (ext || '.mp3'));
+    if (newFilename === originalDisplay) {
+      restore();
+      return;
+    }
+    input.disabled = true;
+    try {
+      const res = await apiPatch(loopId, { filename: newFilename });
+      Object.assign(loop, res.loop);
+      el.classList.remove('editing');
+      el.textContent = loop.filename;
+      el.title = `${loop.filename} — clic pour renommer`;
+      showToast('Nom mis à jour');
+    } catch (e) {
+      restore();
+      showToast('Impossible de modifier le nom : ' + e.message, true);
+    }
+  }
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      input.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelled = true;
+      input.blur();
+    }
+  });
+}
+window.editLoopName = editLoopName;
 
 function openTagEditor(loopId) {
   const loop = allLoops.find(l => l.id === loopId);
