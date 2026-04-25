@@ -14,6 +14,12 @@
   <meta name="theme-color" content="#0f0e18">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- SoundTouchJS pour time-stretch (préserve le pitch) -->
+  <script type="module">
+    import { PitchShifter } from 'https://cdn.jsdelivr.net/npm/soundtouchjs@0.1.30/dist/soundtouch.es.js';
+    window.PitchShifter = PitchShifter;
+    window.dispatchEvent(new Event('pitchshifter-ready'));
+  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -698,13 +704,38 @@ function renderWaveform(canvas, audioBuffer) {
   }
 }
 
-// ─── Playback ──────────────────────────────────────────────────
+// ─── Playback (SoundTouchJS — pitch préservé) ──────────────────
+// PitchShifter remplace l'AudioBufferSourceNode + playbackRate :
+//   - shifter.tempo = X ∈ [0.7, 1.3] → change la vitesse SANS toucher le pitch
+//   - shifter.pitch = 1.0 → toujours fixé, on ne modifie jamais le pitch
+//   - shifter est one-shot (instance jetable, recréé à chaque play)
+
+async function ensurePitchShifter() {
+  if (window.PitchShifter) return window.PitchShifter;
+  // Attend l'événement émis quand le module ES est chargé (timeout 5s)
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const onReady = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('pitchshifter-ready', onReady);
+      window.PitchShifter ? resolve(window.PitchShifter) : reject(new Error('PitchShifter introuvable'));
+    };
+    window.addEventListener('pitchshifter-ready', onReady);
+    setTimeout(() => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('pitchshifter-ready', onReady);
+      window.PitchShifter ? resolve(window.PitchShifter) : reject(new Error('SoundTouchJS pas chargé (timeout)'));
+    }, 5000);
+  });
+}
+
 function stopPlayback() {
   if (!activePlayback) return;
-  const { source, loopId, rafId } = activePlayback;
-  try { source.stop(); } catch (_) {}
-  cancelAnimationFrame(rafId);
-  // Update UI
+  const { shifter, loopId } = activePlayback;
+  try { shifter.disconnect(); } catch (_) {}
+  // Reset UI
   const btn = document.querySelector(`.play-btn[data-id="${loopId}"]`);
   if (btn) { btn.classList.remove('playing'); btn.textContent = '▶'; }
   const cursor = document.querySelector(`.waveform-cursor[data-id="${loopId}"]`);
@@ -713,10 +744,10 @@ function stopPlayback() {
 }
 
 async function togglePlay(loopId) {
-  // Stop current playback (even if same loop : reset & restart)
+  // Toggle : si déjà en cours sur ce loop, arrête et sors
   const wasActive = activePlayback?.loopId === loopId;
   stopPlayback();
-  if (wasActive) return; // toggle off
+  if (wasActive) return;
 
   let buffer;
   try { buffer = await fetchAndDecode(loopId); }
@@ -729,78 +760,82 @@ async function togglePlay(loopId) {
     canvas.dataset.rendered = 'true';
   }
 
-  const ctx = ensureAudioCtx();
-  const source = ctx.createBufferSource();
-  source.buffer = buffer;
+  // Charge PitchShifter (module ES async, prêt après ~50-200ms typiquement)
+  let PitchShifter;
+  try { PitchShifter = await ensurePitchShifter(); }
+  catch (e) { showToast('SoundTouch indisponible : ' + e.message, true); return; }
 
-  // Volume (0..200%) → gainNode
+  const ctx = ensureAudioCtx();
+
+  // Reset des sliders à 100 % à chaque nouveau play (pas de persistance)
   const card = document.querySelector(`.loop-card[data-id="${loopId}"]`);
   const volumeSlider = card?.querySelector('.volume-slider');
-  const volume = volumeSlider ? Number(volumeSlider.value) / 100 : 1;
+  const rateSlider   = card?.querySelector('.rate-slider');
+  if (volumeSlider) { volumeSlider.value = '100'; updateVolumeLabel(volumeSlider); }
+  if (rateSlider)   { rateSlider.value = '100';   updateTempoLabel(rateSlider); }
+
+  // Pipeline : PitchShifter → GainNode (volume) → destination
+  const shifter = new PitchShifter(ctx, buffer, 1024);
+  shifter.tempo = 1.0;   // Slider tempo (70-130 %) — modifié en live via onRateChange
+  shifter.pitch = 1.0;   // FIXÉ : on ne touche JAMAIS le pitch
+
   const gainNode = ctx.createGain();
-  gainNode.gain.value = volume;
+  gainNode.gain.value = 1.0;
 
-  // Tempo (50..150%) → playbackRate (TODO : migrer vers SoundTouch.js pour
-  // préserver le pitch — actuellement playbackRate change le pitch aussi)
-  const rateSlider = card?.querySelector('.rate-slider');
-  const rate = rateSlider ? Number(rateSlider.value) / 100 : 1;
-  source.playbackRate.value = rate;
-
-  source.connect(gainNode);
+  shifter.connect(gainNode);
   gainNode.connect(ctx.destination);
 
-  source.start();
-  const startTime = ctx.currentTime;
-  const duration = buffer.duration;
+  // Curseur waveform animé via l'event 'play' de PitchShifter
+  // (fournit detail.percentagePlayed à chaque buffer audio traité)
+  const cursor = document.querySelector(`.waveform-cursor[data-id="${loopId}"]`);
+  shifter.on('play', (detail) => {
+    if (!cursor) return;
+    const p = Number(detail?.percentagePlayed);
+    if (Number.isFinite(p)) cursor.style.left = Math.min(100, Math.max(0, p)) + '%';
+  });
+  shifter.on('end', () => {
+    if (activePlayback?.loopId === loopId) stopPlayback();
+  });
 
-  // Reset volume + rate sliders display à 100% UI (la valeur appliquée est
-  // celle du slider au moment du clic)
-  if (volumeSlider) updateSliderLabel(volumeSlider, '%');
-  if (rateSlider) updateSliderLabel(rateSlider, '%');
-
-  // UI : bouton en mode "playing"
+  // UI : bouton en mode playing
   const btn = document.querySelector(`.play-btn[data-id="${loopId}"]`);
   if (btn) { btn.classList.add('playing'); btn.textContent = '■'; }
 
-  // Animation de la position de lecture (curseur waveform)
-  const cursor = document.querySelector(`.waveform-cursor[data-id="${loopId}"]`);
-  function tick() {
-    if (!activePlayback || activePlayback.loopId !== loopId) return;
-    const elapsed = (ctx.currentTime - startTime) * rate;
-    const pct = Math.min(100, (elapsed / duration) * 100);
-    if (cursor) cursor.style.left = pct + '%';
-    activePlayback.rafId = requestAnimationFrame(tick);
-  }
-
-  source.onended = () => {
-    if (activePlayback?.loopId === loopId) stopPlayback();
-  };
-
-  activePlayback = { loopId, source, gain: gainNode, startTime, rate, rafId: 0 };
-  activePlayback.rafId = requestAnimationFrame(tick);
+  activePlayback = { loopId, shifter, gain: gainNode };
 }
 
-// Live-update du gain pendant la lecture
+// Live-update du gain (volume) pendant la lecture
 function onVolumeChange(loopId, value) {
-  updateSliderLabel(document.querySelector(`.loop-card[data-id="${loopId}"] .volume-slider`), '%');
+  updateVolumeLabel(document.querySelector(`.loop-card[data-id="${loopId}"] .volume-slider`));
   if (activePlayback?.loopId === loopId && activePlayback.gain) {
     activePlayback.gain.gain.value = Number(value) / 100;
   }
 }
-// Live-update du rate (impacte playbackRate de la source en cours)
+
+// Live-update du tempo (sans toucher au pitch — SoundTouchJS time-stretch)
 function onRateChange(loopId, value) {
-  updateSliderLabel(document.querySelector(`.loop-card[data-id="${loopId}"] .rate-slider`), '%');
-  if (activePlayback?.loopId === loopId && activePlayback.source) {
-    const newRate = Number(value) / 100;
-    activePlayback.source.playbackRate.value = newRate;
-    activePlayback.rate = newRate;
+  updateTempoLabel(document.querySelector(`.loop-card[data-id="${loopId}"] .rate-slider`));
+  if (activePlayback?.loopId === loopId && activePlayback.shifter) {
+    activePlayback.shifter.tempo = Number(value) / 100;
   }
 }
 
-function updateSliderLabel(slider, suffix) {
+function updateVolumeLabel(slider) {
   if (!slider) return;
   const valEl = slider.parentElement.querySelector('.slider-label .value');
-  if (valEl) valEl.textContent = slider.value + suffix;
+  if (valEl) valEl.textContent = slider.value + '%';
+}
+
+function updateTempoLabel(slider) {
+  if (!slider) return;
+  const valEl = slider.parentElement.querySelector('.slider-label .value');
+  if (!valEl) return;
+  const v = Number(slider.value);
+  let suffix = '';
+  if (v === 100) suffix = ' (original)';
+  else if (v < 100) suffix = ' (ralenti)';
+  else suffix = ' (accéléré)';
+  valEl.textContent = slider.value + '%' + suffix;
 }
 
 // ─── Render ────────────────────────────────────────────────────
@@ -863,11 +898,11 @@ function renderLoops() {
       <div class="sliders">
         <div class="slider-group">
           <div class="slider-label">Volume <span class="value">100%</span></div>
-          <input type="range" class="volume-slider" min="0" max="200" value="100" oninput="onVolumeChange('${esc(loop.id)}', this.value)">
+          <input type="range" class="volume-slider" min="0" max="200" step="1" value="100" oninput="onVolumeChange('${esc(loop.id)}', this.value)">
         </div>
         <div class="slider-group">
-          <div class="slider-label">Tempo <span class="value">100%</span></div>
-          <input type="range" class="rate-slider" min="50" max="150" value="100" oninput="onRateChange('${esc(loop.id)}', this.value)">
+          <div class="slider-label">Tempo <span class="value">100% (original)</span></div>
+          <input type="range" class="rate-slider" min="70" max="130" step="1" value="100" oninput="onRateChange('${esc(loop.id)}', this.value)">
         </div>
       </div>
     </div>
