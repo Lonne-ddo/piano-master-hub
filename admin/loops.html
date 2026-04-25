@@ -14,8 +14,15 @@
   <meta name="theme-color" content="#0f0e18">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <!-- SoundTouchJS pour time-stretch (préserve le pitch) — UMD via unpkg -->
-  <script src="https://unpkg.com/soundtouchjs@0.1.30/dist/soundtouch.min.js"></script>
+  <!-- SoundTouchJS pour time-stretch (préserve le pitch) — ESM via Skypack -->
+  <!-- SoundTouchJS 0.1.30 est ESM-only : le bundle UMD ne crée aucun global.
+       Skypack prépare le package npm pour un import ESM browser-natif. -->
+  <script type="module">
+    import { PitchShifter } from 'https://cdn.skypack.dev/soundtouchjs@0.1.26';
+    window.PitchShifter = PitchShifter;
+    console.log('[loops] SoundTouch ESM loaded:', typeof PitchShifter === 'function');
+    window.dispatchEvent(new CustomEvent('soundtouch-ready'));
+  </script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -159,6 +166,34 @@
     .play-btn:hover { background: var(--v-soft); }
     .play-btn:active { transform: scale(0.96); }
     .play-btn.playing { background: #fff; color: var(--v); }
+
+    /* Tant que SoundTouch (ESM) charge, bloque tous les play. CSS global. */
+    body.engine-loading .play-btn {
+      opacity: 0.5;
+      cursor: wait;
+      pointer-events: none;
+    }
+    .engine-loading-notice {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text2);
+      font-size: 13px;
+    }
+    body.engine-loading .engine-loading-notice {
+      display: flex;
+    }
+    .mini-spinner {
+      width: 14px; height: 14px; flex-shrink: 0;
+      border: 2px solid var(--border);
+      border-top-color: var(--v);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
 
     .loop-name {
       flex: 1; min-width: 0;
@@ -471,6 +506,12 @@
 <!-- ═══ APP ═══════════════════════════════════════════════════ -->
 <div class="app">
 
+  <!-- Notice de chargement du moteur audio (visible tant que body.engine-loading) -->
+  <div class="engine-loading-notice" id="engine-notice">
+    <div class="mini-spinner"></div>
+    <span>Chargement du moteur audio…</span>
+  </div>
+
   <!-- Upload zone -->
   <label class="upload-zone" id="upload-zone">
     <div class="icon">🥁</div>
@@ -706,25 +747,26 @@ function renderWaveform(canvas, audioBuffer) {
 //   - shifter.pitch = 1.0 → toujours fixé, on ne modifie jamais le pitch
 //   - shifter est one-shot (instance jetable, recréé à chaque play)
 //
-// SoundTouchJS chargé via UMD (unpkg). La structure exposée varie selon la
-// version du bundle : on essaie 3 emplacements avant d'abandonner.
-function getPitchShifter() {
-  if (typeof window.PitchShifter === 'function') return window.PitchShifter;
-  if (window.SoundTouch && typeof window.SoundTouch.PitchShifter === 'function') return window.SoundTouch.PitchShifter;
-  if (window.soundtouch && typeof window.soundtouch.PitchShifter === 'function') return window.soundtouch.PitchShifter;
-  return null;
-}
+// SoundTouchJS est importé en ESM natif via Skypack (script module en <head>).
+// window.PitchShifter est défini une fois le module chargé, puis l'event
+// 'soundtouch-ready' est émis pour débloquer l'UI.
 
-// Diagnostic au chargement de la page (visible via F12 → Console)
-window.addEventListener('load', () => {
-  const PS = getPitchShifter();
-  console.log(
-    '[loops] SoundTouch loaded:', !!PS,
-    '| window.PitchShifter:', !!window.PitchShifter,
-    '| window.SoundTouch:', !!window.SoundTouch,
-    '| window.soundtouch:', !!window.soundtouch,
-  );
+// État de readiness du moteur audio + blocage UI tant que pas prêt
+let soundtouchReady = false;
+document.body.classList.add('engine-loading');
+
+window.addEventListener('soundtouch-ready', () => {
+  soundtouchReady = true;
+  document.body.classList.remove('engine-loading');
+  console.log('[loops] soundtouch-ready event received, play buttons unlocked');
 });
+
+// Timeout de sécurité : si après 10s le module ESM n'a pas chargé, on alerte
+setTimeout(() => {
+  if (!soundtouchReady) {
+    showToast("Le moteur audio n'a pas pu se charger. Recharge la page (Ctrl+Shift+R).", true);
+  }
+}, 10000);
 
 function stopPlayback() {
   if (!activePlayback) return;
@@ -755,11 +797,12 @@ async function togglePlay(loopId) {
     canvas.dataset.rendered = 'true';
   }
 
-  // Récupère PitchShifter au moment du play (script UMD synchrone, déjà chargé
-  // au moment où l'utilisateur clique)
-  const PitchShifter = getPitchShifter();
-  if (!PitchShifter) {
-    showToast("SoundTouch n'a pas pu charger. Vérifie ta connexion internet et recharge la page.", true);
+  // PitchShifter est défini par le module ESM chargé en <head>. Les boutons
+  // play sont désactivés via body.engine-loading tant que pas prêt — cette
+  // garde est une ceinture de sécurité au cas où.
+  const PitchShifter = window.PitchShifter;
+  if (typeof PitchShifter !== 'function') {
+    showToast('Moteur audio pas encore prêt — patiente une seconde.', true);
     return;
   }
 
