@@ -122,6 +122,51 @@ function extractJSON(text) {
   return s;
 }
 
+// ─── Stats helpers (duplicated from sync.js pour autonomie du worker) ──
+const MONTHS_LONG_FR = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+];
+function parseIsoDate(s) {
+  if (!s) return null;
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+  return isNaN(d) ? null : d;
+}
+function labelFrStats(iso) {
+  const d = parseIsoDate(iso);
+  if (!d) return '—';
+  return `${d.getDate()} ${MONTHS_LONG_FR[d.getMonth()]} ${d.getFullYear()}`;
+}
+function computeProgressionPct(debutIso, finIso) {
+  const start = parseIsoDate(debutIso);
+  const end = parseIsoDate(finIso);
+  if (!start || !end) return 0;
+  const total = (end - start) / 86400000;
+  if (total <= 0) return 0;
+  const elapsed = (Date.now() - start) / 86400000;
+  return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
+}
+function mergeStats(autoRaw, override) {
+  const auto = autoRaw || { nb_cours: 0, date_debut: null, date_fin_prevue: null };
+  const ov = override || {};
+  const dateDebut = ov.date_debut || auto.date_debut || null;
+  const dateFin   = ov.date_fin   || auto.date_fin_prevue || null;
+  return {
+    nb_cours: auto.nb_cours,
+    date_debut: dateDebut,
+    date_debut_label: labelFrStats(dateDebut),
+    date_fin: dateFin,
+    date_fin_label: labelFrStats(dateFin),
+    progression_pct: computeProgressionPct(dateDebut, dateFin),
+    override_active: {
+      date_debut: !!ov.date_debut,
+      date_fin: !!ov.date_fin,
+    },
+  };
+}
+
 // ─── PARSING via LLM ─────────────────────────────────────────────
 async function parseDoc(docText, student, env) {
   const systemPrompt = `Tu es un assistant qui extrait des données structurées depuis des notes de cours de piano.
@@ -253,6 +298,11 @@ export async function onRequestGet({ params, request, env }) {
 }
 
 // ─── PATCH /api/eleves/{id} ──────────────────────────────────────
+// Body attendu : { stats_override: { date_debut?: "YYYY-MM-DD"|null, date_fin?: "YYYY-MM-DD"|null } }
+// - date_debut=null OU date_fin=null → reset du champ correspondant (revient au calcul auto)
+// - Seuls les champs présents dans body.stats_override sont modifiés (merge avec override existant)
+// - Validation stricte : format YYYY-MM-DD uniquement
+// - Recompute `stats` (labels, progression, override_active) sur la base de stats_auto_raw + nouvel override
 export async function onRequestPatch({ params, request, env }) {
   const authErr = requireAuth(request, env);
   if (authErr) return authErr;
@@ -269,31 +319,46 @@ export async function onRequestPatch({ params, request, env }) {
   if (!existingRaw) return jsonResponse({ error: 'Cache introuvable — lancer un sync' }, 404);
 
   const existing = JSON.parse(existingRaw);
-  const updated = { ...existing, ...body };
+  const updated = { ...existing };
 
-  if (body.premier_cours !== undefined || body.fin_prevue !== undefined) {
-    const parseDate = (str) => {
-      if (!str) return null;
-      const p = str.split('/');
-      if (p.length !== 3) return null;
-      return new Date(parseInt(p[2]), parseInt(p[1]) - 1, parseInt(p[0]));
-    };
-    const start = parseDate(updated.premier_cours);
-    const end = parseDate(updated.fin_prevue);
-    const today = new Date();
-    if (start && end && !isNaN(start) && !isNaN(end)) {
-      const totalDays = (end - start) / (1000 * 60 * 60 * 24);
-      if (totalDays > 0) {
-        const elapsedDays = (today - start) / (1000 * 60 * 60 * 24);
-        updated.progression = Math.min(
-          100,
-          Math.max(0, Math.round((elapsedDays / totalDays) * 100))
-        );
-      }
+  // ── Validation helpers pour stats_override ────────────────────
+  const isValidIsoOrNull = (v) => {
+    if (v === null) return true;
+    if (typeof v !== 'string') return false;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+    return parseIsoDate(v) !== null;
+  };
+
+  // ── Handle stats_override patch ────────────────────────────────
+  if (body.stats_override !== undefined) {
+    const patch = body.stats_override || {};
+    if (patch.date_debut !== undefined && !isValidIsoOrNull(patch.date_debut)) {
+      return jsonResponse({ error: 'stats_override.date_debut invalide (attendu YYYY-MM-DD ou null)' }, 400);
     }
+    if (patch.date_fin !== undefined && !isValidIsoOrNull(patch.date_fin)) {
+      return jsonResponse({ error: 'stats_override.date_fin invalide (attendu YYYY-MM-DD ou null)' }, 400);
+    }
+    const currentOverride = existing.stats_override || { date_debut: null, date_fin: null };
+    const newOverride = {
+      date_debut: patch.date_debut !== undefined ? patch.date_debut : currentOverride.date_debut,
+      date_fin:   patch.date_fin   !== undefined ? patch.date_fin   : currentOverride.date_fin,
+    };
+    updated.stats_override = newOverride;
+    const autoRaw = existing.stats_auto_raw || { nb_cours: 0, date_debut: null, date_fin_prevue: null };
+    const stats = mergeStats(autoRaw, newOverride);
+    updated.stats = stats;
+    updated.sessionCount = stats.nb_cours;
+    updated.progression = stats.progression_pct;
   }
 
+  // ── Backwards-compat : permet PATCH de champs libres (notes, statut, programme) ──
+  const ALLOW_FIELDS = ['notes', 'statut', 'programme'];
+  for (const f of ALLOW_FIELDS) {
+    if (body[f] !== undefined) updated[f] = body[f];
+  }
+
+  updated._patchedAt = new Date().toISOString();
   await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated), { expirationTtl: 3600 });
 
-  return jsonResponse({ success: true, data: updated });
+  return jsonResponse({ ok: true, success: true, data: updated, stats: updated.stats || null });
 }

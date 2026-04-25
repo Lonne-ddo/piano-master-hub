@@ -360,6 +360,16 @@
       border-color: var(--v);
       padding: 2px 4px;
     }
+    .date-value.override-active {
+      border-bottom: 1px dashed var(--v);
+    }
+    .date-value.override-active::after {
+      content: "✎";
+      margin-left: 4px;
+      font-size: 10px;
+      color: var(--v);
+      opacity: 0.7;
+    }
     .date-value input[type="date"] {
       background: transparent;
       border: none;
@@ -370,6 +380,30 @@
       outline: none;
       padding: 2px 4px;
       color-scheme: dark;
+    }
+    .date-reset-btn {
+      margin-left: 4px;
+      background: none;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      font-size: 13px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color .15s, background .15s;
+      line-height: 1;
+    }
+    .date-reset-btn:hover {
+      color: var(--v);
+      background: var(--bg2);
+    }
+    .ctx-bar .date-inline {
+      border-bottom: 1px dashed transparent;
+      transition: border-color .15s, color .15s;
+    }
+    .ctx-bar .date-inline.override-active {
+      color: var(--v);
+      border-bottom-color: var(--v);
     }
 
     /* ── Cards ─────────────────────────────────────────────── */
@@ -722,17 +756,6 @@ function fmtDateLong(str) {
   return `${p.d} ${MONTHS_LONG[p.m]} ${p.y}`;
 }
 
-function isoToJJMMYYYY(iso) {
-  if (!iso) return '';
-  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
-}
-function jjmmyyyyToISO(str) {
-  const p = parseJJMMYYYY(str);
-  if (!p) return '';
-  return `${p.y}-${String(p.m + 1).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`;
-}
-
 function renderTabs() {
   const bar = document.getElementById('tabBar');
   bar.innerHTML = STUDENT_LIST.map(s => `
@@ -743,21 +766,33 @@ function renderTabs() {
   `).join('');
 }
 
+function fmtIsoShort(iso) {
+  if (!iso) return '—';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return iso;
+  const mi = parseInt(m[2], 10) - 1;
+  if (mi < 0 || mi > 11) return iso;
+  return `${parseInt(m[3], 10)} ${MONTHS_SHORT[mi]}`;
+}
+
 function renderCtx(s) {
   const ctx = document.getElementById('ctxBar');
   if (!s) { ctx.innerHTML = ''; return; }
-  const seances = s.seances || [];
-  const sessionCount = s.sessionCount || seances.length;
-  const debut = fmtDateShort(s.premier_cours);
-  const fin = fmtDateShort(s.fin_prevue);
+  const stats = s.stats || null;
+  const sessionCount = stats?.nb_cours ?? s.sessionCount ?? (s.seances?.length || 0);
+  // Préfère stats.date_debut (ISO) → "8 mars", fallback sur ancien format slash
+  const debut = stats?.date_debut ? fmtIsoShort(stats.date_debut) : fmtDateShort(s.premier_cours);
+  const fin   = stats?.date_fin   ? fmtIsoShort(stats.date_fin)   : fmtDateShort(s.fin_prevue);
+  const debutOverride = stats?.override_active?.date_debut ? 'override-active' : '';
+  const finOverride   = stats?.override_active?.date_fin   ? 'override-active' : '';
   const staleBadge = s.source === 'stale'
     ? '<span class="ctx-stale-badge" title="Gemini et Groq sont indisponibles. Données de la dernière synchronisation.">● cache périmé</span>'
     : '';
   ctx.innerHTML = `
     <strong>${escapeHtml(s.nom)}</strong>
     <span class="sep">·</span> ${sessionCount} cours
-    <span class="sep">·</span> début ${escapeHtml(debut)}
-    <span class="sep">·</span> fin ${escapeHtml(fin)}
+    <span class="sep">·</span> début <span class="date-inline ${debutOverride}">${escapeHtml(debut)}</span>
+    <span class="sep">·</span> fin <span class="date-inline ${finOverride}">${escapeHtml(fin)}</span>
     ${staleBadge}
   `;
 }
@@ -852,12 +887,19 @@ function renderProfile(s) {
   const devoirsRecurrents = lastDevoirs.length > 0 ? lastDevoirs : ['Tonedear (ear training)'];
   const repertoireActif = repertoire.filter(r => r.statut === 'en-cours');
 
-  // Progression
-  const progression = typeof s.progression === 'number' ? s.progression
+  // Progression : priorité au stats.progression_pct (sync.js v3+), fallback aux anciens champs
+  const stats = s.stats || null;
+  const progression = typeof stats?.progression_pct === 'number' ? stats.progression_pct
+    : typeof s.progression === 'number' ? s.progression
     : (theorie.length ? Math.round(theorie.filter(t => t.statut === 'done').length / theorie.length * 100) : 0);
 
-  const premierRaw = s.premier_cours || '';
-  const finRaw = s.fin_prevue || '';
+  // Dates ISO pour édition inline + labels français
+  const debutIso = stats?.date_debut || '';
+  const finIso   = stats?.date_fin   || '';
+  const debutLabel = stats?.date_debut_label || (s.premier_cours || '—');
+  const finLabel   = stats?.date_fin_label   || (s.fin_prevue     || '—');
+  const debutOverride = stats?.override_active?.date_debut || false;
+  const finOverride   = stats?.override_active?.date_fin   || false;
 
   const main = document.getElementById('mainContent');
   main.innerHTML = `
@@ -867,15 +909,21 @@ function renderProfile(s) {
       <div class="prog-pct">${progression}%</div>
     </div>
 
-    <!-- ═ Dates éditables ═════════════════════════════════════ -->
+    <!-- ═ Dates éditables (stats_override via PATCH) ══════════ -->
     <div class="dates-row">
-      <div class="date-edit" data-field="premier_cours">
+      <div class="date-edit" data-field="date_debut">
         <span class="date-label">Début</span>
-        <span class="date-value" tabindex="0" role="button" data-raw="${escapeHtml(premierRaw)}">${escapeHtml(premierRaw ? fmtDateLong(premierRaw) : '—')}</span>
+        <span style="display:inline-flex;align-items:center;">
+          <span class="date-value ${debutOverride ? 'override-active' : ''}" tabindex="0" role="button" data-raw="${escapeHtml(debutIso)}">${escapeHtml(debutLabel)}</span>
+          ${debutOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','date_debut')" title="Réinitialiser au calcul auto">↺</button>` : ''}
+        </span>
       </div>
-      <div class="date-edit" data-field="fin_prevue">
+      <div class="date-edit" data-field="date_fin">
         <span class="date-label">Fin prévue</span>
-        <span class="date-value" tabindex="0" role="button" data-raw="${escapeHtml(finRaw)}">${escapeHtml(finRaw ? fmtDateLong(finRaw) : '—')}</span>
+        <span style="display:inline-flex;align-items:center;">
+          <span class="date-value ${finOverride ? 'override-active' : ''}" tabindex="0" role="button" data-raw="${escapeHtml(finIso)}">${escapeHtml(finLabel)}</span>
+          ${finOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','date_fin')" title="Réinitialiser au calcul auto">↺</button>` : ''}
+        </span>
       </div>
     </div>
 
@@ -1078,15 +1126,15 @@ function showToast(msg) {
 }
 
 async function makeDateEditable(el, studentId, field) {
-  // Évite les éditions concurrentes
+  // field = 'date_debut' ou 'date_fin'
   if (el.classList.contains('editing')) return;
 
-  const rawBefore = el.dataset.raw || '';
+  const rawBefore = el.dataset.raw || ''; // format ISO YYYY-MM-DD
   const displayBefore = el.textContent;
 
   const input = document.createElement('input');
   input.type = 'date';
-  input.value = jjmmyyyyToISO(rawBefore);
+  input.value = rawBefore; // déjà ISO
 
   el.classList.add('editing');
   el.textContent = '';
@@ -1100,41 +1148,25 @@ async function makeDateEditable(el, studentId, field) {
     settled = true;
 
     const newISO = input.value;
-    // Pas de changement → restore
-    if (!newISO || newISO === jjmmyyyyToISO(rawBefore)) {
-      restore();
-      return;
-    }
+    if (!newISO || newISO === rawBefore) { restore(); return; }
 
-    const newJJ = isoToJJMMYYYY(newISO);
     showToast('Sauvegarde…');
-
     try {
       const res = await fetch(`/api/eleves/${studentId}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeaders()
-        },
-        body: JSON.stringify({
-          [field]: newJJ,
-          manualDates: true
-        })
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ stats_override: { [field]: newISO } })
       });
       const payload = await res.json().catch(() => ({}));
-      if (!res.ok || payload.error || !payload.success) {
+      if (!res.ok || payload.error || !(payload.ok || payload.success)) {
         throw new Error(payload.error || `HTTP ${res.status}`);
       }
-
-      // Réutiliser la donnée complète renvoyée par le worker
       let fresh = payload.data || null;
       if (!fresh) {
-        // Fallback : GET refresh si la réponse PATCH ne contient pas la data complète
         const getRes = await fetch(`/api/eleves/${studentId}`, { headers: authHeaders() });
         const getData = await getRes.json();
         if (getRes.ok && !getData.error) fresh = getData;
       }
-
       if (fresh) {
         clientCache[studentId] = fresh;
         const scrollY = window.scrollY;
@@ -1169,6 +1201,38 @@ async function makeDateEditable(el, studentId, field) {
   });
 }
 window.makeDateEditable = makeDateEditable;
+
+async function resetDateOverride(studentId, field) {
+  // field = 'date_debut' ou 'date_fin'
+  showToast('Réinitialisation…');
+  try {
+    const res = await fetch(`/api/eleves/${studentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ stats_override: { [field]: null } })
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload.error || !(payload.ok || payload.success)) {
+      throw new Error(payload.error || `HTTP ${res.status}`);
+    }
+    let fresh = payload.data || null;
+    if (!fresh) {
+      const getRes = await fetch(`/api/eleves/${studentId}`, { headers: authHeaders() });
+      const getData = await getRes.json();
+      if (getRes.ok && !getData.error) fresh = getData;
+    }
+    if (fresh) {
+      clientCache[studentId] = fresh;
+      const scrollY = window.scrollY;
+      renderProfile(fresh);
+      window.scrollTo(0, scrollY);
+    }
+    showToast('Réinitialisé au calcul auto ✓');
+  } catch (e) {
+    showToast('Erreur, réessaie');
+  }
+}
+window.resetDateOverride = resetDateOverride;
 
 function toggleTheory(el, studentId, index) {
   const order = ['todo', 'in-progress', 'done'];

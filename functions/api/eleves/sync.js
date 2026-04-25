@@ -45,15 +45,46 @@ function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// ─── Stats globales via regex (ne dépend pas du LLM) ─────────────
+// ─── Stats : calcul auto via regex + override KV ─────────────────
 // Matche les titres de séance : "# 08/03", "08/03", "22/04/2024", "## 8/3/24"
 // Rejette : "Onglet 1", "Général", "PRATIQUE", "Tab 1" (pas au format JJ/MM)
 const SESSION_TITLE_RE = /^[\s#]*(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s*$/gm;
 
+const MONTHS_LONG = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
+];
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function isoOf(d) {
+  if (!d || isNaN(d)) return null;
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+function parseIso(s) {
+  if (!s) return null;
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+  return isNaN(d) ? null : d;
+}
+function labelFr(iso) {
+  const d = parseIso(iso);
+  if (!d) return '—';
+  return `${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
+}
+function computeProgressionPct(debutIso, finIso) {
+  const start = parseIso(debutIso);
+  const end = parseIso(finIso);
+  if (!start || !end) return 0;
+  const total = (end - start) / 86400000;
+  if (total <= 0) return 0;
+  const elapsed = (Date.now() - start) / 86400000;
+  return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
+}
+
 function parseSessionTitles(docText) {
   const currentYear = new Date().getFullYear();
   const out = [];
-  // Reset lastIndex au cas où la regex serait réutilisée (elle a /g)
   SESSION_TITLE_RE.lastIndex = 0;
   let m;
   while ((m = SESSION_TITLE_RE.exec(docText)) !== null) {
@@ -68,27 +99,11 @@ function parseSessionTitles(docText) {
   return out;
 }
 
-const MONTHS_LONG = [
-  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
-];
-
-function pad2(n) { return String(n).padStart(2, '0'); }
-
-function computeStats(sessions) {
+// Calcul auto brut : nb_cours + date_debut (ISO) + date_fin_prevue (ISO = début +60j)
+function computeAutoStats(sessions) {
   if (!sessions.length) {
-    return {
-      nb_cours: 0,
-      date_debut: null,
-      date_debut_label: '—',
-      date_debut_slash: null,
-      date_fin_prevue: null,
-      date_fin_prevue_label: '—',
-      date_fin_prevue_slash: null,
-      progression_pct: 0,
-    };
+    return { nb_cours: 0, date_debut: null, date_fin_prevue: null };
   }
-  // Tri chronologique croissant (plus ancienne = première)
   const sorted = [...sessions].sort((a, b) => {
     if (a.annee !== b.annee) return a.annee - b.annee;
     if (a.mois !== b.mois) return a.mois - b.mois;
@@ -96,30 +111,32 @@ function computeStats(sessions) {
   });
   const first = sorted[0];
   const start = new Date(first.annee, first.mois - 1, first.jour);
-  // Fin prévue = début + 60 jours (programme Piano Master = 2 mois)
   const end = new Date(start);
   end.setDate(end.getDate() + 60);
-
-  const isoOf = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-  const slashOf = d => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
-  const labelOf = d => `${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
-
-  const today = new Date();
-  const msPerDay = 86400000;
-  const joursEcoules = Math.floor((today - start) / msPerDay);
-  let progression = Math.round((joursEcoules / 60) * 100);
-  if (progression < 0) progression = 0;
-  if (progression > 100) progression = 100;
-
   return {
     nb_cours: sessions.length,
     date_debut: isoOf(start),
-    date_debut_label: labelOf(start),
-    date_debut_slash: slashOf(start),
     date_fin_prevue: isoOf(end),
-    date_fin_prevue_label: labelOf(end),
-    date_fin_prevue_slash: slashOf(end),
-    progression_pct: progression,
+  };
+}
+
+// Override prioritaire sur auto. override = { date_debut?: iso|null, date_fin?: iso|null }
+// Retourne l'objet `stats` final avec labels + progression + override_active.
+function mergeStats(autoRaw, override) {
+  const ov = override || {};
+  const dateDebut = ov.date_debut || autoRaw.date_debut || null;
+  const dateFin   = ov.date_fin   || autoRaw.date_fin_prevue || null;
+  return {
+    nb_cours: autoRaw.nb_cours,
+    date_debut: dateDebut,
+    date_debut_label: labelFr(dateDebut),
+    date_fin: dateFin,
+    date_fin_label: labelFr(dateFin),
+    progression_pct: computeProgressionPct(dateDebut, dateFin),
+    override_active: {
+      date_debut: !!ov.date_debut,
+      date_fin: !!ov.date_fin,
+    },
   };
 }
 
@@ -422,10 +439,10 @@ export async function onRequestPost(context) {
       }
       const docText = await res.text();
 
-      // 2. Stats globales via regex (ne dépend pas du LLM)
+      // 2. Stats auto via regex (ne dépend pas du LLM)
       const sessionTitles = parseSessionTitles(docText);
-      const stats = computeStats(sessionTitles);
-      console.log(`[sync.js] eleve=${name} step=stats nb_cours=${stats.nb_cours} debut=${stats.date_debut} progression=${stats.progression_pct}%`);
+      const statsAutoRaw = computeAutoStats(sessionTitles);
+      console.log(`[sync.js] eleve=${name} step=stats_auto nb_cours=${statsAutoRaw.nb_cours} debut=${statsAutoRaw.date_debut} fin=${statsAutoRaw.date_fin_prevue}`);
 
       // 3. LLM cascade pour derniere_seance uniquement (Gemini → Groq → Claude)
       let extracted;
@@ -451,10 +468,17 @@ export async function onRequestPost(context) {
         continue;
       }
 
-      // 4. Merge avec KV existant
+      // 4. Merge avec KV existant + override prioritaire
       const cacheKey = `eleve:${name}`;
       const existing = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'json' }) || {};
       const docUrl = `https://docs.google.com/document/d/${docId}/edit`;
+
+      // Override préservé entre syncs (set/reset via PATCH /api/eleves/{id})
+      const statsOverride = {
+        date_debut: existing?.stats_override?.date_debut || null,
+        date_fin:   existing?.stats_override?.date_fin   || null,
+      };
+      const stats = mergeStats(statsAutoRaw, statsOverride);
 
       const updated = {
         // Préserve tout l'existant (theorie, canaux, repertoire, notes, statut, etc.)
@@ -465,22 +489,16 @@ export async function onRequestPost(context) {
         doc_id: docId,
         doc_url: docUrl,
         derniere_seance: extracted.parsed,
-        // Bloc stats complet (schéma nouveau)
+        // Stats : bloc fusionné + bloc raw (pour reset) + override (persistant)
         stats,
-        // Clés top-level pour compat avec le client actuel (bandeau ctx-bar)
+        stats_auto_raw: statsAutoRaw,
+        stats_override: statsOverride,
+        // Aliases top-level pour compat client actuel
         sessionCount: stats.nb_cours,
         progression: stats.progression_pct,
         _syncedAt: new Date().toISOString(),
         _cachedAt: Date.now(),
       };
-
-      // Dates : override par le calcul regex SAUF si l'utilisateur a édité
-      // manuellement via la date-picker UI (flag manualDates === true).
-      // En l'absence de sessions détectées, on conserve les valeurs existantes.
-      if (existing.manualDates !== true) {
-        if (stats.date_debut_slash)      updated.premier_cours = stats.date_debut_slash;
-        if (stats.date_fin_prevue_slash) updated.fin_prevue = stats.date_fin_prevue_slash;
-      }
 
       await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated), { expirationTtl: 3600 });
       results[name] = {
@@ -488,11 +506,12 @@ export async function onRequestPost(context) {
         provider: extracted.provider,
         nb_cours: stats.nb_cours,
         date_debut: stats.date_debut,
+        date_fin: stats.date_fin,
         progression: stats.progression_pct,
         derniere_seance_date: extracted.parsed?.date,
         derniere_seance_titre: extracted.parsed?.titre,
       };
-      console.log(`[sync.js] eleve=${name} step=done provider=${extracted.provider} duration=${Date.now()-startMs}ms`);
+      console.log(`[sync.js] eleve=${name} step=done provider=${extracted.provider} duration=${Date.now()-startMs}ms override=${stats.override_active.date_debut || stats.override_active.date_fin ? 'yes' : 'no'}`);
 
     } catch (e) {
       results[name] = { ok: false, error: e.message };
