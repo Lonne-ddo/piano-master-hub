@@ -166,6 +166,23 @@
     .play-btn:hover { background: var(--v-soft); }
     .play-btn:active { transform: scale(0.96); }
     .play-btn.playing { background: #fff; color: var(--v); }
+    /* États transitionnels du bouton play (preload + lock anti-double-clic + erreur) */
+    .play-btn.loading {
+      opacity: 0.55;
+      cursor: wait;
+      pointer-events: none;
+    }
+    .play-btn.locked {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+    .play-btn.error {
+      opacity: 0.4;
+      cursor: not-allowed;
+      pointer-events: none;
+      background: var(--bg3);
+      color: #e05c6b;
+    }
 
     /* Tant que SoundTouch (ESM) charge, bloque tous les play. CSS global. */
     body.engine-loading .play-btn {
@@ -713,20 +730,103 @@ function ensureAudioCtx() {
   return audioCtx;
 }
 
+// Dédup de promesses : si plusieurs callers (preload + click play) demandent
+// le même audio simultanément, on partage la même Promise (pas de double fetch)
+const audioBufferPromises = {};
+
 async function fetchAndDecode(loopId) {
   if (audioBufferCache[loopId]) return audioBufferCache[loopId];
-  const res = await fetch(`/api/loops/${encodeURIComponent(loopId)}/audio`, {
-    headers: authHeaders(),
-  });
-  if (!res.ok) throw new Error('Audio HTTP ' + res.status);
-  const arr = await res.arrayBuffer();
-  const ctx = ensureAudioCtx();
-  // decodeAudioData copie le buffer ; on lui passe une copie pour éviter les
-  // soucis de transfert entre threads/contextes
-  const buf = await ctx.decodeAudioData(arr.slice(0));
-  audioBufferCache[loopId] = buf;
-  return buf;
+  if (audioBufferPromises[loopId]) return audioBufferPromises[loopId];
+
+  audioBufferPromises[loopId] = (async () => {
+    try {
+      const res = await fetch(`/api/loops/${encodeURIComponent(loopId)}/audio`, {
+        headers: authHeaders(),
+      });
+      if (!res.ok) throw new Error('Audio HTTP ' + res.status);
+      const arr = await res.arrayBuffer();
+      const ctx = ensureAudioCtx();
+      // decodeAudioData copie le buffer ; on lui passe une copie pour éviter les
+      // soucis de transfert entre threads/contextes
+      const buf = await ctx.decodeAudioData(arr.slice(0));
+      audioBufferCache[loopId] = buf;
+      return buf;
+    } finally {
+      delete audioBufferPromises[loopId];
+    }
+  })();
+
+  return audioBufferPromises[loopId];
 }
+
+// État du préchargement par loopId : 'loading' | 'ready' | 'error'
+const loadStates = {};
+// Lock anti-double-clic par loopId : true pendant les transitions play/pause
+const playLocks = {};
+
+// Met à jour l'apparence du bouton play selon l'état combiné
+// (loading > error > locked > playing > idle)
+function updatePlayBtnState(btn, loopId) {
+  if (!btn) return;
+  btn.classList.remove('loading', 'error', 'locked');
+  if (loadStates[loopId] === 'loading') {
+    btn.classList.add('loading');
+    btn.textContent = '⏳';
+    return;
+  }
+  if (loadStates[loopId] === 'error') {
+    btn.classList.add('error');
+    btn.textContent = '⚠';
+    return;
+  }
+  if (playLocks[loopId]) {
+    btn.classList.add('locked');
+    // textContent : reflète l'état effectif (▶ idle, ■ playing) pendant le lock
+    btn.textContent = (activePlayback?.loopId === loopId) ? '■' : '▶';
+    return;
+  }
+  if (activePlayback?.loopId === loopId) {
+    btn.classList.add('playing');
+    btn.textContent = '■';
+  } else {
+    btn.classList.remove('playing');
+    btn.textContent = '▶';
+  }
+}
+
+// Pré-charge l'audio + décode + render waveform en background à la création de la card.
+// Appelé pour chaque loop visible. Idempotent (skip si déjà ready/loading).
+function preloadCardAudio(loopId) {
+  if (loadStates[loopId] === 'ready' || loadStates[loopId] === 'loading') return;
+  loadStates[loopId] = 'loading';
+  const btn = document.querySelector(`.play-btn[data-id="${loopId}"]`);
+  updatePlayBtnState(btn, loopId);
+  fetchAndDecode(loopId).then(buf => {
+    loadStates[loopId] = 'ready';
+    const btn2 = document.querySelector(`.play-btn[data-id="${loopId}"]`);
+    updatePlayBtnState(btn2, loopId);
+    const canvas = document.querySelector(`.waveform-canvas[data-id="${loopId}"]`);
+    if (canvas && !canvas.dataset.rendered) {
+      renderWaveform(canvas, buf);
+      canvas.dataset.rendered = 'true';
+    }
+  }).catch(e => {
+    loadStates[loopId] = 'error';
+    const btn2 = document.querySelector(`.play-btn[data-id="${loopId}"]`);
+    updatePlayBtnState(btn2, loopId);
+    console.warn('[loops] preload failed:', loopId, e.message);
+  });
+}
+
+// iOS / Safari : créer + reprendre l'AudioContext au tout premier click ou touch
+// (les navigateurs exigent une user gesture pour autoriser la lecture audio)
+function unlockAudioOnce() {
+  ensureAudioCtx();
+  document.removeEventListener('click',      unlockAudioOnce);
+  document.removeEventListener('touchstart', unlockAudioOnce);
+}
+document.addEventListener('click',      unlockAudioOnce, { passive: true });
+document.addEventListener('touchstart', unlockAudioOnce, { passive: true });
 
 // ─── Waveform rendering ────────────────────────────────────────
 function renderWaveform(canvas, audioBuffer) {
@@ -819,7 +919,9 @@ function sliceAudioBuffer(ctx, originalBuffer, startRatio) {
 
 function createShifterAtPosition(ctx, audioBuffer, startRatio) {
   const src = startRatio > 0 ? sliceAudioBuffer(ctx, audioBuffer, startRatio) : audioBuffer;
-  return new window.PitchShifter(ctx, src, 16384);
+  // Buffer 4096 (~93 ms latence à 44.1 kHz) : compromis qualité/réactivité.
+  // 16384 produisait trop de latence perçue sur mobile au démarrage.
+  return new window.PitchShifter(ctx, src, 4096);
 }
 
 // Boucle requestAnimationFrame qui poll shifter.percentagePlayed (propriété
@@ -895,69 +997,86 @@ function stopPlayback(opts = {}) {
 }
 
 async function togglePlay(loopId) {
-  // Toggle : si déjà en cours sur ce loop, arrête et sors
-  const wasActive = activePlayback?.loopId === loopId;
-  stopPlayback();
-  if (wasActive) return;
-
-  let buffer;
-  try { buffer = await fetchAndDecode(loopId); }
-  catch (e) { showToast('Erreur audio : ' + e.message, true); return; }
-
-  // Render waveform si pas encore fait
-  const canvas = document.querySelector(`.waveform-canvas[data-id="${loopId}"]`);
-  if (canvas && !canvas.dataset.rendered) {
-    renderWaveform(canvas, buffer);
-    canvas.dataset.rendered = 'true';
-  }
-
-  // PitchShifter est défini par le module ESM chargé en <head>. Les boutons
-  // play sont désactivés via body.engine-loading tant que pas prêt — cette
-  // garde est une ceinture de sécurité au cas où.
-  const PitchShifter = window.PitchShifter;
-  if (typeof PitchShifter !== 'function') {
-    showToast('Moteur audio pas encore prêt — patiente une seconde.', true);
+  // Garde 1 : audio pas encore chargé/décodé
+  if (loadStates[loopId] === 'loading') {
+    showToast('Audio en cours de chargement…');
     return;
   }
+  if (loadStates[loopId] === 'error') {
+    showToast('Erreur audio — recharge la page', true);
+    return;
+  }
+  // Garde 2 : transition déjà en cours sur ce loop (anti double-tap)
+  if (playLocks[loopId]) return;
 
-  const ctx = ensureAudioCtx();
-
-  // Reset des sliders à 100 % à chaque nouveau play (pas de persistance)
-  const card = document.querySelector(`.loop-card[data-id="${loopId}"]`);
-  const volumeSlider = card?.querySelector('.volume-slider');
-  const rateSlider   = card?.querySelector('.rate-slider');
-  if (volumeSlider) { volumeSlider.value = '100'; updateVolumeLabel(volumeSlider); }
-  if (rateSlider)   { rateSlider.value = '100';   updateTempoLabel(rateSlider); }
-
-  // Pipeline : PitchShifter(buffer slicé au startRatio) → GainNode → destination
-  // Buffer 16384 (recommandation officielle SoundTouchJS) → élimine underruns.
-  // Seek : buffer slicé à partir du sample correspondant à startRatio
-  // (plus fiable que le setter shifter.percentagePlayed qui bug sur 0.1.26).
-  const startRatio = Math.min(0.9999, Math.max(0, lastPositions[loopId] || 0));
-  const shifter = createShifterAtPosition(ctx, buffer, startRatio);
-  shifter.tempo = 1.0;   // Slider tempo (70-130 %) — modifié en live via onRateChange
-  shifter.pitch = 1.0;   // FIXÉ : on ne touche JAMAIS le pitch
-
-  const gainNode = ctx.createGain();
-  gainNode.gain.value = 1.0;
-
-  shifter.connect(gainNode);
-  gainNode.connect(ctx.destination);
-
-  shifter.on('end', () => {
-    // Fin naturelle du slice : reset à 0 pour démarrer from scratch au prochain play
-    if (activePlayback?.loopId === loopId) stopPlayback({ resetPosition: true });
-  });
-
-  // UI : bouton en mode playing
+  playLocks[loopId] = true;
   const btn = document.querySelector(`.play-btn[data-id="${loopId}"]`);
-  if (btn) { btn.classList.add('playing'); btn.textContent = '■'; }
+  updatePlayBtnState(btn, loopId);
 
-  activePlayback = { loopId, shifter, gain: gainNode, rafId: null, startRatio };
+  try {
+    // Toggle : si déjà en cours sur ce loop, arrête et sors
+    const wasActive = activePlayback?.loopId === loopId;
+    stopPlayback();
+    if (wasActive) return;
 
-  // Lance la boucle RAF qui anime le curseur waveform
-  // (calcule la position absolue = startRatio + (1 - startRatio) * sliceProgress)
-  startCursorLoop(loopId);
+    let buffer;
+    try { buffer = await fetchAndDecode(loopId); }
+    catch (e) { showToast('Erreur audio : ' + e.message, true); return; }
+
+    // Render waveform si pas encore fait (filet de sécurité — preload le fait normalement)
+    const canvas = document.querySelector(`.waveform-canvas[data-id="${loopId}"]`);
+    if (canvas && !canvas.dataset.rendered) {
+      renderWaveform(canvas, buffer);
+      canvas.dataset.rendered = 'true';
+    }
+
+    const PitchShifter = window.PitchShifter;
+    if (typeof PitchShifter !== 'function') {
+      showToast('Moteur audio pas encore prêt — patiente une seconde.', true);
+      return;
+    }
+
+    const ctx = ensureAudioCtx();
+
+    // Reset des sliders à 100 % à chaque nouveau play (pas de persistance)
+    const card = document.querySelector(`.loop-card[data-id="${loopId}"]`);
+    const volumeSlider = card?.querySelector('.volume-slider');
+    const rateSlider   = card?.querySelector('.rate-slider');
+    if (volumeSlider) { volumeSlider.value = '100'; updateVolumeLabel(volumeSlider); }
+    if (rateSlider)   { rateSlider.value = '100';   updateTempoLabel(rateSlider); }
+
+    // Pipeline : PitchShifter(buffer slicé au startRatio) → GainNode → destination
+    const startRatio = Math.min(0.9999, Math.max(0, lastPositions[loopId] || 0));
+    const shifter = createShifterAtPosition(ctx, buffer, startRatio);
+    shifter.tempo = 1.0;   // Slider tempo (70-130 %) — modifié en live via onRateChange
+    shifter.pitch = 1.0;   // FIXÉ : on ne touche JAMAIS le pitch
+
+    const gainNode = ctx.createGain();
+    gainNode.gain.value = 1.0;
+
+    shifter.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    shifter.on('end', () => {
+      // Fin naturelle du slice : reset à 0 pour démarrer from scratch au prochain play
+      if (activePlayback?.loopId === loopId) stopPlayback({ resetPosition: true });
+    });
+
+    activePlayback = { loopId, shifter, gain: gainNode, rafId: null, startRatio };
+
+    // Lance la boucle RAF qui anime le curseur waveform
+    startCursorLoop(loopId);
+
+    // UI : bouton playing (le lock sera retiré dans le finally)
+    if (btn) { btn.classList.add('playing'); btn.textContent = '■'; }
+  } finally {
+    // Libère le lock après 60 ms (couvre le fade-out 25 ms de stopPlayback)
+    setTimeout(() => {
+      playLocks[loopId] = false;
+      const btn2 = document.querySelector(`.play-btn[data-id="${loopId}"]`);
+      updatePlayBtnState(btn2, loopId);
+    }, 60);
+  }
 }
 
 // ─── Interaction waveform (clic / drag pour seek) ──────────────
@@ -1126,6 +1245,9 @@ function renderLoops() {
   // Bind events
   container.querySelectorAll('.play-btn').forEach(b => {
     b.addEventListener('click', () => togglePlay(b.dataset.id));
+    // Précharge l'audio + render waveform en background (réduit la latence du 1er play)
+    preloadCardAudio(b.dataset.id);
+    updatePlayBtnState(b, b.dataset.id);
   });
   container.querySelectorAll('.delete-btn').forEach(b => {
     b.addEventListener('click', () => deleteLoop(b.dataset.id));
@@ -1163,6 +1285,9 @@ async function deleteLoop(id) {
   try {
     if (activePlayback?.loopId === id) stopPlayback();
     delete audioBufferCache[id];
+    delete audioBufferPromises[id];
+    delete loadStates[id];
+    delete playLocks[id];
     delete lastPositions[id];
     await apiDelete(id);
     allLoops = allLoops.filter(l => l.id !== id);
