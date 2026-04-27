@@ -1,14 +1,7 @@
 # Espace élève — URLs personnelles (Cloudflare Pages)
-# Règles spécifiques EN PREMIER, racines à la fin. Pas de catch-all.
-# Devoirs : pas de page séparée (intégré dans le dashboard) → 301 vers /{slug}.
-/japhet/outils    /outils.html   200
-/tara/outils      /outils.html   200
-/dexter/outils    /outils.html   200
-/messon/outils    /outils.html   200
-/japhet/quiz      /quiz.html     200
-/tara/quiz        /quiz.html     200
-/dexter/quiz      /quiz.html     200
-/messon/quiz      /quiz.html     200
+# Slug en query string pour /outils et /quiz (CF Pages ne respecte pas
+# fiablement le rewrite 200 multi-segment). Routes /{slug} simples seulement.
+# Devoirs : pas de page séparée (intégré au dashboard) → 301 vers /{slug}.
 /japhet/devoirs   /japhet        301
 /tara/devoirs     /tara          301
 /dexter/devoirs   /dexter        301

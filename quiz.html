@@ -466,11 +466,12 @@
     }
 
     (function init() {
-        // Slug extrait UNIQUEMENT depuis pathname, jamais depuis localStorage.
-        var parts = window.location.pathname.replace(/^\/+/, '').split('/').filter(Boolean);
-        var slug = parts[0] ? parts[0].toLowerCase() : null;
+        // Slug lu depuis query string (?eleve=...) — bypass CF Pages multi-segment rewrite.
+        var params = new URLSearchParams(window.location.search);
+        var slug = params.get('eleve');
+        slug = slug ? slug.toLowerCase() : null;
 
-        console.log('[quiz] pathname:', window.location.pathname, 'slug:', slug);
+        console.log('[quiz] query eleve:', slug);
 
         if (!slug || ELEVES_WHITELIST.indexOf(slug) < 0) {
             console.warn('[quiz] slug invalide → redirect /');
@@ -482,7 +483,7 @@
 
         try { localStorage.setItem('eleve_slug', slug); } catch (e) {}
         state.slug = slug;
-        document.getElementById('back-link').href = '/' + slug + '/outils';
+        document.getElementById('back-link').href = '/outils?eleve=' + encodeURIComponent(slug);
 
         // Build sections
         var html = '';

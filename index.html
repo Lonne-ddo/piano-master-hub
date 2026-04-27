@@ -843,8 +843,8 @@
         // Cartes générées en HTML template inline. Outils est un vrai <a> avec
         // href interpolé sur le slug courant — pas de div+JS handler.
         cardsContainer.innerHTML =
-            // Outils — anchor interne avec slug dynamique
-            '<a class="card" href="/' + escapeHtml(slug) + '/outils">' +
+            // Outils — anchor interne, slug en query string (bypass CF Pages multi-segment rewrite)
+            '<a class="card" href="/outils?eleve=' + encodeURIComponent(slug) + '">' +
                 '<div class="card-icon">' + ICONS.tools + '</div>' +
                 '<div class="card-body">' +
                     '<div class="card-title">Outils</div>' +
