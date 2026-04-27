@@ -476,10 +476,17 @@
 
         var backLink = document.getElementById("back-link");
 
+        // Fallback : pas de slug valide en première position de l'URL
+        // (ex: /quiz direct, ou lien partagé sans slug)
+        // → redirect /{stored}/quiz si localStorage existe, sinon /
         if (!eleve) {
-            backLink.href = "/";
-            document.getElementById("content").innerHTML =
-                '<p class="empty">Cette page n\'est pas reconnue. Retourne à l\'accueil pour t\'identifier.</p>';
+            var stored = null;
+            try { stored = localStorage.getItem("eleve_slug"); } catch (e) {}
+            if (stored && ELEVES_WHITELIST[stored]) {
+                window.location.replace("/" + stored + "/quiz");
+                return;
+            }
+            window.location.replace("/");
             return;
         }
 
