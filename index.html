@@ -836,11 +836,12 @@
 
     function renderResourceCards(eleve) {
         var cardsContainer = document.getElementById("cards");
+        var slug = eleve.slug;
         var koalendarUrl = "https://koalendar.com/e/cours-piano-master?name=" + encodeURIComponent(eleve.display);
         var koalendarInitialized = false;
 
         var LINKS = [
-            { id: "outils", icon: ICONS.tools,    title: "Outils",               sub: "Tes exercices interactifs",  url: "/" + eleve.slug + "/outils", internal: true },
+            { id: "outils", icon: ICONS.tools,    title: "Outils",               sub: "Tes exercices interactifs",  url: "/" + slug + "/outils", internal: true },
             { id: "videos", icon: ICONS.play,     title: "Vidéos de formation",  sub: "Bonzai — cours enregistrés", url: "https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master" },
             { id: "live",   icon: ICONS.bolt,     title: "Cours en live",        sub: "Rejoindre sur Discord",      deepLink: "discord://channels/KtJF8dPT", url: "https://discord.gg/KtJF8dPT" },
             { id: "rdv",    icon: ICONS.calendar, title: "Réserver un cours",    sub: "Koalendar",                  isToggle: true }
