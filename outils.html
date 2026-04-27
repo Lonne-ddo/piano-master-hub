@@ -273,17 +273,12 @@
 
         var backLink = document.getElementById("back-link");
 
-        // Fallback : pas de slug valide en première position de l'URL
-        // (ex: /outils direct, ou lien partagé sans slug)
-        // → redirect /{stored}/outils si localStorage existe, sinon /
         if (!eleve) {
-            var stored = null;
-            try { stored = localStorage.getItem("eleve_slug"); } catch (e) {}
-            if (stored && ELEVES_WHITELIST[stored]) {
-                window.location.replace("/" + stored + "/outils");
-                return;
-            }
-            window.location.replace("/");
+            backLink.href = "/";
+            document.getElementById("page-title").textContent = "Espace introuvable";
+            document.getElementById("page-subtitle").textContent = "";
+            document.getElementById("content").innerHTML =
+                '<p class="empty">Cette page n\'est pas reconnue. Retourne à l\'accueil pour t\'identifier.</p>';
             return;
         }
 
