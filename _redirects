@@ -1,10 +1,12 @@
-# Espace élève — URLs personnelles (rewrites status 200, l'URL reste visible)
-# Ordre : routes les plus spécifiques d'abord (devoirs/outils), puis racines.
+# Espace élève — URLs personnelles
+# Ordre : routes les plus spécifiques d'abord (outils), puis racines.
+# /{slug}/devoirs : URL legacy (Commit 1) → redirect 301 vers le dashboard
+# /{slug} = dashboard riche (devoirs intégrés, programme, résumé)
 
-/japhet/devoirs   /devoirs.html  200
-/tara/devoirs     /devoirs.html  200
-/dexter/devoirs   /devoirs.html  200
-/messon/devoirs   /devoirs.html  200
+/japhet/devoirs   /japhet        301
+/tara/devoirs     /tara          301
+/dexter/devoirs   /dexter        301
+/messon/devoirs   /messon        301
 
 /japhet/outils    /outils.html   200
 /tara/outils      /outils.html   200
