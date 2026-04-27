@@ -221,12 +221,8 @@
     </div>
 
     <script>
-    var ELEVES_WHITELIST = {
-        japhet: { display: "Japhet" },
-        tara:   { display: "Tara"   },
-        dexter: { display: "Dexter" },
-        messon: { display: "Messon" }
-    };
+    var ELEVES_WHITELIST = ['japhet', 'tara', 'dexter', 'messon'];
+    var DISPLAY = { japhet: 'Japhet', tara: 'Tara', dexter: 'Dexter', messon: 'Messon' };
 
     function escapeHtml(str) {
         var d = document.createElement("div");
@@ -267,22 +263,24 @@
     ];
 
     (function init() {
-        var pathSegs = window.location.pathname.split('/').filter(Boolean);
-        var slug = pathSegs[0] ? pathSegs[0].toLowerCase() : null;
-        var eleve = slug && ELEVES_WHITELIST[slug] ? ELEVES_WHITELIST[slug] : null;
+        // Slug extrait UNIQUEMENT depuis pathname, jamais depuis localStorage.
+        var parts = window.location.pathname.replace(/^\/+/, '').split('/').filter(Boolean);
+        var slug = parts[0] ? parts[0].toLowerCase() : null;
 
-        var backLink = document.getElementById("back-link");
+        console.log('[outils] pathname:', window.location.pathname, 'slug:', slug);
 
-        // Slug invalide ou absent (ex: /outils direct) → retour à l'écran prénom
-        if (!eleve) {
-            window.location.replace("/");
+        if (!slug || ELEVES_WHITELIST.indexOf(slug) < 0) {
+            console.warn('[outils] slug invalide → redirect /');
+            window.location.replace('/');
             return;
         }
 
-        // Met à jour le localStorage pour cohérence (cf. dashboard /)
-        try { localStorage.setItem("eleve_slug", slug); } catch (e) {}
+        console.log('[outils] slug valide → render Outils de', DISPLAY[slug]);
 
-        backLink.href = "/" + slug;
+        // localStorage écrit (jamais lu) pour cohérence avec dashboard /
+        try { localStorage.setItem('eleve_slug', slug); } catch (e) {}
+
+        document.getElementById('back-link').href = '/' + slug;
 
         var html = '<div class="tools-grid">';
         for (var i = 0; i < TOOLS.length; i++) {

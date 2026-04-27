@@ -380,12 +380,8 @@
     <div class="toast" id="toast"></div>
 
     <script>
-    var ELEVES_WHITELIST = {
-        japhet: { display: "Japhet" },
-        tara:   { display: "Tara"   },
-        dexter: { display: "Dexter" },
-        messon: { display: "Messon" }
-    };
+    var ELEVES_WHITELIST = ['japhet', 'tara', 'dexter', 'messon'];
+    var DISPLAY = { japhet: 'Japhet', tara: 'Tara', dexter: 'Dexter', messon: 'Messon' };
 
     function escapeHtml(str) {
         var d = document.createElement("div");
@@ -470,22 +466,23 @@
     }
 
     (function init() {
-        var pathSegs = window.location.pathname.split('/').filter(Boolean);
-        var slug = pathSegs[0] ? pathSegs[0].toLowerCase() : null;
-        var eleve = slug && ELEVES_WHITELIST[slug] ? ELEVES_WHITELIST[slug] : null;
+        // Slug extrait UNIQUEMENT depuis pathname, jamais depuis localStorage.
+        var parts = window.location.pathname.replace(/^\/+/, '').split('/').filter(Boolean);
+        var slug = parts[0] ? parts[0].toLowerCase() : null;
 
-        var backLink = document.getElementById("back-link");
+        console.log('[quiz] pathname:', window.location.pathname, 'slug:', slug);
 
-        if (!eleve) {
-            backLink.href = "/";
-            document.getElementById("content").innerHTML =
-                '<p class="empty">Cette page n\'est pas reconnue. Retourne à l\'accueil pour t\'identifier.</p>';
+        if (!slug || ELEVES_WHITELIST.indexOf(slug) < 0) {
+            console.warn('[quiz] slug invalide → redirect /');
+            window.location.replace('/');
             return;
         }
 
-        try { localStorage.setItem("eleve_slug", slug); } catch (e) {}
+        console.log('[quiz] slug valide → render Quiz pour', DISPLAY[slug]);
+
+        try { localStorage.setItem('eleve_slug', slug); } catch (e) {}
         state.slug = slug;
-        backLink.href = "/" + slug + "/outils";
+        document.getElementById('back-link').href = '/' + slug + '/outils';
 
         // Build sections
         var html = '';
