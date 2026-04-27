@@ -1,23 +1,18 @@
-# Espace élève — URLs personnelles
-# Ordre : routes les plus spécifiques d'abord (outils), puis racines.
-# /{slug}/devoirs : URL legacy (Commit 1) → redirect 301 vers le dashboard
-# /{slug} = dashboard riche (devoirs intégrés, programme, résumé)
-
-/japhet/devoirs   /japhet        301
-/tara/devoirs     /tara          301
-/dexter/devoirs   /dexter        301
-/messon/devoirs   /messon        301
-
+# Espace élève — URLs personnelles (Cloudflare Pages)
+# Règles spécifiques EN PREMIER, racines à la fin. Pas de catch-all.
+# Devoirs : pas de page séparée (intégré dans le dashboard) → 301 vers /{slug}.
 /japhet/outils    /outils.html   200
 /tara/outils      /outils.html   200
 /dexter/outils    /outils.html   200
 /messon/outils    /outils.html   200
-
 /japhet/quiz      /quiz.html     200
 /tara/quiz        /quiz.html     200
 /dexter/quiz      /quiz.html     200
 /messon/quiz      /quiz.html     200
-
+/japhet/devoirs   /japhet        301
+/tara/devoirs     /tara          301
+/dexter/devoirs   /dexter        301
+/messon/devoirs   /messon        301
 /japhet           /index.html    200
 /tara             /index.html    200
 /dexter           /index.html    200
