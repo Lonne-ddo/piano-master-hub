@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Master Hub — Outils</title>
+    <meta name="theme-color" content="#0f0f14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="Master Hub — Outils élève.">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+">
+    <style>
+        :root {
+            --bg: #0f0f14;
+            --bg-card: #1a1a24;
+            --bg-card-hover: #22222f;
+            --text: #eee;
+            --text-muted: #888;
+            --accent: #c9a84c;
+            --accent-soft: rgba(201, 168, 76, 0.12);
+            --radius: 16px;
+            --tap-min: 48px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 24px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+
+        .back-link {
+            align-self: flex-start;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-decoration: none;
+            padding: 4px 8px;
+            margin-bottom: 8px;
+        }
+
+        .back-link:hover { color: var(--text); }
+
+        .header {
+            text-align: center;
+            padding: 16px 0 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #fff;
+        }
+
+        .header .meta {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .cards {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 28px;
+            width: 100%;
+        }
+
+        .card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--radius);
+            padding: 16px;
+            min-height: var(--tap-min);
+            opacity: 0.55;
+            transition: background 0.2s;
+        }
+
+        .card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: var(--accent-soft);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .card-body { flex: 1; min-width: 0; }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            line-height: 1.3;
+        }
+
+        .card-sub {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .card-tag {
+            font-size: 0.72rem;
+            color: var(--accent);
+            background: var(--accent-soft);
+            padding: 3px 8px;
+            border-radius: 999px;
+            flex-shrink: 0;
+            font-weight: 600;
+        }
+
+        .empty {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--radius);
+            padding: 20px;
+            text-align: center;
+            margin-top: 28px;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div class="container">
+        <a href="#" class="back-link" id="back-link">&larr; Retour</a>
+        <header class="header">
+            <h1 id="page-title">Outils</h1>
+            <div class="meta" id="page-meta"></div>
+        </header>
+        <div id="content"></div>
+    </div>
+
+    <script>
+    var ELEVES_WHITELIST = {
+        japhet: { display: "Japhet" },
+        tara:   { display: "Tara"   },
+        dexter: { display: "Dexter" },
+        messon: { display: "Messon" }
+    };
+
+    function escapeHtml(str) {
+        var d = document.createElement("div");
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    var TOOLS = [
+        { icon: "\uD83C\uDFB5", title: "Quiz musical",          sub: "Reconnaître intervalles, accords, modes" },
+        { icon: "\uD83C\uDFB9", title: "Grilles harmoniques",   sub: "Progressions classiques à pratiquer"     },
+        { icon: "\u23F1\uFE0F", title: "Métronome",              sub: "Tempo, subdivisions, accents"             },
+        { icon: "\uD83D\uDCD6", title: "Dictionnaire d'accords", sub: "Voicings et inversions"                   }
+    ];
+
+    (function init() {
+        var pathMatch = window.location.pathname.match(/^\/([^\/]+)\/outils\/?$/);
+        var slug = pathMatch ? pathMatch[1].toLowerCase() : null;
+        var eleve = slug && ELEVES_WHITELIST[slug] ? ELEVES_WHITELIST[slug] : null;
+
+        var backLink = document.getElementById("back-link");
+        backLink.href = slug ? "/" + slug : "/";
+
+        if (!eleve) {
+            document.getElementById("page-title").textContent = "Espace introuvable";
+            document.getElementById("content").innerHTML =
+                '<p class="empty">Cette page n\'est pas reconnue. Retourne à l\'accueil pour t\'identifier.</p>';
+            return;
+        }
+
+        document.getElementById("page-title").textContent = "Outils";
+        document.getElementById("page-meta").textContent = "Bientôt disponibles pour " + eleve.display;
+
+        var html = '<div class="cards">';
+        for (var i = 0; i < TOOLS.length; i++) {
+            var t = TOOLS[i];
+            html +=
+                '<div class="card">' +
+                    '<div class="card-icon">' + t.icon + '</div>' +
+                    '<div class="card-body">' +
+                        '<div class="card-title">' + escapeHtml(t.title) + '</div>' +
+                        '<div class="card-sub">' + escapeHtml(t.sub) + '</div>' +
+                    '</div>' +
+                    '<span class="card-tag">À venir</span>' +
+                '</div>';
+        }
+        html += '</div>';
+        document.getElementById("content").innerHTML = html;
+    })();
+    </script>
+
+    <script>
+    (function() {
+        var canvas = document.getElementById("bg-canvas");
+        var ctx = canvas.getContext("2d");
+        var particles = [];
+        var COUNT = 18;
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", resize);
+        resize();
+
+        function createParticle() {
+            var w = 6 + Math.random() * 4;
+            var h = 18 + Math.random() * 10;
+            return {
+                x: Math.random() * canvas.width,
+                y: canvas.height + h,
+                w: w, h: h, r: 2,
+                speed: 0.15 + Math.random() * 0.35,
+                opacity: 0.04 + Math.random() * 0.04,
+                drift: (Math.random() - 0.5) * 0.3
+            };
+        }
+
+        for (var i = 0; i < COUNT; i++) {
+            var p = createParticle();
+            p.y = Math.random() * canvas.height;
+            particles.push(p);
+        }
+
+        function drawRoundRect(x, y, w, h, r, alpha) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < particles.length; i++) {
+                var p = particles[i];
+                p.y -= p.speed;
+                p.x += p.drift;
+                drawRoundRect(p.x, p.y, p.w, p.h, p.r, p.opacity);
+                if (p.y + p.h < 0) particles[i] = createParticle();
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+    })();
+    </script>
+
+</body>
+</html>

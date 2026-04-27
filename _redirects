@@ -1,0 +1,17 @@
+# Espace élève — URLs personnelles (rewrites status 200, l'URL reste visible)
+# Ordre : routes les plus spécifiques d'abord (devoirs/outils), puis racines.
+
+/japhet/devoirs   /devoirs.html  200
+/tara/devoirs     /devoirs.html  200
+/dexter/devoirs   /devoirs.html  200
+/messon/devoirs   /devoirs.html  200
+
+/japhet/outils    /outils.html   200
+/tara/outils      /outils.html   200
+/dexter/outils    /outils.html   200
+/messon/outils    /outils.html   200
+
+/japhet           /index.html    200
+/tara             /index.html    200
+/dexter           /index.html    200
+/messon           /index.html    200

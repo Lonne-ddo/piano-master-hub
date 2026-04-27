@@ -123,6 +123,10 @@
             font-weight: 400;
         }
 
+        #content {
+            width: 100%;
+        }
+
         /* Cards */
         .cards {
             display: flex;
@@ -150,10 +154,12 @@
         }
 
         .card:nth-child(1) { animation-delay: 0.05s; }
-        .card:nth-child(2) { animation-delay: 0.1s; }
+        .card:nth-child(2) { animation-delay: 0.10s; }
         .card:nth-child(3) { animation-delay: 0.15s; }
-        .card:nth-child(4) { animation-delay: 0.2s; }
+        .card:nth-child(4) { animation-delay: 0.20s; }
         .card:nth-child(5) { animation-delay: 0.25s; }
+        .card:nth-child(6) { animation-delay: 0.30s; }
+        .card:nth-child(7) { animation-delay: 0.35s; }
 
         @keyframes fadeInUp {
             to { opacity: 1; transform: translateY(0); }
@@ -243,6 +249,101 @@
             transform: rotate(180deg);
         }
 
+        /* Prénom input (élève non identifié) */
+        .prenom-section {
+            width: 100%;
+            margin-top: 28px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--radius);
+            padding: 24px 20px;
+        }
+
+        .prenom-section h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+
+        .prenom-section .lead {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+        }
+
+        .prenom-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .prenom-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .prenom-input:focus {
+            border-color: var(--accent);
+        }
+
+        .prenom-submit {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--accent);
+            color: #0f0f14;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            min-height: var(--tap-min);
+            transition: opacity 0.2s, transform 0.15s;
+        }
+
+        .prenom-submit:active {
+            transform: scale(0.97);
+            opacity: 0.85;
+        }
+
+        .prenom-error {
+            color: #ff6b6b;
+            font-size: 0.82rem;
+            margin-top: 4px;
+            min-height: 1em;
+        }
+
+        /* Footer "Changer de profil" */
+        .footer-actions {
+            margin-top: 32px;
+            text-align: center;
+            width: 100%;
+        }
+
+        .footer-actions button {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            cursor: pointer;
+            font-family: inherit;
+            padding: 8px 12px;
+        }
+
+        .footer-actions button:hover {
+            color: var(--text);
+            text-decoration: underline;
+        }
+
     </style>
 </head>
 <body>
@@ -262,121 +363,158 @@
             <p class="subtitle">Espace élève</p>
             <div id="greeting"></div>
         </header>
-        <div class="cards" id="cards"></div>
+        <div id="content"></div>
+        <div id="footer"></div>
     </div>
 
     <script>
     // ──────────────────────────────────────────────
-    //  CONFIG ÉLÈVES — modifier ici pour ajouter/retirer
+    //  WHITELIST ÉLÈVES — slugs + prénom + alias only.
+    //  Aucune URL Drive/Telegram/Koalendar custom ici :
+    //  les données privées sont servies par /api/eleves/{slug}/...
     // ──────────────────────────────────────────────
-    const ELEVES = {
-        messon: { nom: "Messon", drive: "https://drive.google.com/drive/folders/1fWxnPi8uMfhpPPv182CelgjVnNuy4U9R?usp=drive_link", telegram: "", koalendar: "https://koalendar.com/e/cours-piano-master?name=Messon" },
-        tara:   { nom: "Tara",   drive: "https://drive.google.com/drive/folders/1b18WMHYT2cDYM3DLbEUU7WzLqKBMhtts?usp=drive_link", telegram: "", koalendar: "https://koalendar.com/e/cours-piano-master?name=Tara" },
-        japhet: { nom: "Japhet", drive: "https://drive.google.com/drive/folders/1AUB8zd4LgfOfQ5lcGeEm0z3bYNzZTfYc?usp=sharing", telegram: "https://t.me/+Kt0JwAghijoxODk0", koalendar: "https://koalendar.com/e/cours-piano-master?name=Japhet" },
-        dexter: { nom: "Dexter", drive: "https://drive.google.com/drive/folders/1Mk7aXS0SsI2B74gfHZtGcm09PccUOTu1?usp=drive_link", telegram: "https://t.me/+o4DoTBKy2XllMGE0", koalendar: "https://koalendar.com/e/cours-piano-master?name=Dexter" },
+    var ELEVES_WHITELIST = {
+        japhet: { display: "Japhet", aliases: ["japhet"] },
+        tara:   { display: "Tara",   aliases: ["tara"] },
+        dexter: { display: "Dexter", aliases: ["dexter"] },
+        messon: { display: "Messon", aliases: ["messon"] }
     };
 
     // ──────────────────────────────────────────────
-    //  LIENS — deep links + fallback navigateur
+    //  Helpers
     // ──────────────────────────────────────────────
-    // SVG icons (white, 20x20)
+    function normalize(s) {
+        return String(s == null ? "" : s)
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLowerCase()
+            .trim();
+    }
+
+    function findEleveBySlug(slug) {
+        var key = normalize(slug);
+        if (!key || !ELEVES_WHITELIST[key]) return null;
+        return { slug: key, display: ELEVES_WHITELIST[key].display };
+    }
+
+    function findEleveByName(name) {
+        var norm = normalize(name);
+        if (!norm) return null;
+        for (var slug in ELEVES_WHITELIST) {
+            var aliases = ELEVES_WHITELIST[slug].aliases || [];
+            for (var i = 0; i < aliases.length; i++) {
+                if (normalize(aliases[i]) === norm) {
+                    return { slug: slug, display: ELEVES_WHITELIST[slug].display };
+                }
+            }
+        }
+        return null;
+    }
+
+    function escapeHtml(str) {
+        var d = document.createElement("div");
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    // ──────────────────────────────────────────────
+    //  Icônes (SVG inline, blanc 20x20)
+    // ──────────────────────────────────────────────
     var ICONS = {
         play:     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="7,4 19,12 7,20" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" fill="none"/></svg>',
-        folder:   '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 6a2 2 0 012-2h5l2 2h9a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" stroke="#fff" stroke-width="1.5" fill="none"/></svg>',
-        bolt:     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" fill="none"/></svg>',
-        calendar: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="18" height="18" rx="3" stroke="#fff" stroke-width="1.5" fill="none"/><line x1="3" y1="10" x2="21" y2="10" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="2" x2="8" y2="6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><line x1="16" y1="2" x2="16" y2="6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>',
-        chat:     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 12c0 4.418-4.03 8-9 8a9.86 9.86 0 01-4.255-.96L3 21l1.395-4.672C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" stroke="#fff" stroke-width="1.5" fill="none"/></svg>',
         pianokey: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="2" width="16" height="20" rx="2" stroke="#fff" stroke-width="1.5" fill="none"/><rect x="8" y="2" width="8" height="10" rx="1" stroke="#fff" stroke-width="1.5" fill="none"/></svg>',
+        tools:    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
+        book:     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 4.5A2.5 2.5 0 016.5 2H20v18H6.5A2.5 2.5 0 014 17.5v-13z" stroke="#fff" stroke-width="1.5" fill="none"/><path d="M4 17.5A2.5 2.5 0 016.5 15H20" stroke="#fff" stroke-width="1.5" fill="none"/></svg>',
+        bolt:     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" fill="none"/></svg>',
+        calendar: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="18" height="18" rx="3" stroke="#fff" stroke-width="1.5" fill="none"/><line x1="3" y1="10" x2="21" y2="10" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="2" x2="8" y2="6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><line x1="16" y1="2" x2="16" y2="6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>'
     };
 
-    const LINKS = [
-        {
-            id: "videos",
-            icon: ICONS.play,
-            title: "Vidéos de formation",
-            sub: "Bonzai — cours enregistrés",
-            url: "https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master",
-        },
-        {
-            id: "pianokey",
-            icon: ICONS.pianokey,
-            title: "Piano Key",
-            sub: "Application interactive",
-            deepLink: "pianokey://",
-            url: "https://www.piano-key.com/",
-            mobileOnly: true,
-        },
-        {
-            id: "drive",
-            icon: ICONS.folder,
-            title: "Mon dossier",
-            sub: "Google Drive — ressources et notes",
-            url: null,
-            needsEleve: true,
-        },
-        {
-            id: "live",
-            icon: ICONS.bolt,
-            title: "Cours en live",
-            sub: "Rejoindre sur Discord",
-            deepLink: "discord://channels/KtJF8dPT",
-            url: "https://discord.gg/KtJF8dPT",
-        },
-        {
-            id: "rdv",
-            icon: ICONS.calendar,
-            title: "Réserver un cours",
-            sub: "Koalendar",
-            isToggle: true,
-        },
-        {
-            id: "chat",
-            icon: ICONS.chat,
-            title: "Canal de discussion",
-            sub: "Telegram",
-            deepLink: "tg://resolve?domain=À_REMPLACER",
-            url: "https://t.me/À_REMPLACER",
-            needsTelegram: true,
-        },
-    ];
-
     // ──────────────────────────────────────────────
-    //  INIT
+    //  Init — détection slug par URL puis fallback localStorage
     // ──────────────────────────────────────────────
     (function init() {
-        const params = new URLSearchParams(window.location.search);
-        const eleveKey = (params.get("eleve") || "").toLowerCase();
-        const eleve = ELEVES[eleveKey] || null;
+        var pathMatch = window.location.pathname.match(/^\/([^\/]+)\/?$/);
+        var pathSlug = pathMatch ? normalize(pathMatch[1]) : null;
+        var eleve = pathSlug ? findEleveBySlug(pathSlug) : null;
 
-        // Greeting
-        if (eleve) {
-            document.getElementById("greeting").innerHTML =
-                '<p class="greeting">Bonjour ' + escapeHtml(eleve.nom) + ' \uD83D\uDC4B</p>';
+        if (!eleve) {
+            var stored = localStorage.getItem("eleve_slug");
+            if (stored) eleve = findEleveBySlug(stored);
         }
 
-        // Build cards
-        const container = document.getElementById("cards");
+        if (eleve) {
+            localStorage.setItem("eleve_slug", eleve.slug);
+            renderEspaceEleve(eleve);
+        } else {
+            renderPrenomInput();
+        }
+    })();
 
-        var koalendarUrl = (eleve && eleve.koalendar)
-            ? eleve.koalendar
-            : "https://koalendar.com/e/cours-piano-master";
+    // ──────────────────────────────────────────────
+    //  Mode 1 — élève non identifié : input prénom
+    // ──────────────────────────────────────────────
+    function renderPrenomInput() {
+        var content = document.getElementById("content");
+        content.innerHTML =
+            '<div class="prenom-section">' +
+                '<h2>Bienvenue</h2>' +
+                '<p class="lead">Entre ton prénom pour accéder à ton espace.</p>' +
+                '<form class="prenom-form" id="prenom-form" autocomplete="off">' +
+                    '<input type="text" class="prenom-input" id="prenom-input" placeholder="Ton prénom" autocapitalize="words" autocomplete="given-name" />' +
+                    '<button type="submit" class="prenom-submit">Entrer</button>' +
+                    '<div class="prenom-error" id="prenom-error"></div>' +
+                '</form>' +
+            '</div>';
+
+        var form = document.getElementById("prenom-form");
+        var input = document.getElementById("prenom-input");
+        var errorBox = document.getElementById("prenom-error");
+
+        form.addEventListener("submit", function(e) {
+            e.preventDefault();
+            errorBox.textContent = "";
+            var match = findEleveByName(input.value);
+            if (!match) {
+                errorBox.textContent = "Prénom inconnu. Vérifie l'orthographe.";
+                return;
+            }
+            localStorage.setItem("eleve_slug", match.slug);
+            window.location.href = "/" + match.slug;
+        });
+
+        setTimeout(function() { try { input.focus(); } catch (e) {} }, 200);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Mode 2 — élève identifié : 6 cards + footer
+    // ──────────────────────────────────────────────
+    function renderEspaceEleve(eleve) {
+        var greeting = document.getElementById("greeting");
+        greeting.innerHTML = '<p class="greeting">Bonjour ' + escapeHtml(eleve.display) + ' \uD83D\uDC4B</p>';
+
+        var content = document.getElementById("content");
+        content.innerHTML = '<div class="cards" id="cards"></div>';
+        var cardsContainer = document.getElementById("cards");
+
+        var koalendarUrl = "https://koalendar.com/e/cours-piano-master?name=" + encodeURIComponent(eleve.display);
         var koalendarInitialized = false;
 
+        var LINKS = [
+            { id: "videos",   icon: ICONS.play,     title: "Vidéos de formation", sub: "Bonzai — cours enregistrés",          url: "https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master" },
+            { id: "pianokey", icon: ICONS.pianokey, title: "Piano Key",            sub: "Application interactive",              deepLink: "pianokey://", url: "https://www.piano-key.com/", mobileOnly: true },
+            { id: "outils",   icon: ICONS.tools,    title: "Outils",               sub: "Quiz, grilles, métronome (à venir)",   url: "/" + eleve.slug + "/outils", internal: true },
+            { id: "devoirs",  icon: ICONS.book,     title: "Devoirs",              sub: "Tes exercices du dernier cours",       url: "/" + eleve.slug + "/devoirs", internal: true },
+            { id: "live",     icon: ICONS.bolt,     title: "Cours en live",        sub: "Rejoindre sur Discord",                deepLink: "discord://channels/KtJF8dPT", url: "https://discord.gg/KtJF8dPT" },
+            { id: "rdv",      icon: ICONS.calendar, title: "Réserver un cours",    sub: "Koalendar",                            isToggle: true }
+        ];
+
         LINKS.forEach(function(link) {
-            // Skip Drive card if no student or empty drive URL
-            if (link.needsEleve && (!eleve || !eleve.drive)) return;
-
-            // Skip Telegram card if no student or empty telegram URL
-            if (link.needsTelegram && (!eleve || !eleve.telegram)) return;
-
-            // Toggle card for Koalendar
             if (link.isToggle) {
                 var btn = document.createElement("div");
                 btn.className = "card";
                 btn.setAttribute("role", "button");
                 btn.setAttribute("tabindex", "0");
                 btn.style.cursor = "pointer";
-
                 btn.innerHTML =
                     '<div class="card-icon">' + link.icon + '</div>' +
                     '<div class="card-body">' +
@@ -384,17 +522,15 @@
                         '<div class="card-sub">' + escapeHtml(link.sub) + '</div>' +
                     '</div>' +
                     '<span class="card-chevron">\u25BC</span>';
+                cardsContainer.appendChild(btn);
 
-                container.appendChild(btn);
-
-                // Koalendar section right after the card
                 var section = document.createElement("div");
                 section.className = "koalendar-section";
                 section.innerHTML =
                     '<div class="koalendar-wrapper">' +
                         '<div id="inline-widget-cours-piano-master"></div>' +
                     '</div>';
-                container.appendChild(section);
+                cardsContainer.appendChild(section);
 
                 btn.addEventListener("click", function() {
                     var isOpen = section.classList.toggle("open");
@@ -408,36 +544,25 @@
                         });
                     }
                 });
-
                 return;
-            }
-
-            var href = link.needsEleve && eleve ? eleve.drive : link.url;
-            var deepLink = link.deepLink || null;
-
-            // Per-student Telegram override
-            if (link.id === "chat" && eleve && eleve.telegram) {
-                href = eleve.telegram;
-                // Derive deep link: https://t.me/+CODE → tg://join?invite=CODE
-                var tgMatch = eleve.telegram.match(/t\.me\/\+(.+)/);
-                deepLink = tgMatch ? "tg://join?invite=" + tgMatch[1] : null;
             }
 
             var a = document.createElement("a");
             a.className = "card";
-            a.href = href;
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
+            a.href = link.url;
+            if (!link.internal) {
+                a.target = "_blank";
+                a.rel = "noopener noreferrer";
+            }
 
-            // Deep link: try native app first
-            if (deepLink) {
+            if (link.deepLink) {
                 var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
                 var useDeepLink = link.mobileOnly ? isMobile : true;
                 if (useDeepLink) {
                     a.addEventListener("click", function(e) {
                         e.preventDefault();
-                        window.location.href = deepLink;
-                        setTimeout(function() { window.open(href, "_blank", "noopener"); }, 800);
+                        window.location.href = link.deepLink;
+                        setTimeout(function() { window.open(link.url, "_blank", "noopener"); }, 800);
                     });
                 }
             }
@@ -449,26 +574,32 @@
                     '<div class="card-sub">' + escapeHtml(link.sub) + '</div>' +
                 '</div>' +
                 '<span class="card-arrow">\u203A</span>';
-
-            container.appendChild(a);
+            cardsContainer.appendChild(a);
         });
 
-        // Register manifest
-        const manifestTag = document.querySelector('script[type="application/manifest+json"]');
-        if (manifestTag) {
-            const blob = new Blob([manifestTag.textContent], { type: "application/json" });
-            const link = document.createElement("link");
-            link.rel = "manifest";
-            link.href = URL.createObjectURL(blob);
-            document.head.appendChild(link);
-        }
-    })();
-
-    function escapeHtml(str) {
-        var d = document.createElement("div");
-        d.textContent = str;
-        return d.innerHTML;
+        var footer = document.getElementById("footer");
+        footer.innerHTML =
+            '<div class="footer-actions">' +
+                '<button type="button" id="change-profile-btn">Changer de profil</button>' +
+            '</div>';
+        document.getElementById("change-profile-btn").addEventListener("click", function() {
+            localStorage.removeItem("eleve_slug");
+            window.location.href = "/";
+        });
     }
+
+    // ──────────────────────────────────────────────
+    //  PWA manifest (inline blob)
+    // ──────────────────────────────────────────────
+    (function() {
+        var manifestTag = document.querySelector('script[type="application/manifest+json"]');
+        if (!manifestTag) return;
+        var blob = new Blob([manifestTag.textContent], { type: "application/json" });
+        var link = document.createElement("link");
+        link.rel = "manifest";
+        link.href = URL.createObjectURL(blob);
+        document.head.appendChild(link);
+    })();
     </script>
 
     <script>
