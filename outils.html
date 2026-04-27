@@ -273,12 +273,9 @@
 
         var backLink = document.getElementById("back-link");
 
+        // Slug invalide ou absent (ex: /outils direct) → retour à l'écran prénom
         if (!eleve) {
-            backLink.href = "/";
-            document.getElementById("page-title").textContent = "Espace introuvable";
-            document.getElementById("page-subtitle").textContent = "";
-            document.getElementById("content").innerHTML =
-                '<p class="empty">Cette page n\'est pas reconnue. Retourne à l\'accueil pour t\'identifier.</p>';
+            window.location.replace("/");
             return;
         }
 
