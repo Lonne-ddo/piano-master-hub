@@ -840,79 +840,75 @@
         var koalendarUrl = "https://koalendar.com/e/cours-piano-master?name=" + encodeURIComponent(eleve.display);
         var koalendarInitialized = false;
 
-        var LINKS = [
-            { id: "outils", icon: ICONS.tools,    title: "Outils",               sub: "Tes exercices interactifs",  url: "/" + slug + "/outils", internal: true },
-            { id: "videos", icon: ICONS.play,     title: "Vidéos de formation",  sub: "Bonzai — cours enregistrés", url: "https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master" },
-            { id: "live",   icon: ICONS.bolt,     title: "Cours en live",        sub: "Rejoindre sur Discord",      deepLink: "discord://channels/KtJF8dPT", url: "https://discord.gg/KtJF8dPT" },
-            { id: "rdv",    icon: ICONS.calendar, title: "Réserver un cours",    sub: "Koalendar",                  isToggle: true }
-        ];
-
-        LINKS.forEach(function(link) {
-            if (link.isToggle) {
-                var btn = document.createElement("div");
-                btn.className = "card";
-                btn.setAttribute("role", "button");
-                btn.setAttribute("tabindex", "0");
-                btn.style.cursor = "pointer";
-                btn.innerHTML =
-                    '<div class="card-icon">' + link.icon + '</div>' +
-                    '<div class="card-body">' +
-                        '<div class="card-title">' + escapeHtml(link.title) + '</div>' +
-                        '<div class="card-sub">' + escapeHtml(link.sub) + '</div>' +
-                    '</div>' +
-                    '<span class="card-chevron">\u25BC</span>';
-                cardsContainer.appendChild(btn);
-
-                var section = document.createElement("div");
-                section.className = "koalendar-section";
-                section.innerHTML =
-                    '<div class="koalendar-wrapper">' +
-                        '<div id="inline-widget-cours-piano-master"></div>' +
-                    '</div>';
-                cardsContainer.appendChild(section);
-
-                btn.addEventListener("click", function() {
-                    var isOpen = section.classList.toggle("open");
-                    var chevron = btn.querySelector(".card-chevron");
-                    if (chevron) chevron.classList.toggle("open", isOpen);
-                    if (isOpen && !koalendarInitialized) {
-                        koalendarInitialized = true;
-                        Koalendar("inline", {
-                            "url": koalendarUrl,
-                            "selector": "#inline-widget-cours-piano-master"
-                        });
-                    }
-                });
-                return;
-            }
-
-            var a = document.createElement("a");
-            a.className = "card";
-            a.href = link.url;
-            if (!link.internal) {
-                a.target = "_blank";
-                a.rel = "noopener noreferrer";
-            }
-
-            if (link.deepLink) {
-                var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-                if (isMobile) {
-                    a.addEventListener("click", function(e) {
-                        e.preventDefault();
-                        window.location.href = link.deepLink;
-                        setTimeout(function() { window.open(link.url, "_blank", "noopener"); }, 800);
-                    });
-                }
-            }
-
-            a.innerHTML =
-                '<div class="card-icon">' + link.icon + '</div>' +
+        // Cartes générées en HTML template inline. Outils est un vrai <a> avec
+        // href interpolé sur le slug courant — pas de div+JS handler.
+        cardsContainer.innerHTML =
+            // Outils — anchor interne avec slug dynamique
+            '<a class="card" href="/' + escapeHtml(slug) + '/outils">' +
+                '<div class="card-icon">' + ICONS.tools + '</div>' +
                 '<div class="card-body">' +
-                    '<div class="card-title">' + escapeHtml(link.title) + '</div>' +
-                    '<div class="card-sub">' + escapeHtml(link.sub) + '</div>' +
+                    '<div class="card-title">Outils</div>' +
+                    '<div class="card-sub">Tes exercices interactifs</div>' +
                 '</div>' +
-                '<span class="card-arrow">\u203A</span>';
-            cardsContainer.appendChild(a);
+                '<span class="card-arrow">\u203A</span>' +
+            '</a>' +
+            // Vidéos — anchor externe Bonzai
+            '<a class="card" href="https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master" target="_blank" rel="noopener noreferrer">' +
+                '<div class="card-icon">' + ICONS.play + '</div>' +
+                '<div class="card-body">' +
+                    '<div class="card-title">Vidéos de formation</div>' +
+                    '<div class="card-sub">Bonzai — cours enregistrés</div>' +
+                '</div>' +
+                '<span class="card-arrow">\u203A</span>' +
+            '</a>' +
+            // Cours en live — anchor Discord (deeplink mobile câblé après render)
+            '<a class="card" id="card-live" href="https://discord.gg/KtJF8dPT" target="_blank" rel="noopener noreferrer">' +
+                '<div class="card-icon">' + ICONS.bolt + '</div>' +
+                '<div class="card-body">' +
+                    '<div class="card-title">Cours en live</div>' +
+                    '<div class="card-sub">Rejoindre sur Discord</div>' +
+                '</div>' +
+                '<span class="card-arrow">\u203A</span>' +
+            '</a>' +
+            // Réserver — bouton toggle pour widget Koalendar inline
+            '<div class="card" role="button" tabindex="0" id="card-rdv" style="cursor:pointer">' +
+                '<div class="card-icon">' + ICONS.calendar + '</div>' +
+                '<div class="card-body">' +
+                    '<div class="card-title">Réserver un cours</div>' +
+                    '<div class="card-sub">Koalendar</div>' +
+                '</div>' +
+                '<span class="card-chevron">\u25BC</span>' +
+            '</div>' +
+            '<div class="koalendar-section" id="koalendar-section">' +
+                '<div class="koalendar-wrapper">' +
+                    '<div id="inline-widget-cours-piano-master"></div>' +
+                '</div>' +
+            '</div>';
+
+        // Discord deeplink sur mobile (fallback web après 800 ms)
+        var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile) {
+            document.getElementById("card-live").addEventListener("click", function(e) {
+                e.preventDefault();
+                window.location.href = "discord://channels/KtJF8dPT";
+                setTimeout(function() { window.open("https://discord.gg/KtJF8dPT", "_blank", "noopener"); }, 800);
+            });
+        }
+
+        // Toggle Koalendar inline
+        var rdvBtn = document.getElementById("card-rdv");
+        var koalendarSection = document.getElementById("koalendar-section");
+        rdvBtn.addEventListener("click", function() {
+            var isOpen = koalendarSection.classList.toggle("open");
+            var chevron = rdvBtn.querySelector(".card-chevron");
+            if (chevron) chevron.classList.toggle("open", isOpen);
+            if (isOpen && !koalendarInitialized) {
+                koalendarInitialized = true;
+                Koalendar("inline", {
+                    "url": koalendarUrl,
+                    "selector": "#inline-widget-cours-piano-master"
+                });
+            }
         });
     }
 
