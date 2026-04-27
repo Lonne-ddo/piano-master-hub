@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Master Hub — Quiz musical</title>
+    <meta name="theme-color" content="#0f0f14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="Master Hub — Quiz musical : choisis catégorie et niveau.">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+">
+    <style>
+        :root {
+            --bg: #0f0f14;
+            --bg-card: #1a1a24;
+            --bg-card-hover: #22222f;
+            --text: #eee;
+            --text-muted: #888;
+            --v: #8B6FE8;
+            --v-soft: rgba(139, 111, 232, 0.08);
+            --v-soft-stronger: rgba(139, 111, 232, 0.14);
+            --v-border: rgba(139, 111, 232, 0.3);
+            --radius: 16px;
+            --tap-min: 48px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 24px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            min-height: 100dvh;
+        }
+
+        .back-link {
+            align-self: flex-start;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-decoration: none;
+            padding: 6px 8px;
+            margin-bottom: 8px;
+            transition: color 0.15s;
+        }
+
+        .back-link:hover { color: var(--text); }
+
+        .header {
+            text-align: center;
+            padding: 16px 0 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #fff;
+        }
+
+        .header .subtitle {
+            font-size: 0.92rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .quiz-section {
+            width: 100%;
+            margin-top: 28px;
+        }
+
+        .section-title {
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 600;
+            margin-bottom: 12px;
+            padding: 0 4px;
+        }
+
+        /* ── Cards catégorie ─────────────────────────────────── */
+        .cat-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        @media (min-width: 600px) {
+            .cat-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+        }
+
+        .cat-card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: var(--bg-card);
+            border: 2px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 16px 18px;
+            min-height: 96px;
+            text-align: left;
+            color: var(--text);
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.18s, border-color 0.18s, transform 0.15s;
+        }
+
+        .cat-card:active {
+            transform: scale(0.98);
+        }
+
+        @media (hover: hover) {
+            .cat-card:not(.disabled):hover {
+                background: var(--bg-card-hover);
+                border-color: var(--v-border);
+            }
+        }
+
+        .cat-card.selected {
+            border-color: var(--v);
+            background: var(--v-soft-stronger);
+        }
+
+        .cat-card.disabled {
+            opacity: 0.5;
+            filter: grayscale(0.4);
+            cursor: not-allowed;
+        }
+
+        .cat-card-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cat-card-icon {
+            font-size: 1.35rem;
+            line-height: 1;
+        }
+
+        .cat-card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #fff;
+            line-height: 1.25;
+        }
+
+        .cat-card-sub {
+            font-size: 0.84rem;
+            color: var(--text-muted);
+            line-height: 1.45;
+        }
+
+        .cat-card-check {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--v);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0.6);
+            transition: opacity 0.18s, transform 0.18s;
+        }
+
+        .cat-card.selected .cat-card-check {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .cat-card-tag {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        /* ── Boutons niveau ─────────────────────────────────── */
+        .level-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .level-btn {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            background: var(--bg-card);
+            border: 2px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 14px 8px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.92rem;
+            font-weight: 600;
+            cursor: pointer;
+            min-height: var(--tap-min);
+            transition: background 0.18s, border-color 0.18s, transform 0.15s;
+        }
+
+        .level-btn:active { transform: scale(0.97); }
+
+        @media (hover: hover) {
+            .level-btn:hover {
+                background: var(--bg-card-hover);
+                border-color: var(--v-border);
+            }
+        }
+
+        .level-btn.selected {
+            border-color: var(--v);
+            background: var(--v-soft-stronger);
+        }
+
+        .level-btn-dot {
+            font-size: 1.05rem;
+            line-height: 1;
+        }
+
+        .level-btn-check {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--v);
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transform: scale(0.6);
+            transition: opacity 0.18s, transform 0.18s;
+        }
+
+        .level-btn.selected .level-btn-check {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* ── Bouton Lancer ─────────────────────────────────── */
+        .launch-btn {
+            margin-top: 32px;
+            width: 100%;
+            padding: 16px 18px;
+            background: var(--v);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            min-height: 52px;
+            transition: opacity 0.2s, transform 0.15s, background 0.2s;
+        }
+
+        .launch-btn:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        .launch-btn:hover:not(:disabled) {
+            background: #9b80f0;
+        }
+
+        .launch-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* ── Toast ─────────────────────────────────── */
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 32px;
+            transform: translateX(-50%) translateY(20px);
+            background: rgba(26, 26, 36, 0.96);
+            border: 1px solid var(--v-border);
+            color: var(--text);
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s, transform 0.25s;
+            max-width: calc(100% - 32px);
+            text-align: center;
+            z-index: 50;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .empty {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 20px;
+            text-align: center;
+            margin-top: 28px;
+        }
+
+        @media (max-width: 480px) {
+            .header h1 { font-size: 1.4rem; }
+            .cat-card { padding: 14px 16px; min-height: 86px; }
+            .level-btn { padding: 12px 6px; font-size: 0.88rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div class="container">
+        <a href="#" class="back-link" id="back-link">&larr; Retour</a>
+        <header class="header">
+            <h1>Quiz musical</h1>
+            <p class="subtitle">Choisis ta catégorie et ton niveau</p>
+        </header>
+        <div id="content"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+    var ELEVES_WHITELIST = {
+        japhet: { display: "Japhet" },
+        tara:   { display: "Tara"   },
+        dexter: { display: "Dexter" },
+        messon: { display: "Messon" }
+    };
+
+    function escapeHtml(str) {
+        var d = document.createElement("div");
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    var CATEGORIES = [
+        { id: "notes",         label: "Notes",            icon: "\uD83C\uDFB5", sub: "Reconnais les notes seules (do, ré, mi…)" },
+        { id: "intervalles",   label: "Intervalles",      icon: "\uD83C\uDFBC", sub: "Identifie les intervalles entre 2 notes" },
+        { id: "accords",       label: "Accords",          icon: "\uD83C\uDFB9", sub: "Reconnais le type d'accord (M, m, dim, aug, 7, M7, m7)" },
+        { id: "gammes",        label: "Gammes",           icon: "\uD83C\uDFB6", sub: "Identifie la gamme jouée (majeure, mineure, modes)" },
+        { id: "progressions",  label: "Progressions",     icon: "\uD83D\uDD04", sub: "Reconnais les progressions d'accords (II-V-I, I-V-vi-IV…)" },
+        { id: "dictee",        label: "Dictée mélodique", icon: "\uD83C\uDF99\uFE0F", sub: "Reproduis la mélodie jouée", disabled: true }
+    ];
+
+    var LEVELS = [
+        { id: "debutant",      label: "Débutant",      dot: "\uD83D\uDFE2" },
+        { id: "intermediaire", label: "Intermédiaire", dot: "\uD83D\uDFE1" },
+        { id: "avance",        label: "Avancé",        dot: "\uD83D\uDD34" }
+    ];
+
+    function categoryLabel(id) {
+        for (var i = 0; i < CATEGORIES.length; i++) {
+            if (CATEGORIES[i].id === id) return CATEGORIES[i].label;
+        }
+        return id;
+    }
+
+    function levelLabel(id) {
+        for (var i = 0; i < LEVELS.length; i++) {
+            if (LEVELS[i].id === id) return LEVELS[i].label;
+        }
+        return id;
+    }
+
+    var state = { category: null, level: null, slug: null };
+    var toastTimer = null;
+
+    function showToast(message) {
+        var toast = document.getElementById("toast");
+        toast.textContent = message;
+        toast.classList.add("show");
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function() { toast.classList.remove("show"); }, 3500);
+    }
+
+    function updateLaunchBtn() {
+        var btn = document.getElementById("launch-btn");
+        if (!btn) return;
+        btn.disabled = !(state.category && state.level);
+    }
+
+    function selectCategory(id) {
+        var cards = document.querySelectorAll(".cat-card[data-category]");
+        cards.forEach(function(card) {
+            if (card.classList.contains("disabled")) return;
+            card.classList.toggle("selected", card.getAttribute("data-category") === id);
+        });
+        state.category = id;
+        updateLaunchBtn();
+    }
+
+    function selectLevel(id) {
+        var btns = document.querySelectorAll(".level-btn[data-level]");
+        btns.forEach(function(btn) {
+            btn.classList.toggle("selected", btn.getAttribute("data-level") === id);
+        });
+        state.level = id;
+        updateLaunchBtn();
+    }
+
+    function handleLaunch() {
+        if (!state.category || !state.level) return;
+        var payload = {
+            category: state.category,
+            level: state.level,
+            eleve_slug: state.slug
+        };
+        try { sessionStorage.setItem("quiz_pending", JSON.stringify(payload)); } catch (e) {}
+        showToast("Le quiz arrive bientôt — tu as choisi " + categoryLabel(state.category) + " en " + levelLabel(state.level));
+    }
+
+    (function init() {
+        var pathSegs = window.location.pathname.split('/').filter(Boolean);
+        var slug = pathSegs[0] ? pathSegs[0].toLowerCase() : null;
+        var eleve = slug && ELEVES_WHITELIST[slug] ? ELEVES_WHITELIST[slug] : null;
+
+        var backLink = document.getElementById("back-link");
+
+        if (!eleve) {
+            backLink.href = "/";
+            document.getElementById("content").innerHTML =
+                '<p class="empty">Cette page n\'est pas reconnue. Retourne à l\'accueil pour t\'identifier.</p>';
+            return;
+        }
+
+        try { localStorage.setItem("eleve_slug", slug); } catch (e) {}
+        state.slug = slug;
+        backLink.href = "/" + slug + "/outils";
+
+        // Build sections
+        var html = '';
+
+        // ── Catégorie ──
+        html += '<section class="quiz-section">';
+        html += '<h2 class="section-title">Catégorie</h2>';
+        html += '<div class="cat-grid">';
+        for (var i = 0; i < CATEGORIES.length; i++) {
+            var c = CATEGORIES[i];
+            if (c.disabled) {
+                html +=
+                    '<div class="cat-card disabled" aria-disabled="true">' +
+                        '<span class="cat-card-tag">Bientôt</span>' +
+                        '<div class="cat-card-row">' +
+                            '<span class="cat-card-icon">' + c.icon + '</span>' +
+                            '<span class="cat-card-title">' + escapeHtml(c.label) + '</span>' +
+                        '</div>' +
+                        '<div class="cat-card-sub">' + escapeHtml(c.sub) + '</div>' +
+                    '</div>';
+            } else {
+                html +=
+                    '<button type="button" class="cat-card" data-category="' + escapeHtml(c.id) + '">' +
+                        '<span class="cat-card-check">\u2713</span>' +
+                        '<div class="cat-card-row">' +
+                            '<span class="cat-card-icon">' + c.icon + '</span>' +
+                            '<span class="cat-card-title">' + escapeHtml(c.label) + '</span>' +
+                        '</div>' +
+                        '<div class="cat-card-sub">' + escapeHtml(c.sub) + '</div>' +
+                    '</button>';
+            }
+        }
+        html += '</div></section>';
+
+        // ── Niveau ──
+        html += '<section class="quiz-section">';
+        html += '<h2 class="section-title">Niveau</h2>';
+        html += '<div class="level-row">';
+        for (var j = 0; j < LEVELS.length; j++) {
+            var lv = LEVELS[j];
+            html +=
+                '<button type="button" class="level-btn" data-level="' + escapeHtml(lv.id) + '">' +
+                    '<span class="level-btn-check">\u2713</span>' +
+                    '<span class="level-btn-dot">' + lv.dot + '</span>' +
+                    '<span>' + escapeHtml(lv.label) + '</span>' +
+                '</button>';
+        }
+        html += '</div></section>';
+
+        // ── Bouton Lancer ──
+        html += '<button type="button" class="launch-btn" id="launch-btn" disabled>Lancer le quiz</button>';
+
+        document.getElementById("content").innerHTML = html;
+
+        // Wire up listeners
+        document.querySelectorAll(".cat-card[data-category]").forEach(function(card) {
+            card.addEventListener("click", function() {
+                selectCategory(card.getAttribute("data-category"));
+            });
+        });
+        document.querySelectorAll(".level-btn[data-level]").forEach(function(btn) {
+            btn.addEventListener("click", function() {
+                selectLevel(btn.getAttribute("data-level"));
+            });
+        });
+        document.getElementById("launch-btn").addEventListener("click", handleLaunch);
+    })();
+    </script>
+
+    <script>
+    (function() {
+        var canvas = document.getElementById("bg-canvas");
+        var ctx = canvas.getContext("2d");
+        var particles = [];
+        var COUNT = 18;
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", resize);
+        resize();
+
+        function createParticle() {
+            var w = 6 + Math.random() * 4;
+            var h = 18 + Math.random() * 10;
+            return {
+                x: Math.random() * canvas.width,
+                y: canvas.height + h,
+                w: w, h: h, r: 2,
+                speed: 0.15 + Math.random() * 0.35,
+                opacity: 0.04 + Math.random() * 0.04,
+                drift: (Math.random() - 0.5) * 0.3
+            };
+        }
+
+        for (var i = 0; i < COUNT; i++) {
+            var p = createParticle();
+            p.y = Math.random() * canvas.height;
+            particles.push(p);
+        }
+
+        function drawRoundRect(x, y, w, h, r, alpha) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < particles.length; i++) {
+                var p = particles[i];
+                p.y -= p.speed;
+                p.x += p.drift;
+                drawRoundRect(p.x, p.y, p.w, p.h, p.r, p.opacity);
+                if (p.y + p.h < 0) particles[i] = createParticle();
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+    })();
+    </script>
+
+</body>
+</html>

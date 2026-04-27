@@ -13,6 +13,11 @@
 /dexter/outils    /outils.html   200
 /messon/outils    /outils.html   200
 
+/japhet/quiz      /quiz.html     200
+/tara/quiz        /quiz.html     200
+/dexter/quiz      /quiz.html     200
+/messon/quiz      /quiz.html     200
+
 /japhet           /index.html    200
 /tara             /index.html    200
 /dexter           /index.html    200
