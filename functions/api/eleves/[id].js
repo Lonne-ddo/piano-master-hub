@@ -180,8 +180,43 @@ function mergeStats(autoRaw, override) {
   };
 }
 
+// ─── Sanitization post-LLM des années (anti-hallucination) ───────
+// Le LLM peut produire "08/03/2024" sur un doc qui ne dit que "08/03". On corrige
+// toute date au format JJ/MM/YYYY dont l'année est < (currentYear - 1) — c'est
+// presque toujours une hallucination biaisée par les exemples du prompt.
+function sanitizeYears(parsed, currentYear) {
+  const cutoffYear = currentYear - 1;
+
+  function fixDate(dateStr, label) {
+    if (!dateStr || typeof dateStr !== 'string') return dateStr;
+    const m = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return dateStr;
+    const year = parseInt(m[3], 10);
+    if (year < cutoffYear) {
+      const corrected = `${m[1]}/${m[2]}/${currentYear}`;
+      console.warn(`[parseDoc] year sanitized (${label}): "${dateStr}" → "${corrected}"`);
+      return corrected;
+    }
+    return dateStr;
+  }
+
+  if (parsed.premier_cours) parsed.premier_cours = fixDate(parsed.premier_cours, 'premier_cours');
+  if (parsed.fin_prevue)    parsed.fin_prevue    = fixDate(parsed.fin_prevue, 'fin_prevue');
+  if (Array.isArray(parsed.seances)) {
+    parsed.seances = parsed.seances.map((s, i) => ({
+      ...s,
+      date: fixDate(s.date, `seances[${i}]`),
+    }));
+  }
+  return parsed;
+}
+
 // ─── PARSING via LLM ─────────────────────────────────────────────
 async function parseDoc(docText, student, env) {
+  const currentYear = new Date().getFullYear();
+  const exDebut = `15/02/${currentYear}`;
+  const exFin   = `15/04/${currentYear}`;
+
   const systemPrompt = `Tu es un assistant qui extrait des données structurées depuis des notes de cours de piano.
 Retourne UNIQUEMENT un objet JSON valide, sans markdown, sans backticks, sans commentaires.
 
@@ -191,8 +226,8 @@ Structure JSON exacte attendue :
   "nom": "string",
   "programme": "string",
   "statut": "actif",
-  "premier_cours": "string — date exacte du tout premier cours au format JJ/MM/YYYY (ex: 15/02/2025)",
-  "fin_prevue": "string — date du premier cours + 2 mois au format JJ/MM/YYYY (ex: 15/04/2025)",
+  "premier_cours": "string — date exacte du tout premier cours au format JJ/MM/YYYY (ex: ${exDebut})",
+  "fin_prevue": "string — date du premier cours + 2 mois au format JJ/MM/YYYY (ex: ${exFin})",
   "frequence": "1× / semaine",
   "progression": number entre 0 et 100,
   "canaux": {
@@ -206,14 +241,21 @@ Structure JSON exacte attendue :
   "seances": [ { "date": "string", "focus": "string", "contenu": ["string"], "devoirs": ["string"] } ]
 }
 
-Règles :
+REGLES DATES (CRITIQUES — l'année courante est ${currentYear}) :
+- Si une date est écrite au format "JJ/MM" sans année (ex: "08/03", "16/03"), tu DOIS utiliser l'année ${currentYear}. Résultat : "08/03/${currentYear}".
+- Si une date est écrite au format "JJ/MM/AA" (ex: "08/03/26", "08/03/${String(currentYear).slice(-2)}"), tu DOIS interpréter "AA" comme "20AA". Résultat : "08/03/20AA".
+- Si l'année produite est antérieure à ${currentYear - 1} ET le programme est actif, c'est une faute de frappe — utilise ${currentYear}.
+- N'INVENTE JAMAIS d'année. En cas de doute, prends ${currentYear}.
+- Pour les séances déjà passées (date < aujourd'hui), même règle : année courante par défaut, sauf mention explicite contraire dans le doc.
+
+Autres règles :
 - Estime la progression (0-100) : 0-20 = débuts, 20-40 = bases acquises, 40-60 = intermédiaire, 60+ = avancé
 - Séances triées chronologiquement, plus ancienne en premier
 - Normalise les notions théoriques (posture, intervalles, gammes, degrés, accords, renversements, ear training, arpèges, rythmique...)
 - Marque "done" les notions clairement enseignées, "in-progress" celles en cours, "todo" les notions pas encore abordées
 - Pour les canaux absents du doc : url = null, handle = ""
-- premier_cours : cherche la date du tout premier cours mentionné dans le document. Format JJ/MM/YYYY.
-- fin_prevue : calcule la date du premier cours + 2 mois exactement. Format JJ/MM/YYYY.
+- premier_cours : cherche la date du tout premier cours mentionné dans le document. Format JJ/MM/YYYY (applique les REGLES DATES ci-dessus).
+- fin_prevue : calcule la date du premier cours + 2 mois exactement. Format JJ/MM/YYYY (applique les REGLES DATES ci-dessus).
 - Identifie les morceaux travaillés pour le répertoire (Let it be, Hallelujah, Stay With Me, etc.)
 - Pour le répertoire : cherche les liens YouTube mentionnés dans le doc pour chaque morceau et mets-les dans le champ youtube. Si pas de lien trouvé, youtube = null.
 - Résume contenu et devoirs en bullets courts et clairs (max 8 mots par bullet)`;
@@ -221,6 +263,7 @@ Règles :
   const userPrompt = `Élève : ${student.nom} — Programme : ${student.programme}
 ID : ${student.id}
 Doc URL : https://docs.google.com/document/d/${student.docId}/edit
+Année courante : ${currentYear}
 
 Notes de cours :
 ---
@@ -230,6 +273,8 @@ ${docText.slice(0, 6000)}
   const text = await callLLM(`${systemPrompt}\n\n${userPrompt}`, env);
   const clean = extractJSON(text);
   const parsed = JSON.parse(clean);
+  // Garde-fou : corrige les dates dont le LLM aurait inventé une année trop ancienne
+  sanitizeYears(parsed, currentYear);
   parsed.id = student.id;
   parsed.doc_url = `https://docs.google.com/document/d/${student.docId}/edit`;
   return parsed;
