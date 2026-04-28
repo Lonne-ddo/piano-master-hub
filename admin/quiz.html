@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <script>
+  (function(){
+    if (localStorage.getItem('mh_admin') !== '4697') {
+      window.location.replace('/admin/');
+    }
+  })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Quiz — Master Hub Admin</title>
+  <meta name="theme-color" content="#09090f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MH Admin">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --v:       #8B6FE8;
+      --v-dim:   #8B6FE826;
+      --v-soft:  #6b54c4;
+      --bg0:     #09090f;
+      --bg1:     #0f0e18;
+      --bg2:     #161524;
+      --bg3:     #1e1c30;
+      --text1:   #eeeaf8;
+      --text2:   #9d9ab5;
+      --text3:   #5a5870;
+      --border:  #25233a;
+      --green:   #5ecb8b;
+      --amber:   #f0b429;
+      --red:     #e05c6b;
+    }
+
+    html, body { min-height: 100%; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg0);
+      color: var(--text1);
+      min-height: 100vh;
+      min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 20px 80px;
+    }
+
+    /* ── Header ───────────────────────────────────────── */
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding-bottom: 18px;
+      margin-bottom: 22px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo-block { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+    .logo-icon {
+      width: 44px; height: 44px;
+      background: var(--v);
+      border-radius: 11px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .logo-icon svg { width: 28px; height: 28px; }
+    .logo-text {
+      font-size: 1.05rem; font-weight: 700; color: var(--text1);
+      letter-spacing: -0.01em; line-height: 1.1;
+    }
+    .logo-sub {
+      font-size: 0.78rem; color: var(--text2); margin-top: 2px;
+    }
+    .header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .hbtn {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text1);
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 9px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: background 0.18s, border-color 0.18s;
+    }
+    .hbtn:hover { background: var(--bg3); border-color: var(--v-dim); }
+    .hbtn.refresh { color: var(--v); }
+
+    /* ── Tabs (élèves) ───────────────────────────────── */
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+    }
+    .tab-eleve {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-family: inherit;
+      font-size: 0.88rem;
+      font-weight: 500;
+      padding: 10px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s, color 0.18s;
+    }
+    .tab-eleve:hover { background: var(--bg2); color: var(--text1); }
+    .tab-eleve.active {
+      background: var(--v);
+      border-color: var(--v);
+      color: #fff;
+    }
+
+    /* ── Status / loading ─────────────────────────────── */
+    .status-box {
+      padding: 60px 24px;
+      text-align: center;
+      color: var(--text2);
+      font-size: 0.95rem;
+    }
+    .status-box .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid rgba(139, 111, 232, 0.2);
+      border-top-color: var(--v);
+      border-radius: 50%;
+      margin: 0 auto 12px;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status-box.error { color: var(--red); }
+
+    /* ── Vue "Tous" : grid de cards ──────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+    .stat-card {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      transition: border-color 0.18s;
+      cursor: pointer;
+    }
+    .stat-card:hover { border-color: var(--v-dim); }
+    .stat-card-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 14px;
+    }
+    .stat-card-name {
+      font-size: 1.05rem; font-weight: 600; color: var(--text1);
+    }
+    .stat-card-pill {
+      font-size: 0.72rem;
+      background: var(--bg3);
+      padding: 3px 8px;
+      border-radius: 999px;
+      color: var(--text2);
+      font-weight: 500;
+    }
+    .stat-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 6px 0;
+      font-size: 0.88rem;
+      color: var(--text2);
+    }
+    .stat-row .val {
+      font-family: 'DM Mono', monospace;
+      color: var(--text1);
+      font-weight: 500;
+    }
+    .stat-row .val.score-good   { color: var(--green); }
+    .stat-row .val.score-mid    { color: var(--amber); }
+    .stat-row .val.score-bad    { color: var(--red); }
+    .stat-card-modes {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      text-align: center;
+    }
+    .mode-block .mode-label {
+      font-size: 0.72rem;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .mode-block .mode-count {
+      font-family: 'DM Mono', monospace;
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--v);
+      margin-top: 2px;
+    }
+    .stat-card-empty {
+      color: var(--text3);
+      font-size: 0.88rem;
+      font-style: italic;
+      text-align: center;
+      padding: 18px 0;
+    }
+
+    /* ── Vue par élève ────────────────────────────────── */
+    .eleve-summary {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px 22px;
+      margin-bottom: 18px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 16px;
+    }
+    .summary-block .summary-label {
+      font-size: 0.74rem;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .summary-block .summary-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--text1);
+    }
+    .summary-block .summary-val.score-good { color: var(--green); }
+    .summary-block .summary-val.score-mid  { color: var(--amber); }
+    .summary-block .summary-val.score-bad  { color: var(--red); }
+    .summary-block .summary-sub {
+      font-size: 0.78rem; color: var(--text2); margin-top: 2px;
+    }
+
+    .sessions-list {
+      display: flex; flex-direction: column;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .session-row {
+      display: flex; align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .session-row:last-child { border-bottom: none; }
+    .session-row:hover { background: var(--bg2); }
+    .session-date {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      color: var(--text2);
+      min-width: 140px;
+      flex-shrink: 0;
+    }
+    .session-mode {
+      flex: 1;
+      min-width: 0;
+      font-size: 0.92rem;
+      color: var(--text1);
+    }
+    .session-mode .mode-icon {
+      margin-right: 6px;
+    }
+    .session-level {
+      font-size: 0.78rem;
+      color: var(--text2);
+      background: var(--bg3);
+      padding: 3px 10px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+    .session-score {
+      font-family: 'DM Mono', monospace;
+      font-size: 1rem;
+      font-weight: 600;
+      min-width: 60px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .session-score.score-good { color: var(--green); }
+    .session-score.score-mid  { color: var(--amber); }
+    .session-score.score-bad  { color: var(--red); }
+
+    .empty-msg {
+      text-align: center;
+      padding: 50px 20px;
+      color: var(--text3);
+      font-size: 0.92rem;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+
+    @media (max-width: 600px) {
+      .session-row {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .session-date { min-width: 100%; font-size: 0.76rem; }
+      .session-mode { font-size: 0.85rem; }
+      .session-score { font-size: 0.92rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ═══ Header ═══════════════════════════════════════ -->
+  <header class="app-header">
+    <div class="logo-block">
+      <div class="logo-icon">
+        <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+          <rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+          <rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+          <rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+          <rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+          <rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+        </svg>
+      </div>
+      <div>
+        <div class="logo-text">Quiz</div>
+        <div class="logo-sub">Sessions élèves &amp; statistiques</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="hbtn refresh" id="refreshBtn">↻ Rafraîchir</button>
+      <a class="hbtn" href="/admin/outils.html">← Outils</a>
+      <button type="button" class="hbtn" id="logoutBtn">Se déconnecter</button>
+    </div>
+  </header>
+
+  <!-- ═══ Tab bar ══════════════════════════════════════ -->
+  <nav class="tab-bar" id="tabBar"></nav>
+
+  <!-- ═══ Main content ═════════════════════════════════ -->
+  <main id="mainContent">
+    <div class="status-box" id="statusBox">
+      <div class="spinner"></div>
+      Chargement des sessions…
+    </div>
+  </main>
+</div>
+
+<script>
+// ─── Config ──────────────────────────────────────────────────
+const STUDENT_LIST = [
+  { id: 'japhet', nom: 'Japhet' },
+  { id: 'messon', nom: 'Messon' },
+  { id: 'dexter', nom: 'Dexter' },
+  { id: 'tara',   nom: 'Tara' }
+];
+
+const MODE_LABELS = { notes: 'Notes', intervals: 'Intervalles', chords: 'Accords' };
+const MODE_ICONS  = { notes: '\u266A', intervals: '\u2933', chords: '\u266C' };
+const LEVEL_LABELS = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé' };
+
+let dataCache = null;
+let activeTab = 'all'; // 'all' | <slug>
+
+// ─── Helpers ─────────────────────────────────────────────────
+function authHeaders() {
+  return { 'x-admin-secret': localStorage.getItem('mh_admin') || '' };
+}
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+function scoreClass(score, total) {
+  if (!total || total <= 0) return '';
+  const pct = (Number(score) / Number(total)) * 10;
+  if (pct >= 8) return 'score-good';
+  if (pct >= 5) return 'score-mid';
+  return 'score-bad';
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString('fr-FR', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    }).replace(',', ' ·');
+  } catch { return iso; }
+}
+
+function fmtDateShort(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+  } catch { return iso; }
+}
+
+// ─── Render tabs ─────────────────────────────────────────────
+function renderTabs() {
+  const bar = document.getElementById('tabBar');
+  const tabs = [{ id: 'all', nom: 'Tous' }].concat(STUDENT_LIST);
+  bar.innerHTML = tabs.map(t =>
+    '<button type="button" class="tab-eleve' +
+    (activeTab === t.id ? ' active' : '') +
+    '" data-tab="' + escapeHtml(t.id) + '">' +
+    escapeHtml(t.nom) +
+    '</button>'
+  ).join('');
+  bar.querySelectorAll('[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeTab = btn.getAttribute('data-tab');
+      renderTabs();
+      renderContent();
+    });
+  });
+}
+
+// ─── Render content ──────────────────────────────────────────
+function renderContent() {
+  const main = document.getElementById('mainContent');
+  if (!dataCache) {
+    main.innerHTML =
+      '<div class="status-box"><div class="spinner"></div>Chargement des sessions…</div>';
+    return;
+  }
+  if (activeTab === 'all') {
+    main.innerHTML = renderAllView(dataCache);
+    main.querySelectorAll('[data-eleve-card]').forEach(card => {
+      card.addEventListener('click', () => {
+        activeTab = card.getAttribute('data-eleve-card');
+        renderTabs();
+        renderContent();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  } else {
+    main.innerHTML = renderEleveView(activeTab, dataCache[activeTab]);
+  }
+}
+
+function renderAllView(data) {
+  return '<div class="stats-grid">' +
+    STUDENT_LIST.map(stu => {
+      const s = data[stu.id] || { total: 0, avg_score: 0, by_mode: { notes: 0, intervals: 0, chords: 0 }, last_session_iso: null };
+      if (!s.total) {
+        return '<div class="stat-card" data-eleve-card="' + escapeHtml(stu.id) + '">' +
+          '<div class="stat-card-head">' +
+            '<div class="stat-card-name">' + escapeHtml(stu.nom) + '</div>' +
+            '<span class="stat-card-pill">0 session</span>' +
+          '</div>' +
+          '<div class="stat-card-empty">Aucune session pour le moment</div>' +
+          '</div>';
+      }
+      const avgCls = scoreClass(s.avg_score, 10);
+      return '<div class="stat-card" data-eleve-card="' + escapeHtml(stu.id) + '">' +
+        '<div class="stat-card-head">' +
+          '<div class="stat-card-name">' + escapeHtml(stu.nom) + '</div>' +
+          '<span class="stat-card-pill">' + s.total + ' session' + (s.total > 1 ? 's' : '') + '</span>' +
+        '</div>' +
+        '<div class="stat-row"><span>Moyenne</span><span class="val ' + avgCls + '">' + s.avg_score.toFixed(1) + '/10</span></div>' +
+        '<div class="stat-row"><span>Dernière</span><span class="val">' + fmtDateShort(s.last_session_iso) + '</span></div>' +
+        '<div class="stat-card-modes">' +
+          '<div class="mode-block"><div class="mode-label">Notes</div><div class="mode-count">' + s.by_mode.notes + '</div></div>' +
+          '<div class="mode-block"><div class="mode-label">Intervalles</div><div class="mode-count">' + s.by_mode.intervals + '</div></div>' +
+          '<div class="mode-block"><div class="mode-label">Accords</div><div class="mode-count">' + s.by_mode.chords + '</div></div>' +
+        '</div>' +
+        '</div>';
+    }).join('') +
+  '</div>';
+}
+
+function renderEleveView(slug, s) {
+  const stu = STUDENT_LIST.find(x => x.id === slug);
+  if (!stu) return '<div class="empty-msg">Élève inconnu.</div>';
+  if (!s || !s.total) {
+    return '<div class="eleve-summary">' +
+      '<div class="summary-block"><div class="summary-label">Sessions</div><div class="summary-val">0</div><div class="summary-sub">' + escapeHtml(stu.nom) + '</div></div>' +
+      '</div>' +
+      '<div class="empty-msg">Aucune session pour le moment.</div>';
+  }
+  const avgCls = scoreClass(s.avg_score, 10);
+  const summary =
+    '<div class="eleve-summary">' +
+      '<div class="summary-block">' +
+        '<div class="summary-label">Élève</div>' +
+        '<div class="summary-val">' + escapeHtml(stu.nom) + '</div>' +
+        '<div class="summary-sub">' + s.total + ' session' + (s.total > 1 ? 's' : '') + '</div>' +
+      '</div>' +
+      '<div class="summary-block">' +
+        '<div class="summary-label">Moyenne</div>' +
+        '<div class="summary-val ' + avgCls + '">' + s.avg_score.toFixed(1) + '<span style="font-size:0.7em;color:var(--text2)">/10</span></div>' +
+      '</div>' +
+      '<div class="summary-block">' +
+        '<div class="summary-label">Dernière</div>' +
+        '<div class="summary-val" style="font-size:1rem">' + fmtDateShort(s.last_session_iso) + '</div>' +
+      '</div>' +
+      '<div class="summary-block">' +
+        '<div class="summary-label">Notes / Interv. / Acc.</div>' +
+        '<div class="summary-val" style="font-size:1rem">' +
+          s.by_mode.notes + ' · ' + s.by_mode.intervals + ' · ' + s.by_mode.chords +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  const sessions = (s.sessions || []).map(sess => {
+    const cls = scoreClass(sess.score, sess.total);
+    const mode = MODE_LABELS[sess.mode] || sess.mode || '—';
+    const icon = MODE_ICONS[sess.mode] || '';
+    const level = LEVEL_LABELS[sess.level] || sess.level || '—';
+    return '<div class="session-row">' +
+      '<div class="session-date">' + escapeHtml(fmtDate(sess.ts_iso)) + '</div>' +
+      '<div class="session-mode"><span class="mode-icon">' + icon + '</span>' + escapeHtml(mode) + '</div>' +
+      '<div class="session-level">' + escapeHtml(level) + '</div>' +
+      '<div class="session-score ' + cls + '">' + escapeHtml(String(sess.score)) + '/' + escapeHtml(String(sess.total)) + '</div>' +
+    '</div>';
+  }).join('');
+
+  return summary + '<div class="sessions-list">' + sessions + '</div>';
+}
+
+// ─── Fetch data ──────────────────────────────────────────────
+async function loadData() {
+  document.getElementById('mainContent').innerHTML =
+    '<div class="status-box"><div class="spinner"></div>Chargement des sessions…</div>';
+  try {
+    const res = await fetch('/api/quiz/admin/list', { headers: authHeaders() });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || ('HTTP ' + res.status));
+    dataCache = json.data || {};
+    renderContent();
+  } catch (e) {
+    console.error('[admin/quiz] fetch failed:', e);
+    document.getElementById('mainContent').innerHTML =
+      '<div class="status-box error">' +
+        'Erreur de chargement : ' + escapeHtml(e.message || 'inconnue') +
+        '<br><br>' +
+        '<button type="button" class="hbtn refresh" onclick="window.__quizReload()">↻ Réessayer</button>' +
+      '</div>';
+  }
+}
+window.__quizReload = loadData;
+
+// ─── Boot ────────────────────────────────────────────────────
+renderTabs();
+loadData();
+
+document.getElementById('refreshBtn').addEventListener('click', loadData);
+document.getElementById('logoutBtn').addEventListener('click', function () {
+  localStorage.removeItem('mh_admin');
+  window.location.replace('/admin/');
+});
+</script>
+
+</body>
+</html>
