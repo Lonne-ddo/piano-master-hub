@@ -120,22 +120,29 @@ function computeAutoStats(sessions) {
   };
 }
 
-// Override prioritaire sur auto. override = { date_debut?: iso|null, date_fin?: iso|null }
-// Retourne l'objet `stats` final avec labels + progression + override_active.
+// Admin (override) gagne TOUJOURS sur auto/LLM si défini.
+// override = { date_debut?: iso, date_fin?: iso, total_cours?: int }
 function mergeStats(autoRaw, override) {
+  const auto = autoRaw || {};
   const ov = override || {};
-  const dateDebut = ov.date_debut || autoRaw.date_debut || null;
-  const dateFin   = ov.date_fin   || autoRaw.date_fin_prevue || null;
+  const isSet = (v) => v !== undefined && v !== null && v !== '';
+
+  const dateDebut = isSet(ov.date_debut) ? ov.date_debut : (auto.date_debut || null);
+  const dateFin   = isSet(ov.date_fin)   ? ov.date_fin   : (auto.date_fin_prevue || auto.date_fin || null);
+  const totalCours = isSet(ov.total_cours) ? Number(ov.total_cours) : 8;
+
   return {
-    nb_cours: autoRaw.nb_cours,
+    nb_cours: auto.nb_cours || 0,
+    total_cours: totalCours,
     date_debut: dateDebut,
     date_debut_label: labelFr(dateDebut),
     date_fin: dateFin,
     date_fin_label: labelFr(dateFin),
     progression_pct: computeProgressionPct(dateDebut, dateFin),
     override_active: {
-      date_debut: !!ov.date_debut,
-      date_fin: !!ov.date_fin,
+      date_debut:  isSet(ov.date_debut),
+      date_fin:    isSet(ov.date_fin),
+      total_cours: isSet(ov.total_cours),
     },
   };
 }
@@ -473,11 +480,8 @@ export async function onRequestPost(context) {
       const existing = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'json' }) || {};
       const docUrl = `https://docs.google.com/document/d/${docId}/edit`;
 
-      // Override préservé entre syncs (set/reset via PATCH /api/eleves/{id})
-      const statsOverride = {
-        date_debut: existing?.stats_override?.date_debut || null,
-        date_fin:   existing?.stats_override?.date_fin   || null,
-      };
+      // Override préservé tel quel entre syncs (spread = robuste à l'ajout futur de champs).
+      const statsOverride = { ...(existing?.stats_override || {}) };
       const stats = mergeStats(statsAutoRaw, statsOverride);
 
       const updated = {

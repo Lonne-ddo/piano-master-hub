@@ -161,21 +161,30 @@ function computeProgressionPct(debutIso, finIso) {
   const elapsed = (Date.now() - start) / 86400000;
   return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
 }
+// Admin (override) gagne TOUJOURS sur auto/LLM si défini. isSet rejette
+// null/undefined/'' mais accepte 0 — utile pour `total_cours: 0` (rare mais possible).
 function mergeStats(autoRaw, override) {
-  const auto = autoRaw || { nb_cours: 0, date_debut: null, date_fin_prevue: null };
+  const auto = autoRaw || {};
   const ov = override || {};
-  const dateDebut = ov.date_debut || auto.date_debut || null;
-  const dateFin   = ov.date_fin   || auto.date_fin_prevue || null;
+  const isSet = (v) => v !== undefined && v !== null && v !== '';
+
+  const dateDebut = isSet(ov.date_debut) ? ov.date_debut : (auto.date_debut || null);
+  const dateFin   = isSet(ov.date_fin)   ? ov.date_fin   : (auto.date_fin_prevue || auto.date_fin || null);
+  // total_cours : override > défaut Piano Master (8). nb_cours reste auto.
+  const totalCours = isSet(ov.total_cours) ? Number(ov.total_cours) : 8;
+
   return {
-    nb_cours: auto.nb_cours,
+    nb_cours: auto.nb_cours || 0,
+    total_cours: totalCours,
     date_debut: dateDebut,
     date_debut_label: labelFrStats(dateDebut),
     date_fin: dateFin,
     date_fin_label: labelFrStats(dateFin),
     progression_pct: computeProgressionPct(dateDebut, dateFin),
     override_active: {
-      date_debut: !!ov.date_debut,
-      date_fin: !!ov.date_fin,
+      date_debut:  isSet(ov.date_debut),
+      date_fin:    isSet(ov.date_fin),
+      total_cours: isSet(ov.total_cours),
     },
   };
 }
@@ -358,11 +367,14 @@ export async function onRequestGet({ params, request, env }) {
 }
 
 // ─── PATCH /api/eleves/{id} ──────────────────────────────────────
-// Body attendu : { stats_override: { date_debut?: "YYYY-MM-DD"|null, date_fin?: "YYYY-MM-DD"|null } }
-// - date_debut=null OU date_fin=null → reset du champ correspondant (revient au calcul auto)
-// - Seuls les champs présents dans body.stats_override sont modifiés (merge avec override existant)
-// - Validation stricte : format YYYY-MM-DD uniquement
-// - Recompute `stats` (labels, progression, override_active) sur la base de stats_auto_raw + nouvel override
+// Body : { stats_override: { date_debut?: "YYYY-MM-DD"|null, date_fin?: "YYYY-MM-DD"|null, total_cours?: int|null } }
+// - Champs présents dans body.stats_override sont mergés avec l'override existant.
+// - Valeur null = supprime le champ d'override (revient au calcul auto/défaut).
+// - date_debut/date_fin : ISO YYYY-MM-DD uniquement.
+// - total_cours : entier 1..100.
+// - Recompute `stats` via mergeStats(stats_auto_raw, nouvel override).
+const ALLOWED_OVERRIDE_FIELDS = ['date_debut', 'date_fin', 'total_cours'];
+
 export async function onRequestPatch({ params, request, env }) {
   const authErr = requireAuth(request, env);
   if (authErr) return authErr;
@@ -381,28 +393,44 @@ export async function onRequestPatch({ params, request, env }) {
   const existing = JSON.parse(existingRaw);
   const updated = { ...existing };
 
-  // ── Validation helpers pour stats_override ────────────────────
+  // ── Validation helpers ────────────────────────────────────────
   const isValidIsoOrNull = (v) => {
     if (v === null) return true;
     if (typeof v !== 'string') return false;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
     return parseIsoDate(v) !== null;
   };
+  const isValidTotalCoursOrNull = (v) => {
+    if (v === null) return true;
+    const n = Number(v);
+    return Number.isInteger(n) && n >= 1 && n <= 100;
+  };
 
   // ── Handle stats_override patch ────────────────────────────────
   if (body.stats_override !== undefined) {
     const patch = body.stats_override || {};
+
     if (patch.date_debut !== undefined && !isValidIsoOrNull(patch.date_debut)) {
-      return jsonResponse({ error: 'stats_override.date_debut invalide (attendu YYYY-MM-DD ou null)' }, 400);
+      return jsonResponse({ error: 'stats_override.date_debut invalide (YYYY-MM-DD ou null)' }, 400);
     }
     if (patch.date_fin !== undefined && !isValidIsoOrNull(patch.date_fin)) {
-      return jsonResponse({ error: 'stats_override.date_fin invalide (attendu YYYY-MM-DD ou null)' }, 400);
+      return jsonResponse({ error: 'stats_override.date_fin invalide (YYYY-MM-DD ou null)' }, 400);
     }
-    const currentOverride = existing.stats_override || { date_debut: null, date_fin: null };
-    const newOverride = {
-      date_debut: patch.date_debut !== undefined ? patch.date_debut : currentOverride.date_debut,
-      date_fin:   patch.date_fin   !== undefined ? patch.date_fin   : currentOverride.date_fin,
-    };
+    if (patch.total_cours !== undefined && !isValidTotalCoursOrNull(patch.total_cours)) {
+      return jsonResponse({ error: 'stats_override.total_cours invalide (entier 1..100 ou null)' }, 400);
+    }
+
+    // Merge : null → delete (revient à l'auto). Sinon écrase.
+    const newOverride = { ...(existing.stats_override || {}) };
+    for (const f of ALLOWED_OVERRIDE_FIELDS) {
+      if (patch[f] === undefined) continue;
+      if (patch[f] === null) {
+        delete newOverride[f];
+      } else {
+        newOverride[f] = (f === 'total_cours') ? Number(patch[f]) : patch[f];
+      }
+    }
+
     updated.stats_override = newOverride;
     const autoRaw = existing.stats_auto_raw || { nb_cours: 0, date_debut: null, date_fin_prevue: null };
     const stats = mergeStats(autoRaw, newOverride);

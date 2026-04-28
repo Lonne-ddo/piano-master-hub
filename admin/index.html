@@ -900,6 +900,9 @@ function renderProfile(s) {
   const finLabel   = stats?.date_fin_label   || (s.fin_prevue     || '—');
   const debutOverride = stats?.override_active?.date_debut || false;
   const finOverride   = stats?.override_active?.date_fin   || false;
+  // Total cours : override > défaut (8). Affichage et édition inline.
+  const totalCours = (stats?.total_cours != null) ? stats.total_cours : 8;
+  const totalCoursOverride = stats?.override_active?.total_cours || false;
 
   const main = document.getElementById('mainContent');
   main.innerHTML = `
@@ -923,6 +926,13 @@ function renderProfile(s) {
         <span style="display:inline-flex;align-items:center;">
           <span class="date-value ${finOverride ? 'override-active' : ''}" tabindex="0" role="button" data-raw="${escapeHtml(finIso)}">${escapeHtml(finLabel)}</span>
           ${finOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','date_fin')" title="Réinitialiser au calcul auto">↺</button>` : ''}
+        </span>
+      </div>
+      <div class="date-edit" data-field="total_cours" data-kind="number">
+        <span class="date-label">Total cours</span>
+        <span style="display:inline-flex;align-items:center;">
+          <span class="date-value ${totalCoursOverride ? 'override-active' : ''}" tabindex="0" role="button" data-raw="${escapeHtml(String(totalCours))}">${escapeHtml(String(totalCours))}</span>
+          ${totalCoursOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','total_cours')" title="Réinitialiser au défaut (8)">↺</button>` : ''}
         </span>
       </div>
     </div>
@@ -1036,14 +1046,15 @@ function renderProfile(s) {
     </div>
   `;
 
-  // Bind les dates éditables
+  // Bind les champs éditables (dates + total_cours)
   document.querySelectorAll('.date-value').forEach(el => {
     const box = el.closest('.date-edit');
     const field = box ? box.dataset.field : null;
     if (!field) return;
-    el.addEventListener('click', () => makeDateEditable(el, s.id, field));
+    const kind = (box && box.dataset.kind) || 'date';
+    el.addEventListener('click', () => makeDateEditable(el, s.id, field, kind));
     el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); makeDateEditable(el, s.id, field); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); makeDateEditable(el, s.id, field, kind); }
     });
   });
 }
@@ -1125,16 +1136,25 @@ function showToast(msg) {
   showToast._tid = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-async function makeDateEditable(el, studentId, field) {
-  // field = 'date_debut' ou 'date_fin'
+async function makeDateEditable(el, studentId, field, kind = 'date') {
+  // field ∈ {'date_debut','date_fin','total_cours'}
+  // kind  ∈ {'date','number'}
   if (el.classList.contains('editing')) return;
 
-  const rawBefore = el.dataset.raw || ''; // format ISO YYYY-MM-DD
+  const rawBefore = el.dataset.raw || ''; // ISO date OU entier (selon kind)
   const displayBefore = el.textContent;
 
   const input = document.createElement('input');
-  input.type = 'date';
-  input.value = rawBefore; // déjà ISO
+  if (kind === 'number') {
+    input.type = 'number';
+    input.min = '1';
+    input.max = '100';
+    input.step = '1';
+    input.style.width = '64px';
+  } else {
+    input.type = 'date';
+  }
+  input.value = rawBefore;
 
   el.classList.add('editing');
   el.textContent = '';
@@ -1147,15 +1167,26 @@ async function makeDateEditable(el, studentId, field) {
     if (settled) return;
     settled = true;
 
-    const newISO = input.value;
-    if (!newISO || newISO === rawBefore) { restore(); return; }
+    const raw = input.value;
+    if (!raw || raw === rawBefore) { restore(); return; }
+
+    let payloadValue;
+    if (kind === 'number') {
+      const n = parseInt(raw, 10);
+      if (!Number.isInteger(n) || n < 1 || n > 100) {
+        restore(); showToast('Valeur entre 1 et 100'); return;
+      }
+      payloadValue = n;
+    } else {
+      payloadValue = raw; // ISO YYYY-MM-DD
+    }
 
     showToast('Sauvegarde…');
     try {
       const res = await fetch(`/api/eleves/${studentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ stats_override: { [field]: newISO } })
+        body: JSON.stringify({ stats_override: { [field]: payloadValue } })
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok || payload.error || !(payload.ok || payload.success)) {
