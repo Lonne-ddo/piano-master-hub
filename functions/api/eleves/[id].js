@@ -6,9 +6,22 @@ const STUDENT_REGISTRY = {
   tara:   { id: "tara",   nom: "Tara",   programme: "Piano Master", statut: "actif", docId: "1EKB8q-NeC4C3qt6xhOfS3QN27Ip4zpAU-X4-yWUIjxY" },
 };
 
-// Champs saisis manuellement → jamais écrasés par un re-sync LLM
+// Champs saisis manuellement OU calculés par sync.js → jamais écrasés par un re-sync LLM
+// (parseDoc ne renvoie que des champs LLM bruts, sans stats ni override)
 const PROTECTED_FIELDS = [
-  'premier_cours', 'fin_prevue', 'statut', 'programme', 'notes', 'manualDates',
+  'premier_cours',
+  'fin_prevue',
+  'statut',
+  'programme',
+  'notes',
+  'manualDates',
+  // Ajouts persistance KV : stats + overrides utilisateur + dernière séance + doc_id
+  'stats',
+  'stats_override',
+  'stats_auto_raw',
+  'derniere_seance',
+  'doc_id',
+  '_patchedAt',
 ];
 
 // ─── CORS ────────────────────────────────────────────────────────
@@ -290,8 +303,10 @@ export async function onRequestGet({ params, request, env }) {
   }
 
   parsed._cachedAt = Date.now();
+  // Pas de TTL : les données élèves doivent persister indéfiniment.
+  // La fraîcheur est gérée applicativement (forceSync=true ou _cachedAt explicite).
   try {
-    await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(parsed), { expirationTtl: 3600 });
+    await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(parsed));
   } catch (_) {}
 
   return jsonResponse({ ...parsed, source: 'fresh' });
@@ -358,7 +373,8 @@ export async function onRequestPatch({ params, request, env }) {
   }
 
   updated._patchedAt = new Date().toISOString();
-  await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated), { expirationTtl: 3600 });
+  // Pas de TTL : un override saisi manuellement doit persister jusqu'au prochain reset explicite.
+  await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated));
 
   return jsonResponse({ ok: true, success: true, data: updated, stats: updated.stats || null });
 }

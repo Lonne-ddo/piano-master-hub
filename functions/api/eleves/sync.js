@@ -500,7 +500,10 @@ export async function onRequestPost(context) {
         _cachedAt: Date.now(),
       };
 
-      await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated), { expirationTtl: 3600 });
+      // Pas de TTL : sync écrase volontairement les champs LLM frais (derniere_seance,
+      // stats_auto_raw, stats recomputés) tout en préservant `existing.stats_override`
+      // via le merge construit ci-dessus.
+      await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated));
       results[name] = {
         ok: true,
         provider: extracted.provider,
