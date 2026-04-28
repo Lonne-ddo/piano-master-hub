@@ -393,8 +393,8 @@
         { id: "notes",         label: "Notes",            icon: "\uD83C\uDFB5", sub: "Reconnais les notes seules (do, ré, mi…)" },
         { id: "intervalles",   label: "Intervalles",      icon: "\uD83C\uDFBC", sub: "Identifie les intervalles entre 2 notes" },
         { id: "accords",       label: "Accords",          icon: "\uD83C\uDFB9", sub: "Reconnais le type d'accord (M, m, dim, aug, 7, M7, m7)" },
-        { id: "gammes",        label: "Gammes",           icon: "\uD83C\uDFB6", sub: "Identifie la gamme jouée (majeure, mineure, modes)", disabled: true },
-        { id: "progressions",  label: "Progressions",     icon: "\uD83D\uDD04", sub: "Reconnais les progressions d'accords (II-V-I, I-V-vi-IV…)", disabled: true },
+        { id: "gammes",        label: "Gammes",           icon: "\uD83C\uDFB6", sub: "Identifie la gamme jouée (majeure, mineure)" },
+        { id: "progressions",  label: "Progressions",     icon: "\uD83D\uDD04", sub: "Reconnais les progressions d'accords (I-IV-V, II-V-I…)" },
         { id: "dictee",        label: "Dictée mélodique", icon: "\uD83C\uDF99\uFE0F", sub: "Reproduis la mélodie jouée", disabled: true }
     ];
 
@@ -456,9 +456,11 @@
 
     // Map UI category id → engine mode id
     var CATEGORY_TO_MODE = {
-        notes:       'notes',
-        intervalles: 'intervals',
-        accords:     'chords'
+        notes:        'notes',
+        intervalles:  'intervals',
+        accords:      'chords',
+        gammes:       'scales',
+        progressions: 'progressions'
     };
 
     function handleLaunch() {

@@ -190,19 +190,20 @@
       padding-top: 12px;
       border-top: 1px solid var(--border);
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
       text-align: center;
     }
     .mode-block .mode-label {
-      font-size: 0.72rem;
+      font-size: 0.66rem;
       color: var(--text3);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
     }
     .mode-block .mode-count {
       font-family: 'DM Mono', monospace;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 600;
       color: var(--v);
       margin-top: 2px;
@@ -367,8 +368,14 @@ const STUDENT_LIST = [
   { id: 'tara',   nom: 'Tara' }
 ];
 
-const MODE_LABELS = { notes: 'Notes', intervals: 'Intervalles', chords: 'Accords' };
-const MODE_ICONS  = { notes: '\u266A', intervals: '\u2933', chords: '\u266C' };
+const MODE_LABELS = {
+  notes: 'Notes', intervals: 'Intervalles', chords: 'Accords',
+  scales: 'Gammes', progressions: 'Progressions'
+};
+const MODE_ICONS  = {
+  notes: '\u266A', intervals: '\u2933', chords: '\u266C',
+  scales: '\u266B', progressions: '\u21BB'
+};
 const LEVEL_LABELS = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé' };
 
 let dataCache = null;
@@ -461,7 +468,7 @@ function renderContent() {
 function renderAllView(data) {
   return '<div class="stats-grid">' +
     STUDENT_LIST.map(stu => {
-      const s = data[stu.id] || { total: 0, avg_score: 0, by_mode: { notes: 0, intervals: 0, chords: 0 }, last_session_iso: null };
+      const s = data[stu.id] || { total: 0, avg_score: 0, by_mode: { notes: 0, intervals: 0, chords: 0, scales: 0, progressions: 0 }, last_session_iso: null };
       if (!s.total) {
         return '<div class="stat-card" data-eleve-card="' + escapeHtml(stu.id) + '">' +
           '<div class="stat-card-head">' +
@@ -480,9 +487,11 @@ function renderAllView(data) {
         '<div class="stat-row"><span>Moyenne</span><span class="val ' + avgCls + '">' + s.avg_score.toFixed(1) + '/10</span></div>' +
         '<div class="stat-row"><span>Dernière</span><span class="val">' + fmtDateShort(s.last_session_iso) + '</span></div>' +
         '<div class="stat-card-modes">' +
-          '<div class="mode-block"><div class="mode-label">Notes</div><div class="mode-count">' + s.by_mode.notes + '</div></div>' +
-          '<div class="mode-block"><div class="mode-label">Intervalles</div><div class="mode-count">' + s.by_mode.intervals + '</div></div>' +
-          '<div class="mode-block"><div class="mode-label">Accords</div><div class="mode-count">' + s.by_mode.chords + '</div></div>' +
+          '<div class="mode-block"><div class="mode-label">Notes</div><div class="mode-count">' + (s.by_mode.notes || 0) + '</div></div>' +
+          '<div class="mode-block"><div class="mode-label">Interv.</div><div class="mode-count">' + (s.by_mode.intervals || 0) + '</div></div>' +
+          '<div class="mode-block"><div class="mode-label">Accords</div><div class="mode-count">' + (s.by_mode.chords || 0) + '</div></div>' +
+          '<div class="mode-block"><div class="mode-label">Gammes</div><div class="mode-count">' + (s.by_mode.scales || 0) + '</div></div>' +
+          '<div class="mode-block"><div class="mode-label">Prog.</div><div class="mode-count">' + (s.by_mode.progressions || 0) + '</div></div>' +
         '</div>' +
         '</div>';
     }).join('') +
@@ -515,10 +524,15 @@ function renderEleveView(slug, s) {
         '<div class="summary-val" style="font-size:1rem">' + fmtDateShort(s.last_session_iso) + '</div>' +
       '</div>' +
       '<div class="summary-block">' +
-        '<div class="summary-label">Notes / Interv. / Acc.</div>' +
-        '<div class="summary-val" style="font-size:1rem">' +
-          s.by_mode.notes + ' · ' + s.by_mode.intervals + ' · ' + s.by_mode.chords +
+        '<div class="summary-label">N / I / A / G / P</div>' +
+        '<div class="summary-val" style="font-size:0.95rem">' +
+          (s.by_mode.notes || 0) + ' · ' +
+          (s.by_mode.intervals || 0) + ' · ' +
+          (s.by_mode.chords || 0) + ' · ' +
+          (s.by_mode.scales || 0) + ' · ' +
+          (s.by_mode.progressions || 0) +
         '</div>' +
+        '<div class="summary-sub">Notes · Interv · Accords · Gammes · Prog</div>' +
       '</div>' +
     '</div>';
 

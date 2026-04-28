@@ -15,7 +15,7 @@
 // }
 
 const VALID_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
-const VALID_MODES = ['notes', 'intervals', 'chords'];
+const VALID_MODES = ['notes', 'intervals', 'chords', 'scales', 'progressions'];
 const VALID_LEVELS = ['debutant', 'intermediaire', 'avance'];
 
 const CORS = {

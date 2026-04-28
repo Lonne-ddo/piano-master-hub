@@ -16,7 +16,7 @@
 //       avg_score: number (sur 10, 1 décimale),
 //       last_session_ts: int|null,
 //       last_session_iso: string|null,
-//       by_mode: { notes, intervals, chords },
+//       by_mode: { notes, intervals, chords, scales, progressions },
 //       sessions: [{ key, slug, mode, level, score, total, duration_ms, questions[], ts, ts_iso }]  // récentes d'abord
 //     }
 //   }
@@ -108,7 +108,7 @@ export async function onRequestGet({ request, env }) {
     const sortedDesc = valid.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
     const lastSession = sortedDesc[0] || null;
 
-    const byMode = { notes: 0, intervals: 0, chords: 0 };
+    const byMode = { notes: 0, intervals: 0, chords: 0, scales: 0, progressions: 0 };
     valid.forEach(sess => {
       if (byMode[sess.mode] !== undefined) byMode[sess.mode]++;
     });

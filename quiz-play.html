@@ -317,7 +317,14 @@
     <script>
     var ELEVES = ['japhet', 'tara', 'dexter', 'messon'];
     var DISPLAY = { japhet: 'Japhet', tara: 'Tara', dexter: 'Dexter', messon: 'Messon' };
-    var MODE_LABELS = { notes: 'Notes', intervals: 'Intervalles', chords: 'Accords' };
+    var MODE_LABELS = {
+        notes: 'Notes',
+        intervals: 'Intervalles',
+        chords: 'Accords',
+        scales: 'Gammes',
+        progressions: 'Progressions'
+    };
+    var VALID_MODES = ['notes','intervals','chords','scales','progressions'];
     var LEVEL_LABELS = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé' };
 
     function escapeHtml(str) {
@@ -342,7 +349,7 @@
             window.location.replace('/');
             return;
         }
-        if (!mode || ['notes','intervals','chords'].indexOf(mode) < 0
+        if (!mode || VALID_MODES.indexOf(mode) < 0
             || !level || ['debutant','intermediaire','avance'].indexOf(level) < 0) {
             console.warn('[quiz-play] mode/level invalide → redirect quiz');
             window.location.replace('/quiz?eleve=' + encodeURIComponent(slug));
@@ -364,7 +371,7 @@
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('quiz-screen').classList.remove('hidden');
             renderQuestion();
-            setTimeout(function () { engine.playCurrent(); }, 300);
+            setTimeout(function () { engine.playCurrent().then(updatePlayBtnState); }, 300);
         }).catch(function (err) {
             console.error('[quiz-play] sampler error:', err);
             document.getElementById('loading').innerHTML =
@@ -373,8 +380,9 @@
 
         document.getElementById('play-btn').addEventListener('click', function () {
             var btn = document.getElementById('play-btn');
+            if (btn.disabled) return;
             btn.classList.add('playing');
-            engine.playCurrent();
+            engine.playCurrent().then(updatePlayBtnState);
             setTimeout(function () { btn.classList.remove('playing'); }, 1500);
         });
 
@@ -385,7 +393,7 @@
             }
             engine.next();
             renderQuestion();
-            setTimeout(function () { engine.playCurrent(); }, 250);
+            setTimeout(function () { engine.playCurrent().then(updatePlayBtnState); }, 250);
         });
 
         document.getElementById('restart-btn').addEventListener('click', function () {
@@ -403,22 +411,26 @@
         document.getElementById('score-num').textContent = engine.score;
         document.getElementById('score-den').textContent = '/' + engine.cur;
 
-        // Direction badge (intervals only)
+        // Badge contextuel (intervals → direction, scales → tonique)
         var badge = document.getElementById('direction-badge');
         if (engine.mode === 'intervals' && q.payload.direction) {
             badge.textContent = q.payload.direction === 'asc' ? '↑ Ascendant' : '↓ Descendant';
+            badge.style.display = '';
+        } else if (engine.mode === 'scales' && q.payload.tonicFr) {
+            badge.textContent = 'Tonique : ' + q.payload.tonicFr;
             badge.style.display = '';
         } else {
             badge.textContent = '';
             badge.style.display = 'none';
         }
 
-        // Reset feedback + next + play button label
+        // Reset feedback + next + play button label/state
         var fb = document.getElementById('feedback');
         fb.classList.add('hidden');
         fb.textContent = '';
         document.getElementById('next-btn').classList.add('hidden');
         document.getElementById('play-btn-label').textContent = 'Écouter';
+        updatePlayBtnState();
 
         // Render choices
         var grid = document.getElementById('choices');
@@ -432,6 +444,19 @@
             btn.addEventListener('click', function () { handlePick(choice.id, btn); });
             grid.appendChild(btn);
         });
+    }
+
+    function updatePlayBtnState() {
+        var btn = document.getElementById('play-btn');
+        var label = document.getElementById('play-btn-label');
+        if (!engine || !btn) return;
+        var canPlay = engine.canPlayCurrent();
+        btn.disabled = !canPlay;
+        if (engine.replaysUsedForCurrent > 0) {
+            label.textContent = canPlay ? 'Réécouter' : 'Écoute terminée';
+        } else {
+            label.textContent = 'Écouter';
+        }
     }
 
     function handlePick(answerId, btn) {

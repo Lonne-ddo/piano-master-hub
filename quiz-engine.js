@@ -67,6 +67,51 @@
 
     var BASE_NOTES_CH = ['C4','D4','E4','F4','G4','A4'];
 
+    // ─── Gammes (commit 2b.2) ─────────────────────────────────────
+    // Mineure naturelle uniquement (mode aeolien). Intervals incluent
+    // l'octave (12) pour rendre la gamme complète à l'écoute.
+    var SCALE_TYPES = [
+        { id: 'major', name: 'Majeure', intervals: [0, 2, 4, 5, 7, 9, 11, 12] },
+        { id: 'minor', name: 'Mineure', intervals: [0, 2, 3, 5, 7, 8, 10, 12] }
+    ];
+
+    var NOTE_FR = { C: 'Do', D: 'Ré', E: 'Mi', F: 'Fa', G: 'Sol', A: 'La', B: 'Si' };
+
+    function noteToFr(noteName) {
+        if (!noteName) return '';
+        var base = String(noteName).replace(/\d+$/, '');
+        var natural = base.charAt(0);
+        var fr = NOTE_FR[natural] || natural;
+        if (base.length > 1) {
+            var accidental = base.charAt(1);
+            if (accidental === '#') return fr + '\u266F';
+            if (accidental === 'b' || accidental === 'B') return fr + '\u266D';
+        }
+        return fr;
+    }
+
+    // ─── Progressions diatoniques en Do majeur (commit 2b.2) ──────
+    // Triades simples : I=C E G | ii=D F A | iii=E G B | IV=F A C | V=G B D | vi=A C E
+    var TRIADS_C_MAJOR = {
+        'I':   ['C4','E4','G4'],
+        'ii':  ['D4','F4','A4'],
+        'iii': ['E4','G4','B4'],
+        'IV':  ['F4','A4','C5'],
+        'V':   ['G4','B4','D5'],
+        'vi':  ['A4','C5','E5']
+    };
+
+    var PROGRESSION_POOL = [
+        { id: 'I_IV_V',     name: 'I - IV - V',                   chords: ['I','IV','V']       },
+        { id: 'I_V_vi_IV',  name: 'I - V - vi - IV',              chords: ['I','V','vi','IV']  },
+        { id: 'ii_V_I',     name: 'ii - V - I',                   chords: ['ii','V','I']       },
+        { id: 'I_vi_IV_V',  name: 'I - vi - IV - V (50s)',        chords: ['I','vi','IV','V']  },
+        { id: 'vi_IV_I_V',  name: 'vi - IV - I - V (axis)',       chords: ['vi','IV','I','V']  },
+        { id: 'canon',      name: 'Canon (I-V-vi-iii-IV-I-IV-V)', chords: ['I','V','vi','iii','IV','I','IV','V'] },
+        { id: 'I_iii_IV_V', name: 'I - iii - IV - V',             chords: ['I','iii','IV','V'] },
+        { id: 'vi_ii_V_I',  name: 'vi - ii - V - I',              chords: ['vi','ii','V','I']  }
+    ];
+
     // ─── Configuration des niveaux par mode ─────────────────────
     var QUIZ_DATA = {
         notes: {
@@ -97,6 +142,33 @@
                 avance: null
             },
             levelChoices: { debutant: 3, intermediaire: 4, avance: 6 }
+        },
+        scales: {
+            TYPES: SCALE_TYPES,
+            CHROMATIC: CHROMATIC_IV,
+            TONICS_BY_LEVEL: {
+                debutant:      ['C'],
+                intermediaire: ['C','D','E','F','G','A'],
+                avance:        ['C','D','E','F','G','A']
+            },
+            OCTAVE: 4,
+            REPLAY_BY_LEVEL: {
+                debutant:      999,
+                intermediaire: 2,
+                avance:        1
+            },
+            NOTE_DURATION_S: 0.4
+        },
+        progressions: {
+            POOL: PROGRESSION_POOL,
+            TRIADS_C_MAJOR: TRIADS_C_MAJOR,
+            POOL_BY_LEVEL: {
+                debutant:      ['I_IV_V', 'I_V_vi_IV', 'ii_V_I'],
+                intermediaire: ['I_IV_V', 'I_V_vi_IV', 'ii_V_I', 'I_vi_IV_V', 'vi_IV_I_V'],
+                avance:        ['I_IV_V', 'I_V_vi_IV', 'ii_V_I', 'I_vi_IV_V', 'vi_IV_I_V', 'canon', 'I_iii_IV_V', 'vi_ii_V_I']
+            },
+            CHORD_DURATION_S: 1.0,
+            GAP_S: 0.05
         }
     };
 
@@ -132,7 +204,7 @@
     // ─── QuizEngine class ─────────────────────────────────────────
     function QuizEngine(opts) {
         opts = opts || {};
-        this.mode = opts.mode;             // notes | intervals | chords
+        this.mode = opts.mode;             // notes | intervals | chords | scales | progressions
         this.level = opts.level;            // debutant | intermediaire | avance
         this.slug = opts.slug;
         this.totalQuestions = opts.totalQuestions || 10;
@@ -140,6 +212,7 @@
         this.cur = 0;
         this.score = 0;
         this.answered = false;
+        this.replaysUsedForCurrent = 0; // utilisé par mode scales
         this.startedAt = Date.now();
         this.sampler = null;
         this.samplerReady = false;
@@ -182,6 +255,7 @@
         this.cur = 0;
         this.score = 0;
         this.answered = false;
+        this.replaysUsedForCurrent = 0;
     };
 
     QuizEngine.prototype._buildQuestion = function (data) {
@@ -228,6 +302,32 @@
             };
         }
 
+        if (this.mode === 'scales') {
+            var correctScale = pickRandom(data.TYPES);
+            var tonics = data.TONICS_BY_LEVEL[this.level] || ['C'];
+            var tonic = pickRandom(tonics);
+            // Toujours 2 boutons : Majeure / Mineure (ordre fixe)
+            var scaleChoices = data.TYPES.slice();
+            return {
+                correct: correctScale,
+                choices: scaleChoices,
+                payload: { tonic: tonic, tonicFr: noteToFr(tonic) }
+            };
+        }
+
+        if (this.mode === 'progressions') {
+            var allowedIds = data.POOL_BY_LEVEL[this.level] || data.POOL.map(function (p) { return p.id; });
+            var pool = data.POOL.filter(function (p) { return allowedIds.indexOf(p.id) >= 0; });
+            var correctProg = pickRandom(pool);
+            // Choix = pool entier du niveau (3/5/8 boutons), shuffled
+            var progChoices = shuffle(pool.slice());
+            return {
+                correct: correctProg,
+                choices: progChoices,
+                payload: {}
+            };
+        }
+
         throw new Error('Mode inconnu : ' + this.mode);
     };
 
@@ -270,6 +370,38 @@
                 notes.forEach(function (n) {
                     self.sampler.triggerAttackRelease(n, '2n', nowCh);
                 });
+            } else if (self.mode === 'scales') {
+                // Replay limit (par niveau)
+                var maxPlays = QUIZ_DATA.scales.REPLAY_BY_LEVEL[self.level] || 999;
+                if (self.replaysUsedForCurrent >= maxPlays) return;
+                self.replaysUsedForCurrent++;
+                var sd = QUIZ_DATA.scales;
+                var tonic = q.payload.tonic;
+                var oct = sd.OCTAVE;
+                var chrom = sd.CHROMATIC;
+                var baseIdx = chrom.indexOf(tonic);
+                var dur = sd.NOTE_DURATION_S;
+                var nowSc = Tone.now();
+                q.correct.intervals.forEach(function (semis, i) {
+                    var totalSc = baseIdx + semis;
+                    var noteName = chrom[totalSc % 12];
+                    var noteOct = oct + Math.floor(totalSc / 12);
+                    self.sampler.triggerAttackRelease(noteName + noteOct, dur, nowSc + i * dur);
+                });
+            } else if (self.mode === 'progressions') {
+                var pd = QUIZ_DATA.progressions;
+                var triads = pd.TRIADS_C_MAJOR;
+                var durP = pd.CHORD_DURATION_S;
+                var gap = pd.GAP_S;
+                var nowP = Tone.now();
+                q.correct.chords.forEach(function (chordId, i) {
+                    var chordNotes = triads[chordId];
+                    if (!chordNotes) return;
+                    var t = nowP + i * (durP + gap);
+                    chordNotes.forEach(function (n) {
+                        self.sampler.triggerAttackRelease(n, durP, t);
+                    });
+                });
             }
         });
     };
@@ -294,9 +426,16 @@
         if (this.cur < this.totalQuestions - 1) {
             this.cur++;
             this.answered = false;
+            this.replaysUsedForCurrent = 0;
             return true;
         }
         return false;
+    };
+
+    QuizEngine.prototype.canPlayCurrent = function () {
+        if (this.mode !== 'scales') return true;
+        var max = QUIZ_DATA.scales.REPLAY_BY_LEVEL[this.level] || 999;
+        return this.replaysUsedForCurrent < max;
     };
 
     QuizEngine.prototype.finish = function () {
@@ -331,4 +470,5 @@
     // ─── Exposition globale ─────────────────────────────────────
     window.QuizEngine = QuizEngine;
     window.QUIZ_DATA = QUIZ_DATA;
+    window.noteToFr = noteToFr;
 })();
