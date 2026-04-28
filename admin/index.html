@@ -256,39 +256,6 @@
       .tab-eleve { min-width: 72px; }
     }
 
-    /* ── Context bar ───────────────────────────────────────── */
-    .ctx-bar {
-      font-size: 14px;
-      color: var(--text2);
-      line-height: 1.5;
-      padding: 6px 6px 0;
-      min-height: 1.8em;
-    }
-    .ctx-bar strong {
-      color: var(--text1);
-      font-weight: 700;
-    }
-    .ctx-bar .sep {
-      color: var(--text3);
-      margin: 0 6px;
-    }
-    .ctx-stale-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 8px;
-      background: rgba(240, 180, 41, 0.1);
-      color: var(--amber);
-      border: 1px solid var(--amber);
-      border-radius: 999px;
-      font-size: 11px;
-      font-family: 'DM Mono', monospace;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-left: 8px;
-      cursor: help;
-    }
-
     /* ── Progression bar ───────────────────────────────────── */
     .prog-row {
       display: flex;
@@ -397,15 +364,6 @@
       color: var(--v);
       background: var(--bg2);
     }
-    .ctx-bar .date-inline {
-      border-bottom: 1px dashed transparent;
-      transition: border-color .15s, color .15s;
-    }
-    .ctx-bar .date-inline.override-active {
-      color: var(--v);
-      border-bottom-color: var(--v);
-    }
-
     /* ── Cards ─────────────────────────────────────────────── */
     .card-grid {
       display: grid;
@@ -650,7 +608,6 @@
     @media (max-width: 768px) {
       .app { padding: 18px 14px 60px; }
       .card { padding: 16px; }
-      .ctx-bar { font-size: 13px; }
     }
   </style>
 </head>
@@ -704,7 +661,6 @@
   </header>
 
   <nav class="tab-bar" id="tabBar"></nav>
-  <div class="ctx-bar" id="ctxBar"></div>
   <main id="mainContent"></main>
 </div>
 
@@ -733,28 +689,6 @@ function escapeHtml(s) {
 }
 
 const MONTHS_SHORT = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
-const MONTHS_LONG  = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-
-function parseJJMMYYYY(str) {
-  if (!str) return null;
-  const m = String(str).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!m) return null;
-  const mi = parseInt(m[2], 10) - 1;
-  if (mi < 0 || mi > 11) return null;
-  return { d: parseInt(m[1], 10), m: mi, y: parseInt(m[3], 10) };
-}
-
-function fmtDateShort(str) {
-  const p = parseJJMMYYYY(str);
-  if (!p) return str || '—';
-  return `${p.d} ${MONTHS_SHORT[p.m]}`;
-}
-
-function fmtDateLong(str) {
-  const p = parseJJMMYYYY(str);
-  if (!p) return str || '—';
-  return `${p.d} ${MONTHS_LONG[p.m]} ${p.y}`;
-}
 
 function renderTabs() {
   const bar = document.getElementById('tabBar');
@@ -764,37 +698,6 @@ function renderTabs() {
       <div class="tab-name">${escapeHtml(s.nom)}</div>
     </button>
   `).join('');
-}
-
-function fmtIsoShort(iso) {
-  if (!iso) return '—';
-  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return iso;
-  const mi = parseInt(m[2], 10) - 1;
-  if (mi < 0 || mi > 11) return iso;
-  return `${parseInt(m[3], 10)} ${MONTHS_SHORT[mi]}`;
-}
-
-function renderCtx(s) {
-  const ctx = document.getElementById('ctxBar');
-  if (!s) { ctx.innerHTML = ''; return; }
-  const stats = s.stats || null;
-  const sessionCount = stats?.nb_cours ?? s.sessionCount ?? (s.seances?.length || 0);
-  // Préfère stats.date_debut (ISO) → "8 mars", fallback sur ancien format slash
-  const debut = stats?.date_debut ? fmtIsoShort(stats.date_debut) : fmtDateShort(s.premier_cours);
-  const fin   = stats?.date_fin   ? fmtIsoShort(stats.date_fin)   : fmtDateShort(s.fin_prevue);
-  const debutOverride = stats?.override_active?.date_debut ? 'override-active' : '';
-  const finOverride   = stats?.override_active?.date_fin   ? 'override-active' : '';
-  const staleBadge = s.source === 'stale'
-    ? '<span class="ctx-stale-badge" title="Gemini et Groq sont indisponibles. Données de la dernière synchronisation.">● cache périmé</span>'
-    : '';
-  ctx.innerHTML = `
-    <strong>${escapeHtml(s.nom)}</strong>
-    <span class="sep">·</span> ${sessionCount} cours
-    <span class="sep">·</span> début <span class="date-inline ${debutOverride}">${escapeHtml(debut)}</span>
-    <span class="sep">·</span> fin <span class="date-inline ${finOverride}">${escapeHtml(fin)}</span>
-    ${staleBadge}
-  `;
 }
 
 function triggerStalePulse() {
@@ -807,7 +710,6 @@ function triggerStalePulse() {
 }
 
 function renderEmpty() {
-  document.getElementById('ctxBar').innerHTML = '';
   document.getElementById('mainContent').innerHTML = `
     <div class="empty-state">
       <div class="ns-icon">&#127925;</div>
@@ -817,7 +719,6 @@ function renderEmpty() {
 }
 
 function showLoader(nom) {
-  document.getElementById('ctxBar').innerHTML = `<strong>${escapeHtml(nom)}</strong> <span class="sep">·</span> chargement…`;
   document.getElementById('mainContent').innerHTML = `
     <div class="loader">
       <div class="spinner"></div>
@@ -828,7 +729,6 @@ function showLoader(nom) {
 }
 
 function showError(message, details) {
-  document.getElementById('ctxBar').innerHTML = '';
   document.getElementById('mainContent').innerHTML = `
     <div class="error-state">
       <div class="warn">⚠️</div>
@@ -861,7 +761,6 @@ function fmtSessionDate(raw) {
 }
 
 function renderProfile(s) {
-  renderCtx(s);
 
   const seances = s.seances || [];
   const theorie = s.theorie || [];
