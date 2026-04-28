@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Master Hub — Quiz</title>
+    <meta name="theme-color" content="#0f0f14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="Master Hub — Quiz musical en cours.">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+">
+    <script src="https://unpkg.com/tone@14.7.77/build/Tone.js"></script>
+    <style>
+        :root {
+            --bg: #0f0f14;
+            --bg-card: #1a1a24;
+            --bg-card-hover: #22222f;
+            --text: #eee;
+            --text-muted: #888;
+            --v: #8B6FE8;
+            --v-soft: rgba(139, 111, 232, 0.08);
+            --v-soft-stronger: rgba(139, 111, 232, 0.14);
+            --v-border: rgba(139, 111, 232, 0.3);
+            --green: #3dd68c;
+            --red: #e05555;
+            --radius: 16px;
+            --tap-min: 48px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow-x: hidden;
+        }
+        #bg-canvas {
+            position: fixed; inset: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 0;
+        }
+        .container {
+            position: relative; z-index: 1;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 24px 16px 40px;
+            display: flex; flex-direction: column;
+            min-height: 100vh; min-height: 100dvh;
+        }
+        .back-link {
+            align-self: flex-start;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-decoration: none;
+            padding: 6px 8px;
+            margin-bottom: 8px;
+        }
+        .back-link:hover { color: var(--text); }
+        .header { text-align: center; padding: 12px 0 4px; }
+        .header h1 {
+            font-size: 1.4rem; font-weight: 700;
+            letter-spacing: -0.02em; color: #fff;
+        }
+        .header .subtitle {
+            font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;
+        }
+
+        /* ── Status / loading ───────────────────────────── */
+        .status-msg {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+        .spinner {
+            width: 32px; height: 32px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: var(--v);
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Progress + score ───────────────────────────── */
+        .progress-wrap {
+            margin-top: 24px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .progress-row {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.82rem; color: var(--text-muted);
+        }
+        .progress-row .score { color: var(--v); font-weight: 600; }
+        .progress-track {
+            width: 100%; height: 4px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 999px; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; background: var(--v);
+            border-radius: 999px;
+            transition: width 0.4s ease;
+        }
+
+        /* ── Play button + direction badge ──────────────── */
+        .play-area {
+            margin-top: 28px;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 12px;
+        }
+        .play-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+            background: var(--v); color: #fff; border: none;
+            font-family: inherit;
+            padding: 16px 32px; border-radius: 999px;
+            font-size: 1rem; font-weight: 600;
+            cursor: pointer;
+            min-height: 56px; min-width: 200px;
+            transition: opacity 0.2s, transform 0.15s, background 0.2s;
+            box-shadow: 0 8px 24px rgba(139, 111, 232, 0.3);
+        }
+        .play-btn:active { transform: scale(0.97); }
+        .play-btn:hover:not(:disabled) { background: #9b80f0; }
+        .play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .play-btn.playing { background: #9b80f0; }
+        .direction-badge {
+            font-size: 0.82rem; color: var(--text-muted);
+            background: rgba(255,255,255,0.04);
+            padding: 4px 12px; border-radius: 999px;
+            min-height: 22px;
+        }
+
+        /* ── Choices grid ───────────────────────────────── */
+        .choices {
+            margin-top: 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+        .choice-btn {
+            background: var(--bg-card);
+            border: 2px solid rgba(255,255,255,0.06);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem; font-weight: 600;
+            padding: 14px 12px;
+            border-radius: 12px;
+            cursor: pointer;
+            min-height: var(--tap-min);
+            transition: background 0.18s, border-color 0.18s, transform 0.15s;
+        }
+        .choice-btn:active { transform: scale(0.97); }
+        @media (hover: hover) {
+            .choice-btn:hover:not(:disabled) {
+                background: var(--bg-card-hover);
+                border-color: var(--v-border);
+            }
+        }
+        .choice-btn:disabled { cursor: not-allowed; }
+        .choice-btn.correct {
+            border-color: var(--green);
+            background: rgba(61, 214, 140, 0.12);
+            color: var(--green);
+        }
+        .choice-btn.wrong {
+            border-color: var(--red);
+            background: rgba(224, 85, 85, 0.12);
+            color: var(--red);
+        }
+
+        /* ── Feedback + next ───────────────────────────── */
+        .feedback {
+            margin-top: 16px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.92rem;
+            text-align: center;
+            min-height: 22px;
+        }
+        .feedback.hidden { visibility: hidden; }
+        .feedback.correct {
+            background: rgba(61, 214, 140, 0.1);
+            color: var(--green);
+            border: 1px solid rgba(61, 214, 140, 0.3);
+        }
+        .feedback.wrong {
+            background: rgba(224, 85, 85, 0.1);
+            color: var(--red);
+            border: 1px solid rgba(224, 85, 85, 0.3);
+        }
+        .next-btn {
+            margin-top: 14px;
+            width: 100%;
+            background: var(--v);
+            color: #fff;
+            font-family: inherit;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-size: 1rem; font-weight: 600;
+            cursor: pointer;
+            min-height: 52px;
+            transition: opacity 0.2s, transform 0.15s, background 0.2s;
+        }
+        .next-btn:active { transform: scale(0.98); }
+        .next-btn:hover { background: #9b80f0; }
+        .next-btn.hidden { display: none; }
+
+        /* ── Final score screen ─────────────────────────── */
+        .final {
+            margin-top: 32px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--radius);
+            padding: 32px 24px;
+            text-align: center;
+        }
+        .final-score {
+            font-size: 3rem; font-weight: 700;
+            color: var(--v); line-height: 1;
+            margin-bottom: 8px;
+        }
+        .final-msg {
+            font-size: 1.1rem; color: #fff;
+            margin-bottom: 6px; font-weight: 600;
+        }
+        .final-pct { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 24px; }
+        .final-actions {
+            display: flex; gap: 10px; flex-wrap: wrap;
+            justify-content: center;
+        }
+        .final-actions button, .final-actions a {
+            flex: 1; min-width: 140px;
+            padding: 14px 16px;
+            border-radius: 12px;
+            font-size: 0.95rem; font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            text-decoration: none;
+            text-align: center;
+            min-height: 48px;
+            display: inline-flex; align-items: center; justify-content: center;
+            transition: background 0.2s, transform 0.15s;
+        }
+        .final-actions .primary {
+            background: var(--v); color: #fff; border: none;
+        }
+        .final-actions .secondary {
+            background: transparent; color: var(--text);
+            border: 1px solid rgba(255,255,255,0.12);
+        }
+        .final-actions button:active, .final-actions a:active { transform: scale(0.97); }
+
+        .hidden { display: none !important; }
+
+        @media (max-width: 480px) {
+            .header h1 { font-size: 1.2rem; }
+            .play-btn { min-width: 160px; padding: 14px 24px; }
+            .choices { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div class="container">
+        <a href="#" class="back-link" id="back-link">&larr; Retour</a>
+        <header class="header">
+            <h1 id="page-title">Quiz</h1>
+            <p class="subtitle" id="page-subtitle">Chargement…</p>
+        </header>
+
+        <div id="loading" class="status-msg">
+            <div class="spinner"></div>
+            Chargement du piano…
+        </div>
+
+        <div id="quiz-screen" class="hidden">
+            <div class="progress-wrap">
+                <div class="progress-row">
+                    <span id="question-label">Question 1 / 10</span>
+                    <span class="score">Score : <span id="score-num">0</span><span id="score-den">/0</span></span>
+                </div>
+                <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+            </div>
+
+            <div class="play-area">
+                <button type="button" class="play-btn" id="play-btn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>
+                    <span id="play-btn-label">Écouter</span>
+                </button>
+                <div class="direction-badge" id="direction-badge"></div>
+            </div>
+
+            <div class="choices" id="choices"></div>
+            <div class="feedback hidden" id="feedback"></div>
+            <button type="button" class="next-btn hidden" id="next-btn">Suivant →</button>
+        </div>
+
+        <div id="final-screen" class="hidden">
+            <div class="final">
+                <div class="final-score"><span id="final-num">0</span>/10</div>
+                <div class="final-msg" id="final-msg">—</div>
+                <div class="final-pct" id="final-pct"></div>
+                <div class="final-actions">
+                    <button type="button" class="primary" id="restart-btn">Recommencer</button>
+                    <a href="#" class="secondary" id="back-to-quiz">Choisir un autre quiz</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/quiz-engine.js"></script>
+    <script>
+    var ELEVES = ['japhet', 'tara', 'dexter', 'messon'];
+    var DISPLAY = { japhet: 'Japhet', tara: 'Tara', dexter: 'Dexter', messon: 'Messon' };
+    var MODE_LABELS = { notes: 'Notes', intervals: 'Intervalles', chords: 'Accords' };
+    var LEVEL_LABELS = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé' };
+
+    function escapeHtml(str) {
+        var d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    var engine = null;
+    var slug = null;
+
+    (function init() {
+        var params = new URLSearchParams(window.location.search);
+        slug = (params.get('eleve') || '').toLowerCase();
+        var mode = params.get('mode');
+        var level = params.get('level');
+
+        console.log('[quiz-play] params:', { slug: slug, mode: mode, level: level });
+
+        if (!slug || ELEVES.indexOf(slug) < 0) {
+            console.warn('[quiz-play] slug invalide → redirect /');
+            window.location.replace('/');
+            return;
+        }
+        if (!mode || ['notes','intervals','chords'].indexOf(mode) < 0
+            || !level || ['debutant','intermediaire','avance'].indexOf(level) < 0) {
+            console.warn('[quiz-play] mode/level invalide → redirect quiz');
+            window.location.replace('/quiz?eleve=' + encodeURIComponent(slug));
+            return;
+        }
+
+        try { localStorage.setItem('eleve_slug', slug); } catch (e) {}
+
+        document.getElementById('back-link').href = '/quiz?eleve=' + encodeURIComponent(slug);
+        document.getElementById('back-to-quiz').href = '/quiz?eleve=' + encodeURIComponent(slug);
+        document.getElementById('page-title').textContent = 'Quiz ' + MODE_LABELS[mode];
+        document.getElementById('page-subtitle').textContent = LEVEL_LABELS[level] + ' · 10 questions';
+
+        engine = new QuizEngine({ mode: mode, level: level, slug: slug, totalQuestions: 10 });
+
+        engine.init().then(function () {
+            console.log('[quiz-play] sampler ready');
+            engine.generateQuestions();
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('quiz-screen').classList.remove('hidden');
+            renderQuestion();
+            setTimeout(function () { engine.playCurrent(); }, 300);
+        }).catch(function (err) {
+            console.error('[quiz-play] sampler error:', err);
+            document.getElementById('loading').innerHTML =
+                '<p>Erreur de chargement du piano. Vérifie ta connexion et recharge la page.</p>';
+        });
+
+        document.getElementById('play-btn').addEventListener('click', function () {
+            var btn = document.getElementById('play-btn');
+            btn.classList.add('playing');
+            engine.playCurrent();
+            setTimeout(function () { btn.classList.remove('playing'); }, 1500);
+        });
+
+        document.getElementById('next-btn').addEventListener('click', function () {
+            if (engine.cur >= engine.totalQuestions - 1) {
+                showFinalScreen();
+                return;
+            }
+            engine.next();
+            renderQuestion();
+            setTimeout(function () { engine.playCurrent(); }, 250);
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', function () {
+            window.location.reload();
+        });
+    })();
+
+    function renderQuestion() {
+        var q = engine.current();
+        var fill = document.getElementById('progress-fill');
+        var pct = ((engine.cur) / engine.totalQuestions) * 100;
+        fill.style.width = pct + '%';
+        document.getElementById('question-label').textContent =
+            'Question ' + (engine.cur + 1) + ' / ' + engine.totalQuestions;
+        document.getElementById('score-num').textContent = engine.score;
+        document.getElementById('score-den').textContent = '/' + engine.cur;
+
+        // Direction badge (intervals only)
+        var badge = document.getElementById('direction-badge');
+        if (engine.mode === 'intervals' && q.payload.direction) {
+            badge.textContent = q.payload.direction === 'asc' ? '↑ Ascendant' : '↓ Descendant';
+            badge.style.display = '';
+        } else {
+            badge.textContent = '';
+            badge.style.display = 'none';
+        }
+
+        // Reset feedback + next + play button label
+        var fb = document.getElementById('feedback');
+        fb.classList.add('hidden');
+        fb.textContent = '';
+        document.getElementById('next-btn').classList.add('hidden');
+        document.getElementById('play-btn-label').textContent = 'Écouter';
+
+        // Render choices
+        var grid = document.getElementById('choices');
+        grid.innerHTML = '';
+        q.choices.forEach(function (choice) {
+            var btn = document.createElement('button');
+            btn.className = 'choice-btn';
+            btn.type = 'button';
+            btn.textContent = (engine.mode === 'notes') ? choice.name : choice.name;
+            btn.setAttribute('data-id', choice.id);
+            btn.addEventListener('click', function () { handlePick(choice.id, btn); });
+            grid.appendChild(btn);
+        });
+    }
+
+    function handlePick(answerId, btn) {
+        var result = engine.pick(answerId);
+        if (!result) return;
+
+        // Disable all buttons + mark correct/wrong
+        var btns = document.querySelectorAll('#choices .choice-btn');
+        btns.forEach(function (b) {
+            b.disabled = true;
+            if (b.getAttribute('data-id') === result.expected.id) b.classList.add('correct');
+        });
+        if (!result.correct) btn.classList.add('wrong');
+
+        // Feedback
+        var fb = document.getElementById('feedback');
+        fb.classList.remove('hidden');
+        if (result.correct) {
+            fb.className = 'feedback correct';
+            fb.textContent = '✓ Bonne réponse !';
+        } else {
+            fb.className = 'feedback wrong';
+            fb.textContent = '✗ C\'était : ' + result.expected.name;
+        }
+
+        // Update score display (the picked-just answer counts now)
+        document.getElementById('score-num').textContent = engine.score;
+        document.getElementById('score-den').textContent = '/' + (engine.cur + 1);
+
+        // Show next button (label depends on whether it's the last question)
+        var nb = document.getElementById('next-btn');
+        nb.textContent = (engine.cur >= engine.totalQuestions - 1) ? 'Voir mon score →' : 'Suivant →';
+        nb.classList.remove('hidden');
+    }
+
+    function showFinalScreen() {
+        document.getElementById('quiz-screen').classList.add('hidden');
+        document.getElementById('final-screen').classList.remove('hidden');
+
+        var score = engine.score;
+        var pct = Math.round(score / engine.totalQuestions * 100);
+        document.getElementById('final-num').textContent = score;
+        document.getElementById('final-pct').textContent = pct + '%';
+
+        var msg;
+        if (score >= 8) msg = 'Excellent ! 🎹';
+        else if (score >= 5) msg = 'Bien joué !';
+        else msg = 'Continue à pratiquer !';
+        document.getElementById('final-msg').textContent = msg;
+
+        // Submit to KV (fire-and-forget)
+        engine.finish().then(function (resp) {
+            console.log('[quiz-play] submit response:', resp);
+        });
+    }
+    </script>
+
+    <script>
+    (function () {
+        var canvas = document.getElementById('bg-canvas');
+        var ctx = canvas.getContext('2d');
+        var particles = [];
+        var COUNT = 18;
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+        function createParticle() {
+            var w = 6 + Math.random() * 4;
+            var h = 18 + Math.random() * 10;
+            return {
+                x: Math.random() * canvas.width,
+                y: canvas.height + h,
+                w: w, h: h, r: 2,
+                speed: 0.15 + Math.random() * 0.35,
+                opacity: 0.04 + Math.random() * 0.04,
+                drift: (Math.random() - 0.5) * 0.3
+            };
+        }
+        for (var i = 0; i < COUNT; i++) {
+            var p = createParticle();
+            p.y = Math.random() * canvas.height;
+            particles.push(p);
+        }
+        function drawRoundRect(x, y, w, h, r, alpha) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < particles.length; i++) {
+                var p = particles[i];
+                p.y -= p.speed;
+                p.x += p.drift;
+                drawRoundRect(p.x, p.y, p.w, p.h, p.r, p.opacity);
+                if (p.y + p.h < 0) particles[i] = createParticle();
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+    })();
+    </script>
+
+    <script src="/nav-outils.js" data-active="quiz"></script>
+
+</body>
+</html>

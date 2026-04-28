@@ -393,8 +393,8 @@
         { id: "notes",         label: "Notes",            icon: "\uD83C\uDFB5", sub: "Reconnais les notes seules (do, ré, mi…)" },
         { id: "intervalles",   label: "Intervalles",      icon: "\uD83C\uDFBC", sub: "Identifie les intervalles entre 2 notes" },
         { id: "accords",       label: "Accords",          icon: "\uD83C\uDFB9", sub: "Reconnais le type d'accord (M, m, dim, aug, 7, M7, m7)" },
-        { id: "gammes",        label: "Gammes",           icon: "\uD83C\uDFB6", sub: "Identifie la gamme jouée (majeure, mineure, modes)" },
-        { id: "progressions",  label: "Progressions",     icon: "\uD83D\uDD04", sub: "Reconnais les progressions d'accords (II-V-I, I-V-vi-IV…)" },
+        { id: "gammes",        label: "Gammes",           icon: "\uD83C\uDFB6", sub: "Identifie la gamme jouée (majeure, mineure, modes)", disabled: true },
+        { id: "progressions",  label: "Progressions",     icon: "\uD83D\uDD04", sub: "Reconnais les progressions d'accords (II-V-I, I-V-vi-IV…)", disabled: true },
         { id: "dictee",        label: "Dictée mélodique", icon: "\uD83C\uDF99\uFE0F", sub: "Reproduis la mélodie jouée", disabled: true }
     ];
 
@@ -454,15 +454,24 @@
         updateLaunchBtn();
     }
 
+    // Map UI category id → engine mode id
+    var CATEGORY_TO_MODE = {
+        notes:       'notes',
+        intervalles: 'intervals',
+        accords:     'chords'
+    };
+
     function handleLaunch() {
         if (!state.category || !state.level) return;
-        var payload = {
-            category: state.category,
-            level: state.level,
-            eleve_slug: state.slug
-        };
-        try { sessionStorage.setItem("quiz_pending", JSON.stringify(payload)); } catch (e) {}
-        showToast("Le quiz arrive bientôt — tu as choisi " + categoryLabel(state.category) + " en " + levelLabel(state.level));
+        var mode = CATEGORY_TO_MODE[state.category];
+        if (!mode) {
+            showToast("Cette catégorie arrive bientôt — choisis Notes, Intervalles ou Accords.");
+            return;
+        }
+        var url = '/quiz-play?eleve=' + encodeURIComponent(state.slug)
+            + '&mode=' + encodeURIComponent(mode)
+            + '&level=' + encodeURIComponent(state.level);
+        window.location.href = url;
     }
 
     (function init() {
