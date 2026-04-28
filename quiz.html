@@ -466,10 +466,7 @@
     function handleLaunch() {
         if (!state.category || !state.level) return;
         var mode = CATEGORY_TO_MODE[state.category];
-        if (!mode) {
-            showToast("Cette catégorie arrive bientôt — choisis Notes, Intervalles ou Accords.");
-            return;
-        }
+        if (!mode) return; // Toutes les cards cliquables sont mappées ; safety net silencieuse.
         var url = '/quiz-play?eleve=' + encodeURIComponent(state.slug)
             + '&mode=' + encodeURIComponent(mode)
             + '&level=' + encodeURIComponent(state.level);
