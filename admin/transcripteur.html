@@ -962,7 +962,7 @@ async function transcribeFileWithRetry(file, onProgress) {
 // Groq Whisper traite l'audio (évite le timeout 30s de Cloudflare → 502).
 // Renvoie { text } en succès, { error, status } en erreur.
 async function streamTranscribe(formData) {
-  const resp = await fetch('/api/transcribe', { method: 'POST', body: formData })
+  const resp = await fetch('/api/transcribe', { method: 'POST', headers: { 'x-admin-secret': ADMIN_SECRET }, body: formData })
 
   // Le serveur ouvre toujours un 200 (puisqu'il commence à streamer avant
   // d'avoir la réponse Groq). Une 4xx/5xx ici signale un échec amont

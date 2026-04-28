@@ -187,7 +187,15 @@ export async function onRequest(context) {
       });
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (e) {
+      return new Response(JSON.stringify({ error: 'invalid_json' }), {
+        status: 400,
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      });
+    }
     const systemPrompt = body.system || '';
     const baseUserMessage = body.messages?.[0]?.content
       || body.prompt
@@ -195,6 +203,13 @@ export async function onRequest(context) {
       || body.content
       || body.transcript
       || '';
+
+    if (typeof baseUserMessage !== 'string' || !baseUserMessage.trim()) {
+      return new Response(JSON.stringify({ error: 'empty_message' }), {
+        status: 400,
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Annexer les segments timestampés au userMessage si fournis (utile pour
     // retrouver des moments exacts du cours)

@@ -361,7 +361,9 @@ export async function onRequestGet({ params, request, env }) {
   // La fraîcheur est gérée applicativement (forceSync=true ou _cachedAt explicite).
   try {
     await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(parsed));
-  } catch (_) {}
+  } catch (e) {
+    console.error('[eleves/[id]] KV put failed:', e?.message || e, 'key:', cacheKey);
+  }
 
   return jsonResponse({ ...parsed, source: 'fresh' });
 }

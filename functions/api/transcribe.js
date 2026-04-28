@@ -15,7 +15,7 @@ const MODEL = "whisper-large-v3";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin":  "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Headers": "Content-Type, x-admin-secret",
 };
 
 export async function onRequest(context) {
@@ -29,6 +29,15 @@ export async function onRequest(context) {
   if (request.method !== "POST") {
     return new Response(JSON.stringify({ error: "Méthode non autorisée" }), {
       status: 405,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
+  }
+
+  // Auth admin (évite que /api/transcribe consomme le quota Groq publiquement)
+  const secret = request.headers.get("x-admin-secret");
+  if (!secret || secret !== env.ADMIN_SECRET) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });
   }

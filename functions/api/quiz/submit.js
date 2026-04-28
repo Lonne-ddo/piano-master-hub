@@ -53,11 +53,14 @@ export async function onRequestPost({ request, env }) {
   }
   const score = Number(data.score);
   const total = Number(data.total);
-  if (!Number.isInteger(score) || score < 0 || score > 20) {
+  if (!Number.isInteger(score) || score < 0 || score > 50) {
     return json({ ok: false, error: 'invalid_score' }, 400);
   }
   if (!Number.isInteger(total) || total < 1 || total > 50) {
     return json({ ok: false, error: 'invalid_total' }, 400);
+  }
+  if (score > total) {
+    return json({ ok: false, error: 'invalid_score', detail: 'score cannot exceed total' }, 400);
   }
   const duration = Number(data.duration_ms);
   if (!Number.isInteger(duration) || duration <= 0 || duration > 30 * 60 * 1000) {
@@ -66,11 +69,13 @@ export async function onRequestPost({ request, env }) {
   if (!Array.isArray(data.questions) || data.questions.length !== total) {
     return json({ ok: false, error: 'invalid_questions' }, 400);
   }
-  // Sanitize chaque question (whitelist 4 champs)
+  // Sanitize chaque question (whitelist 4 champs + cap longueur 200 chars contre DOS)
+  const MAX_FIELD_LEN = 200;
+  const cap = (v) => (typeof v === 'string' && v.length > MAX_FIELD_LEN) ? v.slice(0, MAX_FIELD_LEN) : v;
   const sanitizedQuestions = data.questions.map(q => ({
-    asked: String(q.asked || ''),
-    asked_name: q.asked_name ? String(q.asked_name) : null,
-    given: q.given ? String(q.given) : null,
+    asked: cap(String(q.asked || '')),
+    asked_name: q.asked_name ? cap(String(q.asked_name)) : null,
+    given: q.given ? cap(String(q.given)) : null,
     correct: !!q.correct,
   }));
 
