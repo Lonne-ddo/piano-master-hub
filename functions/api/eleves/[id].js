@@ -220,6 +220,32 @@ function sanitizeYears(parsed, currentYear) {
   return parsed;
 }
 
+// ─── Schema validation post-LLM (B5) ────────────────────────────
+// Vérifie sanity du profil élève retourné par parseDoc. Si le LLM hallucine
+// la structure (ex: theorie en string au lieu d'array), throw → catch upstream
+// → fallback cache stale (L342) ou 503 si pas de cache.
+function validateParsedProfile(parsed) {
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('parsed: not an object');
+  }
+  if (typeof parsed.nom !== 'string' || !parsed.nom.trim()) {
+    throw new Error('parsed.nom: missing or invalid (expected non-empty string)');
+  }
+  if (typeof parsed.programme !== 'string' || !parsed.programme.trim()) {
+    throw new Error('parsed.programme: missing or invalid (expected non-empty string)');
+  }
+  if (parsed.theorie != null && !Array.isArray(parsed.theorie)) {
+    throw new Error('parsed.theorie: expected array, got ' + typeof parsed.theorie);
+  }
+  if (parsed.repertoire != null && !Array.isArray(parsed.repertoire)) {
+    throw new Error('parsed.repertoire: expected array, got ' + typeof parsed.repertoire);
+  }
+  if (parsed.seances != null && !Array.isArray(parsed.seances)) {
+    throw new Error('parsed.seances: expected array, got ' + typeof parsed.seances);
+  }
+  return parsed;
+}
+
 // ─── PARSING via LLM ─────────────────────────────────────────────
 async function parseDoc(docText, student, env) {
   const currentYear = new Date().getFullYear();
@@ -281,7 +307,20 @@ ${docText.slice(0, 6000)}
 
   const text = await callLLM(`${systemPrompt}\n\n${userPrompt}`, env);
   const clean = extractJSON(text);
-  const parsed = JSON.parse(clean);
+  let parsed;
+  try {
+    parsed = JSON.parse(clean);
+  } catch (e) {
+    console.error('[parseDoc] JSON.parse failed:', e?.message || e, 'raw_first200:', String(text).slice(0, 200));
+    throw new Error('parseDoc: JSON.parse failed (' + (e?.message || 'unknown') + ')');
+  }
+  // Schema validation post-LLM (B5) — throw si structure cassée → cache stale préservé
+  try {
+    validateParsedProfile(parsed);
+  } catch (e) {
+    console.error('[parseDoc] schema validation failed:', e.message, 'raw_first200:', String(text).slice(0, 200));
+    throw e;
+  }
   // Garde-fou : corrige les dates dont le LLM aurait inventé une année trop ancienne
   sanitizeYears(parsed, currentYear);
   parsed.id = student.id;

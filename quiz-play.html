@@ -397,8 +397,20 @@
         });
 
         document.getElementById('restart-btn').addEventListener('click', function () {
+            if (engine) engine.dispose();
             window.location.reload();
         });
+
+        // Cleanup Tone.Sampler avant navigation (B8 — anti memory leak)
+        var disposeOnce = function () {
+            if (engine) { engine.dispose(); engine = null; }
+        };
+        window.addEventListener('beforeunload', disposeOnce);
+        window.addEventListener('pagehide', disposeOnce);
+        var backToQuiz = document.getElementById('back-to-quiz');
+        if (backToQuiz) backToQuiz.addEventListener('click', disposeOnce);
+        var backLink = document.getElementById('back-link');
+        if (backLink) backLink.addEventListener('click', disposeOnce);
     })();
 
     function renderQuestion() {

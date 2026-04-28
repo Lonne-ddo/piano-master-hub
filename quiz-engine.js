@@ -467,6 +467,20 @@
         });
     };
 
+    // Libère le sampler Tone.js pour éviter le leak mémoire entre sessions.
+    // Doit être appelé avant reload / nav out (cf. quiz-play.html beforeunload).
+    QuizEngine.prototype.dispose = function () {
+        if (this.sampler) {
+            try {
+                this.sampler.dispose();
+            } catch (e) {
+                console.warn('[QuizEngine] sampler dispose error:', e && e.message ? e.message : e);
+            }
+            this.sampler = null;
+        }
+        this.samplerReady = false;
+    };
+
     // ─── Exposition globale ─────────────────────────────────────
     window.QuizEngine = QuizEngine;
     window.QUIZ_DATA = QUIZ_DATA;

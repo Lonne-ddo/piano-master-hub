@@ -349,6 +349,28 @@ function sanitizeJson(s) {
   return out;
 }
 
+// ─── Schema validation post-LLM (B5) ────────────────────────────
+// Vérifie que le JSON extrait correspond bien à { date, titre, devoirs[], resume[] }.
+// Si le LLM hallucine la structure, throw → catch upstream → cache existant préservé.
+function validateParsedSeance(parsed) {
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('parsed: not an object');
+  }
+  if (typeof parsed.date !== 'string' || !parsed.date.trim()) {
+    throw new Error('parsed.date: missing or invalid (expected non-empty string)');
+  }
+  if (typeof parsed.titre !== 'string' || !parsed.titre.trim()) {
+    throw new Error('parsed.titre: missing or invalid (expected non-empty string)');
+  }
+  if (!Array.isArray(parsed.devoirs)) {
+    throw new Error('parsed.devoirs: expected array, got ' + typeof parsed.devoirs);
+  }
+  if (!Array.isArray(parsed.resume)) {
+    throw new Error('parsed.resume: expected array, got ' + typeof parsed.resume);
+  }
+  return parsed;
+}
+
 // ─── Cascade LLM : Gemini → Groq → Claude ────────────────────────
 async function extractLatestSession(docText, eleveId, studentName, env) {
   const { system, buildUser } = buildPrompt(studentName);
@@ -367,6 +389,7 @@ async function extractLatestSession(docText, eleveId, studentName, env) {
       raw = await callGemini(system, userMessage, env.GEMINI_API_KEY, opts);
       console.log(`[sync.js] eleve=${eleveId} provider=gemini raw_response_first200="${raw.slice(0, 200).replace(/\s+/g, ' ')}"`);
       const parsed = extractJSON(raw);
+      validateParsedSeance(parsed);
       console.log(`[sync.js] eleve=${eleveId} provider=gemini parse=ok duration=${Date.now()-t0}ms`);
       return { parsed, provider: 'gemini-2.5-flash' };
     } catch (e) {
@@ -386,6 +409,7 @@ async function extractLatestSession(docText, eleveId, studentName, env) {
       raw = await callGroq(system, userMessage, env.GROQ_API_KEY, opts);
       console.log(`[sync.js] eleve=${eleveId} provider=groq raw_response_first200="${raw.slice(0, 200).replace(/\s+/g, ' ')}"`);
       const parsed = extractJSON(raw);
+      validateParsedSeance(parsed);
       console.log(`[sync.js] eleve=${eleveId} provider=groq parse=ok duration=${Date.now()-t0}ms`);
       return { parsed, provider: 'groq-llama-3.3' };
     } catch (e) {
@@ -405,6 +429,7 @@ async function extractLatestSession(docText, eleveId, studentName, env) {
       raw = await callClaude(system, userMessage, env.ANTHROPIC_API_KEY, opts);
       console.log(`[sync.js] eleve=${eleveId} provider=claude raw_response_first200="${raw.slice(0, 200).replace(/\s+/g, ' ')}"`);
       const parsed = extractJSON(raw);
+      validateParsedSeance(parsed);
       console.log(`[sync.js] eleve=${eleveId} provider=claude parse=ok duration=${Date.now()-t0}ms`);
       return { parsed, provider: 'claude-sonnet-4-6' };
     } catch (e) {
