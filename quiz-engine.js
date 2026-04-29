@@ -13,16 +13,19 @@
 (function () {
     'use strict';
 
-    // ─── Catalogues importés verbatim depuis Piano Key ────────────
-    var NOTES = [
-        { id: 'C',  name: 'C'  }, { id: 'C#', name: 'C#' },
-        { id: 'D',  name: 'D'  }, { id: 'D#', name: 'D#' },
-        { id: 'E',  name: 'E'  }, { id: 'F',  name: 'F'  },
-        { id: 'F#', name: 'F#' }, { id: 'G',  name: 'G'  },
-        { id: 'G#', name: 'G#' }, { id: 'A',  name: 'A'  },
-        { id: 'A#', name: 'A#' }, { id: 'B',  name: 'B'  }
-    ];
+    // Dépend de MhTheory (mh-music-theory.js doit être chargé avant ce script).
+    if (!window.MhTheory) {
+        throw new Error('quiz-engine.js requires mh-music-theory.js to be loaded first');
+    }
+    var MT = window.MhTheory;
 
+    // ─── Catalogues — la plupart importés depuis MhTheory, certains
+    //                  spécifiques au quiz restent locaux ─────────
+    var NOTES = MT.CHROMATIC_SHARP.map(function (id) {
+        return { id: id, name: id };
+    });
+
+    // Mapping note → samples Tone.js (3 octaves) — spécifique au quiz audio.
     var NOTE_TONES = {
         'C':  ['C3','C4','C5'],   'C#': ['Db3','Db4','Db5'],
         'D':  ['D3','D4','D5'],   'D#': ['Eb3','Eb4','Eb5'],
@@ -32,35 +35,9 @@
         'A#': ['Bb3','Bb4','Bb5'],'B':  ['B3','B4','B5']
     };
 
-    // Display labels FR par convention dièse vs bémol (ids restent toujours en
-    // notation dièse côté KV/score pour cohérence interne).
-    var NOTE_NAMES_FR_SHARP = {
-        'C':'Do', 'C#':'Do\u266F', 'D':'Ré', 'D#':'Ré\u266F', 'E':'Mi', 'F':'Fa',
-        'F#':'Fa\u266F', 'G':'Sol', 'G#':'Sol\u266F', 'A':'La', 'A#':'La\u266F', 'B':'Si'
-    };
-    var NOTE_NAMES_FR_FLAT = {
-        'C':'Do', 'C#':'Ré\u266D', 'D':'Ré', 'D#':'Mi\u266D', 'E':'Mi', 'F':'Fa',
-        'F#':'Sol\u266D', 'G':'Sol', 'G#':'La\u266D', 'A':'La', 'A#':'Si\u266D', 'B':'Si'
-    };
+    var INTERVAL_TYPES = MT.INTERVAL_TYPES;
 
-    var INTERVAL_TYPES = [
-        { id: 'm2', name: 'Demi-ton (m2)',    semis: 1  },
-        { id: 'M2', name: 'Ton (M2)',         semis: 2  },
-        { id: 'm3', name: 'Tierce m (m3)',    semis: 3  },
-        { id: 'M3', name: 'Tierce M (M3)',    semis: 4  },
-        { id: 'P4', name: 'Quarte (P4)',      semis: 5  },
-        { id: 'TT', name: 'Triton (TT)',      semis: 6  },
-        { id: 'P5', name: 'Quinte (P5)',      semis: 7  },
-        { id: 'm6', name: 'Sixte m (m6)',     semis: 8  },
-        { id: 'M6', name: 'Sixte M (M6)',     semis: 9  },
-        { id: 'm7', name: 'Septième m (m7)',  semis: 10 },
-        { id: 'M7', name: 'Septième M (M7)',  semis: 11 },
-        { id: 'P8', name: 'Octave (P8)',      semis: 12 },
-        { id: 'm9', name: 'Neuvième m',       semis: 13 },
-        { id: 'M9', name: 'Neuvième M',       semis: 14 }
-    ];
-
-    var CHROMATIC_IV  = ['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+    // Roots utilisés par le quiz (uniquement notes blanches → identiques en sharp/flat).
     var BASE_ROOTS_IV = ['C3','D3','E3','F3','G3','A3'];
 
     var CHORD_TYPES_QUIZ = [
@@ -86,20 +63,7 @@
         { id: 'minor', name: 'Mineure', intervals: [0, 2, 3, 5, 7, 8, 10, 12] }
     ];
 
-    var NOTE_FR = { C: 'Do', D: 'Ré', E: 'Mi', F: 'Fa', G: 'Sol', A: 'La', B: 'Si' };
-
-    function noteToFr(noteName) {
-        if (!noteName) return '';
-        var base = String(noteName).replace(/\d+$/, '');
-        var natural = base.charAt(0);
-        var fr = NOTE_FR[natural] || natural;
-        if (base.length > 1) {
-            var accidental = base.charAt(1);
-            if (accidental === '#') return fr + '\u266F';
-            if (accidental === 'b' || accidental === 'B') return fr + '\u266D';
-        }
-        return fr;
-    }
+    // noteToFr est désormais MT.noteToFr (cf. mh-music-theory.js).
 
     // ─── Progressions diatoniques en Do majeur (commit 2b.2) ──────
     // Triades simples : I=C E G | ii=D F A | iii=E G B | IV=F A C | V=G B D | vi=A C E
@@ -133,7 +97,6 @@
         },
         intervals: {
             INTERVAL_TYPES: INTERVAL_TYPES,
-            CHROMATIC: CHROMATIC_IV,
             BASE_ROOTS: BASE_ROOTS_IV,
             // Pool d'intervalles autorisés par niveau (null = tous)
             levelFilter: {
@@ -145,7 +108,6 @@
         },
         chords: {
             CHORD_TYPES: CHORD_TYPES_QUIZ,
-            CHROMATIC: CHROMATIC_IV,
             BASE_NOTES: BASE_NOTES_CH,
             levelFilter: {
                 debutant: ['maj','min','dim'],
@@ -156,7 +118,6 @@
         },
         scales: {
             TYPES: SCALE_TYPES,
-            CHROMATIC: CHROMATIC_IV,
             TONICS_BY_LEVEL: {
                 debutant:      ['C'],
                 intermediaire: ['C','D','E','F','G','A'],
@@ -192,25 +153,7 @@
         return arr[Math.floor(Math.random() * arr.length)];
     }
 
-    function buildChordNotes(rootNote, intervals, chromatic) {
-        var baseName = rootNote.replace(/\d/, '');
-        var baseOct  = parseInt(rootNote.slice(-1), 10);
-        var baseIdx  = chromatic.indexOf(baseName);
-        return intervals.map(function (semi) {
-            var total = baseIdx + semi;
-            var name  = chromatic[total % 12];
-            var oct   = baseOct + Math.floor(total / 12);
-            return name + oct;
-        });
-    }
-
-    function getUpperNote(rootNote, semis, chromatic) {
-        var name  = rootNote.replace(/\d/, '');
-        var oct   = parseInt(rootNote.slice(-1), 10);
-        var idx   = chromatic.indexOf(name);
-        var total = idx + semis;
-        return chromatic[total % 12] + (oct + Math.floor(total / 12));
-    }
+    // buildChordNotes / getUpperNote sont MT.notesFromIntervals / MT.getUpperNote.
 
     // ─── QuizEngine class ─────────────────────────────────────────
     function QuizEngine(opts) {
@@ -286,13 +229,16 @@
                 .filter(function (n) { return n.id !== correctNote.id; });
             distractors = shuffle(distractors).slice(0, nChoices - 1);
             var choices = shuffle(distractors.concat([correctNote]));
-            // 50/50 dièse vs bémol — cohérent dans toute la question (correct + leurres)
+            // 50/50 dièse vs bémol — cohérent dans toute la question (correct + leurres).
+            // Les ids restent en sharp ('C#') côté KV/score ; seul le label affiché varie.
             var useFlat = Math.random() < 0.5;
-            var labels = useFlat ? NOTE_NAMES_FR_FLAT : NOTE_NAMES_FR_SHARP;
             var displayChoices = choices.map(function (n) {
-                return { id: n.id, name: labels[n.id] || n.name };
+                return { id: n.id, name: MT.noteToFr(n.id, { useFlat: useFlat }) };
             });
-            var displayCorrect = { id: correctNote.id, name: labels[correctNote.id] || correctNote.name };
+            var displayCorrect = {
+                id: correctNote.id,
+                name: MT.noteToFr(correctNote.id, { useFlat: useFlat })
+            };
             return {
                 correct: displayCorrect,
                 choices: displayChoices,
@@ -350,7 +296,7 @@
             return {
                 correct: correctScale,
                 choices: scaleChoices,
-                payload: { tonic: tonic, tonicFr: noteToFr(tonic) }
+                payload: { tonic: tonic, tonicFr: MT.noteToFr(tonic) }
             };
         }
 
@@ -392,8 +338,7 @@
                 var dur = QUIZ_DATA.notes.duration;
                 self.sampler.triggerAttackRelease(q.payload.tone, dur);
             } else if (self.mode === 'intervals') {
-                var data = QUIZ_DATA.intervals;
-                var upper = getUpperNote(q.payload.root, q.correct.semis, data.CHROMATIC);
+                var upper = MT.getUpperNote(q.payload.root, q.correct.semis);
                 var now = Tone.now();
                 if (q.payload.direction === 'asc') {
                     self.sampler.triggerAttackRelease(q.payload.root, '2n', now);
@@ -403,8 +348,7 @@
                     self.sampler.triggerAttackRelease(q.payload.root, '2n', now + 0.6);
                 }
             } else if (self.mode === 'chords') {
-                var dataCh = QUIZ_DATA.chords;
-                var notes = buildChordNotes(q.payload.root, q.correct.intervals, dataCh.CHROMATIC);
+                var notes = MT.notesFromIntervals(q.payload.root, q.correct.intervals);
                 var nowCh = Tone.now();
                 notes.forEach(function (n) {
                     self.sampler.triggerAttackRelease(n, '2n', nowCh);
@@ -417,16 +361,10 @@
                 // Stop toute lecture en cours avant de re-démarrer (clic Réécouter)
                 self._clearScheduled();
                 var sd = QUIZ_DATA.scales;
-                var tonic = q.payload.tonic;
-                var oct = sd.OCTAVE;
-                var chrom = sd.CHROMATIC;
-                var baseIdx = chrom.indexOf(tonic);
+                var rootStr = q.payload.tonic + sd.OCTAVE;
                 var dur = sd.NOTE_DURATION_S;
-                q.correct.intervals.forEach(function (semis, i) {
-                    var totalSc = baseIdx + semis;
-                    var noteName = chrom[totalSc % 12];
-                    var noteOct = oct + Math.floor(totalSc / 12);
-                    var noteFull = noteName + noteOct;
+                var scaleNotes = MT.notesFromIntervals(rootStr, q.correct.intervals);
+                scaleNotes.forEach(function (noteFull, i) {
                     var id = setTimeout(function () {
                         if (self.sampler) self.sampler.triggerAttackRelease(noteFull, dur);
                     }, i * dur * 1000);
