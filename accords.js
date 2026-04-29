@@ -61,9 +61,6 @@
     if (state.octave > OCT_MAX) state.octave = OCT_MAX;
 
     // ═══ Catalogues d'affichage ═══
-    var ROOT_LIST = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-    var TYPE_LIST = Object.keys(MT.CHORD_TYPES);
-
     // Mapping id type → suffixe d'affichage (notation jazz)
     var TYPE_SUFFIX = {
         'maj':    '',       'min':    'm',
@@ -78,6 +75,15 @@
         '7sus4':  '7sus4',  '7b9':    '7\u266D9',
         '7#5':    '7\u266F5','7#9':   '7\u266F9'
     };
+
+    // Familles d'accords pour rendu groupé dans le bottom sheet
+    var TYPE_FAMILIES = [
+        { label: 'Triades',    types: ['maj','min','dim','aug','sus2','sus4'] },
+        { label: 'Septièmes',  types: ['7','maj7','min7','min7b5','dim7','mMaj7'] },
+        { label: 'Sixtes',     types: ['6','min6'] },
+        { label: 'Extensions', types: ['9','13','min11','add9'] },
+        { label: 'Altérées',   types: ['7sus4','7b9','7#5','7#9'] }
+    ];
 
     // ═══ Helpers musicaux ═══
 
@@ -330,32 +336,68 @@
         svg.innerHTML = parts.join('');
     }
 
+    // Tonique : 2 lignes (blanches + bémols décalés pour aligner sur les blanches).
+    // state.root est stocké en convention sharp (canonique). Les boutons "Réb"
+    // envoient la version sharp équivalente via data-root.
     function renderRootGrid() {
         var grid = $('root-grid');
-        var html = '';
-        ROOT_LIST.forEach(function (r) {
-            var sel = (r === state.root) ? ' selected' : '';
-            var label = (state.notation === 'FR') ? MT.noteToFr(r) : r;
-            html += '<button type="button" class="pill' + sel + '" data-root="' + r + '">' + label + '</button>';
+        var whites = ['C','D','E','F','G','A','B'];
+        // 6 cellules entre les 2 spacers ; null = pas de bémol entre Mi et Fa.
+        var flats  = ['Db','Eb', null, 'Gb','Ab','Bb'];
+
+        var html = '<div class="root-row whites">';
+        whites.forEach(function (n) {
+            var sel = (n === state.root) ? ' selected' : '';
+            var label = (state.notation === 'FR') ? MT.noteToFr(n) : n;
+            html += '<button type="button" class="root-btn' + sel +
+                '" data-root="' + n + '">' + label + '</button>';
         });
+        html += '</div>';
+
+        html += '<div class="root-row flats">';
+        html += '<div class="root-spacer"></div>';
+        flats.forEach(function (n) {
+            if (n === null) {
+                html += '<div class="root-spacer"></div>';
+                return;
+            }
+            var sharp = MT.toSharp(n);
+            var sel = (sharp === state.root) ? ' selected' : '';
+            var label = (state.notation === 'FR')
+                ? MT.noteToFr(n, { useFlat: true })
+                : n;
+            html += '<button type="button" class="root-btn flat-btn' + sel +
+                '" data-root="' + sharp + '">' + label + '</button>';
+        });
+        html += '<div class="root-spacer"></div>';
+        html += '</div>';
+
         grid.innerHTML = html;
     }
 
-    function renderTypeGrid() {
-        var grid = $('type-grid');
+    function renderTypeFamilies() {
+        var container = $('type-families');
         var html = '';
-        TYPE_LIST.forEach(function (t) {
-            var def = MT.CHORD_TYPES[t];
-            var sel = (t === state.type) ? ' selected' : '';
-            var suffix = TYPE_SUFFIX[t] || t;
-            var displayId = suffix === '' ? 'maj' : suffix;
-            html +=
-                '<button type="button" class="pill type-pill' + sel + '" data-type="' + t + '" title="' + def.name + '">' +
-                    '<span class="type-id">' + displayId + '</span>' +
-                    '<span class="type-name">' + def.name + '</span>' +
-                '</button>';
+        TYPE_FAMILIES.forEach(function (fam) {
+            html += '<div class="family-group">';
+            html += '<div class="family-label">' + fam.label + '</div>';
+            html += '<div class="type-grid">';
+            fam.types.forEach(function (t) {
+                var def = MT.CHORD_TYPES[t];
+                if (!def) return;
+                var sel = (t === state.type) ? ' selected' : '';
+                var suffix = TYPE_SUFFIX[t];
+                var displayId = (suffix === '' || suffix === undefined) ? 'maj' : suffix;
+                html +=
+                    '<button type="button" class="type-btn' + sel +
+                    '" data-type="' + t + '" title="' + def.name + '">' +
+                        '<span class="type-id">' + displayId + '</span>' +
+                        '<span class="type-name">' + def.name + '</span>' +
+                    '</button>';
+            });
+            html += '</div></div>';
         });
-        grid.innerHTML = html;
+        container.innerHTML = html;
     }
 
     var INV_LABELS = ['Fond.', '1\u02E2\u1D49', '2\u1D49', '3\u1D49'];
@@ -366,7 +408,7 @@
         for (var i = 0; i <= 3; i++) {
             var disabled = (i > max) ? ' disabled' : '';
             var sel = (i === state.inversion) ? ' selected' : '';
-            html += '<button type="button" class="pill' + sel + disabled +
+            html += '<button type="button" class="chip' + sel + disabled +
                 '" data-inv="' + i + '"' + (disabled ? ' aria-disabled="true"' : '') +
                 '>' + INV_LABELS[i] + '</button>';
         }
@@ -383,10 +425,34 @@
         renderInfoSection();
         renderKeyboard();
         renderRootGrid();
-        renderTypeGrid();
+        renderTypeFamilies();
         renderInvGrid();
         renderOctave();
         persistState();
+    }
+
+    // ═══ Bottom sheet (mobile) ═══
+    // Le panel `.controls-panel` est sticky-sidebar en desktop ; sur mobile il
+    // se transforme en bottom sheet caché par défaut (transform translateY(100%)).
+    // Ouverture via "⚙ Choisir l'accord", fermeture via backdrop / ✓ Valider /
+    // drag-down sur le handle.
+
+    function openSheet() {
+        var sheet = $('controls-panel');
+        var bd    = $('sheet-backdrop');
+        if (!sheet || !bd) return;
+        sheet.classList.add('is-open');
+        bd.classList.add('is-visible');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeSheet() {
+        var sheet = $('controls-panel');
+        var bd    = $('sheet-backdrop');
+        if (!sheet || !bd) return;
+        sheet.classList.remove('is-open');
+        bd.classList.remove('is-visible');
+        document.body.style.overflow = '';
     }
 
     // ═══ Event listeners ═══
@@ -415,7 +481,7 @@
             renderAll();
         });
 
-        $('type-grid').addEventListener('click', function (e) {
+        $('type-families').addEventListener('click', function (e) {
             var btn = e.target.closest('button[data-type]');
             if (!btn) return;
             state.type = btn.getAttribute('data-type');
@@ -452,6 +518,41 @@
 
         var sub = $('page-subtitle');
         if (sub) sub.textContent = (DISPLAY[slug] || slug) + ' · 22 types · renversements';
+
+        // ─ Bottom sheet (mobile) ─
+        var btnOpen = $('btn-open-sheet');
+        var btnVal  = $('btn-validate-sheet');
+        var bd      = $('sheet-backdrop');
+        var sheet   = $('controls-panel');
+        if (btnOpen) btnOpen.addEventListener('click', openSheet);
+        if (btnVal)  btnVal.addEventListener('click', closeSheet);
+        if (bd)      bd.addEventListener('click', closeSheet);
+
+        // Drag-down to close : déclenché si touch démarre dans les 30 premiers
+        // pixels du sheet (zone du handle), seuil de fermeture à 80px.
+        if (sheet) {
+            var touchStartY = null;
+            sheet.addEventListener('touchstart', function (e) {
+                var rect = sheet.getBoundingClientRect();
+                if (e.touches[0].clientY - rect.top < 30) {
+                    touchStartY = e.touches[0].clientY;
+                }
+            }, { passive: true });
+            sheet.addEventListener('touchmove', function (e) {
+                if (touchStartY === null) return;
+                var dy = e.touches[0].clientY - touchStartY;
+                if (dy > 80) {
+                    closeSheet();
+                    touchStartY = null;
+                }
+            }, { passive: true });
+            sheet.addEventListener('touchend', function () {
+                touchStartY = null;
+            });
+            sheet.addEventListener('touchcancel', function () {
+                touchStartY = null;
+            });
+        }
     }
 
     // ═══ Cleanup ═══
