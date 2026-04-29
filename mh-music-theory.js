@@ -45,32 +45,45 @@
         { id: 'M9', name: 'Neuvième M',       semis: 14 }
     ];
 
-    // ═══════════════ ACCORDS (22 types, convention harmony.js) ═══════════════
-    // ATTENTION : convention « m » pour mineur (pas « min »). Le quiz utilise
-    // une convention distincte (« min ») dans son CHORD_TYPES_QUIZ local.
+    // ═══════════════ ACCORDS (22 types, convention « min ») ═══════════════
+    // Convention « min » alignée avec le quiz CHORD_TYPES_QUIZ (m7 → min7 etc.).
+    // Inclut les dominantes altérées courantes en jazz : 7b9, 7#5, 7#9.
     var CHORD_TYPES = {
-        'maj':    { name: 'Majeur',                 intervals: [0,4,7],         ivLabels: ['1','3','5'] },
-        'm':      { name: 'Mineur',                 intervals: [0,3,7],         ivLabels: ['1','b3','5'] },
-        'dim':    { name: 'Diminué',                intervals: [0,3,6],         ivLabels: ['1','b3','b5'] },
-        'aug':    { name: 'Augmenté',               intervals: [0,4,8],         ivLabels: ['1','3','#5'] },
-        '7':      { name: 'Septième de dominante',  intervals: [0,4,7,10],      ivLabels: ['1','3','5','b7'] },
-        'maj7':   { name: 'Septième majeure',       intervals: [0,4,7,11],      ivLabels: ['1','3','5','7'] },
-        'm7':     { name: 'Septième mineure',       intervals: [0,3,7,10],      ivLabels: ['1','b3','5','b7'] },
-        'm7b5':   { name: 'Demi-diminué',           intervals: [0,3,6,10],      ivLabels: ['1','b3','b5','b7'] },
-        'dim7':   { name: 'Diminué 7',              intervals: [0,3,6,9],       ivLabels: ['1','b3','b5','bb7'] },
-        'sus2':   { name: 'Suspendu 2',             intervals: [0,2,7],         ivLabels: ['1','2','5'] },
-        'sus4':   { name: 'Suspendu 4',             intervals: [0,5,7],         ivLabels: ['1','4','5'] },
-        'add9':   { name: 'Add 9',                  intervals: [0,2,4,7],       ivLabels: ['1','9','3','5'] },
-        'maj9':   { name: 'Majeur 9',               intervals: [0,2,4,7,11],    ivLabels: ['1','9','3','5','7'] },
-        'm9':     { name: 'Mineur 9',               intervals: [0,2,3,7,10],    ivLabels: ['1','9','b3','5','b7'] },
-        'm11':    { name: 'Mineur 11',              intervals: [0,2,3,5,7,10],  ivLabels: ['1','9','b3','11','5','b7'] },
-        '9':      { name: 'Dominante 9',            intervals: [0,2,4,7,10],    ivLabels: ['1','9','3','5','b7'] },
-        '11':     { name: 'Dominante 11',           intervals: [0,2,4,5,7,10],  ivLabels: ['1','9','3','11','5','b7'] },
-        '13':     { name: 'Dominante 13',           intervals: [0,2,4,7,9,10],  ivLabels: ['1','9','3','5','13','b7'] },
-        '7alt':   { name: '7 altéré',               intervals: [0,4,6,10],      ivLabels: ['1','3','b5','b7'] },
-        '7sus4':  { name: '7sus4',                  intervals: [0,5,7,10],      ivLabels: ['1','4','5','b7'] },
-        '6':      { name: 'Sixte',                  intervals: [0,4,7,9],       ivLabels: ['1','3','5','6'] },
-        'm6':     { name: 'Sixte mineure',          intervals: [0,3,7,9],       ivLabels: ['1','b3','5','6'] }
+        // Triades de base
+        'maj':    { name: 'Majeur',                 intervals: [0,4,7],          ivLabels: ['1','3','5'] },
+        'min':    { name: 'Mineur',                 intervals: [0,3,7],          ivLabels: ['1','b3','5'] },
+        'dim':    { name: 'Diminué',                intervals: [0,3,6],          ivLabels: ['1','b3','b5'] },
+        'aug':    { name: 'Augmenté',               intervals: [0,4,8],          ivLabels: ['1','3','#5'] },
+        'sus2':   { name: 'Suspendu 2',             intervals: [0,2,7],          ivLabels: ['1','2','5'] },
+        'sus4':   { name: 'Suspendu 4',             intervals: [0,5,7],          ivLabels: ['1','4','5'] },
+
+        // Septièmes
+        '7':      { name: 'Septième de dominante',  intervals: [0,4,7,10],       ivLabels: ['1','3','5','b7'] },
+        'maj7':   { name: 'Septième majeure',       intervals: [0,4,7,11],       ivLabels: ['1','3','5','7'] },
+        'min7':   { name: 'Septième mineure',       intervals: [0,3,7,10],       ivLabels: ['1','b3','5','b7'] },
+        'min7b5': { name: 'Demi-diminué (m7b5)',    intervals: [0,3,6,10],       ivLabels: ['1','b3','b5','b7'] },
+        'dim7':   { name: 'Diminué 7',              intervals: [0,3,6,9],        ivLabels: ['1','b3','b5','bb7'] },
+        'mMaj7':  { name: 'Mineur Maj7',            intervals: [0,3,7,11],       ivLabels: ['1','b3','5','7'] },
+
+        // Sixtes
+        '6':      { name: 'Sixte',                  intervals: [0,4,7,9],        ivLabels: ['1','3','5','6'] },
+        'min6':   { name: 'Mineur sixte',           intervals: [0,3,7,9],        ivLabels: ['1','b3','5','6'] },
+
+        // Ajouts
+        'add9':   { name: 'Add 9',                  intervals: [0,4,7,14],       ivLabels: ['1','3','5','9'] },
+
+        // Extensions tensions
+        '9':      { name: 'Dominante 9',            intervals: [0,4,7,10,14],    ivLabels: ['1','3','5','b7','9'] },
+        '13':     { name: 'Dominante 13',           intervals: [0,4,7,10,14,21], ivLabels: ['1','3','5','b7','9','13'] },
+        'min11':  { name: 'Mineur 11',              intervals: [0,3,7,10,14,17], ivLabels: ['1','b3','5','b7','9','11'] },
+
+        // Sus dominantes
+        '7sus4':  { name: 'Dominante sus4',         intervals: [0,5,7,10],       ivLabels: ['1','4','5','b7'] },
+
+        // Altérées (dominantes avec altérations courantes)
+        '7b9':    { name: 'Dominante b9',           intervals: [0,4,7,10,13],    ivLabels: ['1','3','5','b7','b9'] },
+        '7#5':    { name: 'Dominante #5 (alt)',     intervals: [0,4,8,10],       ivLabels: ['1','3','#5','b7'] },
+        '7#9':    { name: 'Dominante #9',           intervals: [0,4,7,10,15],    ivLabels: ['1','3','5','b7','#9'] }
     };
 
     // ═══════════════ HELPERS ═══════════════
@@ -149,9 +162,10 @@
         return notesFromIntervals(root, def.intervals);
     }
 
-    // Parse un nom d'accord "Cmaj7" ou "F#m7b5" en { root, type, notes }.
-    // Retourne null si non parsable. Ordre regex : suffixes longs en premier.
-    var CHORD_NAME_RE = /^([A-G][#b]?)(maj9|maj7|maj|m11|m9|m7b5|m7|7alt|7sus4|sus4|sus2|dim7|dim|add9|aug|m6|13|11|9|7|m|6)?$/;
+    // Parse un nom d'accord "Cmaj7" ou "F#min7b5" en { root, type, notes }.
+    // Retourne null si non parsable. Ordre alternation : suffixes longs d'abord
+    // pour éviter qu'un suffixe court court-circuite un long (min vs min7 vs min7b5).
+    var CHORD_NAME_RE = /^([A-G][#b]?)(min7b5|mMaj7|7sus4|min11|maj7|min7|min6|dim7|add9|sus2|sus4|7b9|7#5|7#9|maj|min|dim|aug|13|9|7|6)?$/;
     function parseChord(name) {
         var m = String(name).match(CHORD_NAME_RE);
         if (!m) return null;
