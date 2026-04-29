@@ -50,36 +50,16 @@ function capitalize(s) {
 // Rejette : "Onglet 1", "Général", "PRATIQUE", "Tab 1" (pas au format JJ/MM)
 const SESSION_TITLE_RE = /^[\s#]*(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s*$/gm;
 
-const MONTHS_LONG = [
-  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
-];
+// mergeStats, parseIsoDate, labelFr, computeProgressionPct importés de _lib/.
+// extractJSON aussi (3-level robust shared avec [id].js).
+import { mergeStats } from '../_lib/eleves-stats.js';
+import { extractJSON } from '../_lib/json-extract.js';
 
+// Helpers locaux à sync.js (utilisés par computeAutoStats uniquement)
 function pad2(n) { return String(n).padStart(2, '0'); }
 function isoOf(d) {
   if (!d || isNaN(d)) return null;
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
-function parseIso(s) {
-  if (!s) return null;
-  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return null;
-  const d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
-  return isNaN(d) ? null : d;
-}
-function labelFr(iso) {
-  const d = parseIso(iso);
-  if (!d) return '—';
-  return `${d.getDate()} ${MONTHS_LONG[d.getMonth()]} ${d.getFullYear()}`;
-}
-function computeProgressionPct(debutIso, finIso) {
-  const start = parseIso(debutIso);
-  const end = parseIso(finIso);
-  if (!start || !end) return 0;
-  const total = (end - start) / 86400000;
-  if (total <= 0) return 0;
-  const elapsed = (Date.now() - start) / 86400000;
-  return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
 }
 
 function parseSessionTitles(docText) {
@@ -120,32 +100,7 @@ function computeAutoStats(sessions) {
   };
 }
 
-// Admin (override) gagne TOUJOURS sur auto/LLM si défini.
-// override = { date_debut?: iso, date_fin?: iso, total_cours?: int }
-function mergeStats(autoRaw, override) {
-  const auto = autoRaw || {};
-  const ov = override || {};
-  const isSet = (v) => v !== undefined && v !== null && v !== '';
-
-  const dateDebut = isSet(ov.date_debut) ? ov.date_debut : (auto.date_debut || null);
-  const dateFin   = isSet(ov.date_fin)   ? ov.date_fin   : (auto.date_fin_prevue || auto.date_fin || null);
-  const totalCours = isSet(ov.total_cours) ? Number(ov.total_cours) : 8;
-
-  return {
-    nb_cours: auto.nb_cours || 0,
-    total_cours: totalCours,
-    date_debut: dateDebut,
-    date_debut_label: labelFr(dateDebut),
-    date_fin: dateFin,
-    date_fin_label: labelFr(dateFin),
-    progression_pct: computeProgressionPct(dateDebut, dateFin),
-    override_active: {
-      date_debut:  isSet(ov.date_debut),
-      date_fin:    isSet(ov.date_fin),
-      total_cours: isSet(ov.total_cours),
-    },
-  };
-}
+// mergeStats importé de _lib/eleves-stats.js (cf. import en tête de fichier).
 
 // ─── Prompt ──────────────────────────────────────────────────────
 // Séparé system/user car Gemini utilise systemInstruction et Groq utilise
@@ -274,80 +229,7 @@ async function callClaude(systemPrompt, userMessage, apiKey, opts = {}) {
   return text;
 }
 
-// ─── extractJSON : parsing progressif à 3 niveaux ────────────────
-// 1. JSON.parse direct
-// 2. strip markdown fences + extraction du {...} équilibré
-// 3. sanitize (trailing commas, guillemets typo, commentaires)
-// En cas d'échec total : throw avec head/tail pour debug
-function extractJSON(rawText) {
-  if (!rawText) throw new Error('extractJSON: empty input');
-  const original = String(rawText);
-  let s = original.trim();
-
-  // Niveau 1 : parse direct (cas normal avec JSON natif)
-  try { return JSON.parse(s); } catch (_) {}
-
-  // Niveau 1.5 : retirer les fences markdown
-  const fence = s.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/);
-  if (fence) {
-    try { return JSON.parse(fence[1].trim()); } catch (_) {}
-    s = fence[1].trim();
-  } else {
-    // Fences non closes
-    s = s.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
-  }
-
-  // Niveau 2 : extraire le premier {...} équilibré (ignore texte avant/après)
-  const balanced = extractBalancedJson(s);
-  if (balanced) {
-    try { return JSON.parse(balanced); } catch (_) {}
-    // Niveau 3 : sanitize puis reparse
-    try { return JSON.parse(sanitizeJson(balanced)); } catch (_) {}
-  }
-
-  // Niveau 3b : sanitize sur s direct
-  try { return JSON.parse(sanitizeJson(s)); } catch (_) {}
-
-  // Échec total : erreur explicite avec head/tail pour diagnostic
-  const head = original.slice(0, 200).replace(/\n/g, ' ');
-  const tail = original.length > 200 ? original.slice(-200).replace(/\n/g, ' ') : '';
-  throw new Error(`JSON parse failed after 3 levels. length=${original.length} head="${head}" tail="${tail}"`);
-}
-
-// Extrait le premier bloc {...} équilibré (ignore strings contenant { ou })
-function extractBalancedJson(s) {
-  const first = s.indexOf('{');
-  if (first < 0) return null;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = first; i < s.length; i++) {
-    const c = s[i];
-    if (escape) { escape = false; continue; }
-    if (c === '\\') { escape = true; continue; }
-    if (c === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (c === '{') depth++;
-    else if (c === '}') {
-      depth--;
-      if (depth === 0) return s.slice(first, i + 1);
-    }
-  }
-  return null;
-}
-
-// Sanitization avant 2e tentative de parse
-function sanitizeJson(s) {
-  let out = s;
-  // 1. Retire les commentaires // (fin de ligne) et /* */
-  out = out.replace(/\/\/[^\n\r]*/g, '');
-  out = out.replace(/\/\*[\s\S]*?\*\//g, '');
-  // 2. Guillemets typographiques → droits
-  out = out.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
-  // 3. Trailing commas avant } ou ]
-  out = out.replace(/,(\s*[\]}])/g, '$1');
-  return out;
-}
+// extractJSON 3-level importé de _lib/json-extract.js (cf. import en tête de fichier).
 
 // ─── Schema validation post-LLM (B5) ────────────────────────────
 // Vérifie que le JSON extrait correspond bien à { date, titre, devoirs[], resume[] }.

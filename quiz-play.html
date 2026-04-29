@@ -342,8 +342,6 @@
         var mode = params.get('mode');
         var level = params.get('level');
 
-        console.log('[quiz-play] params:', { slug: slug, mode: mode, level: level });
-
         if (!slug || ELEVES.indexOf(slug) < 0) {
             console.warn('[quiz-play] slug invalide → redirect /');
             window.location.replace('/');
@@ -366,7 +364,6 @@
         engine = new QuizEngine({ mode: mode, level: level, slug: slug, totalQuestions: 10 });
 
         engine.init().then(function () {
-            console.log('[quiz-play] sampler ready');
             engine.generateQuestions();
             document.getElementById('loading').classList.add('hidden');
             document.getElementById('quiz-screen').classList.remove('hidden');
@@ -520,9 +517,7 @@
         document.getElementById('final-msg').textContent = msg;
 
         // Submit to KV (fire-and-forget)
-        engine.finish().then(function (resp) {
-            console.log('[quiz-play] submit response:', resp);
-        });
+        engine.finish();
     }
     </script>
 
@@ -571,6 +566,7 @@
             ctx.closePath();
             ctx.fill();
         }
+        var rafId = null;
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             for (var i = 0; i < particles.length; i++) {
@@ -580,9 +576,15 @@
                 drawRoundRect(p.x, p.y, p.w, p.h, p.r, p.opacity);
                 if (p.y + p.h < 0) particles[i] = createParticle();
             }
-            requestAnimationFrame(animate);
+            rafId = requestAnimationFrame(animate);
         }
         animate();
+        var stopAnim = function () {
+            if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+            window.removeEventListener("resize", resize);
+        };
+        window.addEventListener("beforeunload", stopAnim);
+        window.addEventListener("pagehide", stopAnim);
     })();
     </script>
 

@@ -479,15 +479,11 @@
         var slug = params.get('eleve');
         slug = slug ? slug.toLowerCase() : null;
 
-        console.log('[quiz] query eleve:', slug);
-
         if (!slug || ELEVES_WHITELIST.indexOf(slug) < 0) {
             console.warn('[quiz] slug invalide → redirect /');
             window.location.replace('/');
             return;
         }
-
-        console.log('[quiz] slug valide → render Quiz pour', DISPLAY[slug]);
 
         try { localStorage.setItem('eleve_slug', slug); } catch (e) {}
         state.slug = slug;
@@ -611,6 +607,7 @@
             ctx.fill();
         }
 
+        var rafId = null;
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             for (var i = 0; i < particles.length; i++) {
@@ -620,9 +617,15 @@
                 drawRoundRect(p.x, p.y, p.w, p.h, p.r, p.opacity);
                 if (p.y + p.h < 0) particles[i] = createParticle();
             }
-            requestAnimationFrame(animate);
+            rafId = requestAnimationFrame(animate);
         }
         animate();
+        var stopAnim = function () {
+            if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+            window.removeEventListener("resize", resize);
+        };
+        window.addEventListener("beforeunload", stopAnim);
+        window.addEventListener("pagehide", stopAnim);
     })();
     </script>
 

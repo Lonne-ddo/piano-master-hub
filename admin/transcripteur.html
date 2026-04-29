@@ -1012,7 +1012,6 @@ async function transcribeWithFallback(formData, onProgress = () => {}) {
     if (data.error) {
       const msg = data.error
       if (msg.includes('429')) {
-        console.log('Groq quota dépassé, bascule vers AssemblyAI…')
         onProgress(60, 'Fallback AssemblyAI…')
         const file = formData.get('file')
         return await transcribeWithAssemblyAI(file, file?.name)
@@ -1024,7 +1023,7 @@ async function transcribeWithFallback(formData, onProgress = () => {}) {
 
   } catch (err) {
     // Erreur réseau ou exception → on tente quand même AssemblyAI
-    console.log('Groq erreur, bascule vers AssemblyAI:', err.message)
+    console.warn('Groq erreur, bascule vers AssemblyAI:', err.message)
     onProgress(60, 'Fallback AssemblyAI…')
     const file = formData.get('file')
     return await transcribeWithAssemblyAI(file, file?.name)

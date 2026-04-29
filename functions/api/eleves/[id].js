@@ -123,71 +123,10 @@ async function callLLM(prompt, env, opts) {
   }
 }
 
-function extractJSON(text) {
-  let s = String(text).trim();
-  // Strip ```json fences
-  s = s.replace(/^```(?:json)?\s*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
-  if (s.startsWith('{') && s.endsWith('}')) return s;
-  // Fallback : balanced first-to-last { ... }
-  const first = s.indexOf('{');
-  const last = s.lastIndexOf('}');
-  if (first >= 0 && last > first) return s.slice(first, last + 1);
-  return s;
-}
-
-// ─── Stats helpers (duplicated from sync.js pour autonomie du worker) ──
-const MONTHS_LONG_FR = [
-  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
-];
-function parseIsoDate(s) {
-  if (!s) return null;
-  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return null;
-  const d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
-  return isNaN(d) ? null : d;
-}
-function labelFrStats(iso) {
-  const d = parseIsoDate(iso);
-  if (!d) return '—';
-  return `${d.getDate()} ${MONTHS_LONG_FR[d.getMonth()]} ${d.getFullYear()}`;
-}
-function computeProgressionPct(debutIso, finIso) {
-  const start = parseIsoDate(debutIso);
-  const end = parseIsoDate(finIso);
-  if (!start || !end) return 0;
-  const total = (end - start) / 86400000;
-  if (total <= 0) return 0;
-  const elapsed = (Date.now() - start) / 86400000;
-  return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
-}
-// Admin (override) gagne TOUJOURS sur auto/LLM si défini. isSet rejette
-// null/undefined/'' mais accepte 0 — utile pour `total_cours: 0` (rare mais possible).
-function mergeStats(autoRaw, override) {
-  const auto = autoRaw || {};
-  const ov = override || {};
-  const isSet = (v) => v !== undefined && v !== null && v !== '';
-
-  const dateDebut = isSet(ov.date_debut) ? ov.date_debut : (auto.date_debut || null);
-  const dateFin   = isSet(ov.date_fin)   ? ov.date_fin   : (auto.date_fin_prevue || auto.date_fin || null);
-  // total_cours : override > défaut Piano Master (8). nb_cours reste auto.
-  const totalCours = isSet(ov.total_cours) ? Number(ov.total_cours) : 8;
-
-  return {
-    nb_cours: auto.nb_cours || 0,
-    total_cours: totalCours,
-    date_debut: dateDebut,
-    date_debut_label: labelFrStats(dateDebut),
-    date_fin: dateFin,
-    date_fin_label: labelFrStats(dateFin),
-    progression_pct: computeProgressionPct(dateDebut, dateFin),
-    override_active: {
-      date_debut:  isSet(ov.date_debut),
-      date_fin:    isSet(ov.date_fin),
-      total_cours: isSet(ov.total_cours),
-    },
-  };
-}
+// extractJSON, mergeStats, parseIsoDate, labelFr, computeProgressionPct
+// sont importés de _lib/ (C6+D2 dedup avec sync.js).
+import { extractJSON } from '../_lib/json-extract.js';
+import { mergeStats, parseIsoDate } from '../_lib/eleves-stats.js';
 
 // ─── Sanitization post-LLM des années (anti-hallucination) ───────
 // Le LLM peut produire "08/03/2024" sur un doc qui ne dit que "08/03". On corrige
@@ -306,13 +245,13 @@ ${docText.slice(0, 6000)}
 ---`;
 
   const text = await callLLM(`${systemPrompt}\n\n${userPrompt}`, env);
-  const clean = extractJSON(text);
+  // extractJSON (3-level robust, _lib) retourne directement l'objet parsé
   let parsed;
   try {
-    parsed = JSON.parse(clean);
+    parsed = extractJSON(text);
   } catch (e) {
-    console.error('[parseDoc] JSON.parse failed:', e?.message || e, 'raw_first200:', String(text).slice(0, 200));
-    throw new Error('parseDoc: JSON.parse failed (' + (e?.message || 'unknown') + ')');
+    console.error('[parseDoc] JSON parse failed:', e?.message || e, 'raw_first200:', String(text).slice(0, 200));
+    throw new Error('parseDoc: JSON parse failed (' + (e?.message || 'unknown') + ')');
   }
   // Schema validation post-LLM (B5) — throw si structure cassée → cache stale préservé
   try {

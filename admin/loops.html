@@ -20,7 +20,6 @@
   <script type="module">
     import { PitchShifter } from 'https://cdn.skypack.dev/soundtouchjs@0.1.26';
     window.PitchShifter = PitchShifter;
-    console.log('[loops] SoundTouch ESM loaded:', typeof PitchShifter === 'function');
     window.dispatchEvent(new CustomEvent('soundtouch-ready'));
   </script>
   <style>
@@ -881,7 +880,6 @@ document.body.classList.add('engine-loading');
 window.addEventListener('soundtouch-ready', () => {
   soundtouchReady = true;
   document.body.classList.remove('engine-loading');
-  console.log('[loops] soundtouch-ready event received, play buttons unlocked');
 });
 
 // Timeout de sécurité : si après 10s le module ESM n'a pas chargé, on alerte

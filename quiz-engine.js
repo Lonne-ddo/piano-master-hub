@@ -461,8 +461,11 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
-        }).then(function (r) { return r.json(); }).catch(function (e) {
-            console.error('[quiz-engine] submit failed:', e);
+        }).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        }).catch(function (e) {
+            console.error('[quiz-engine] submit failed:', e && e.message ? e.message : e);
             return { ok: false, error: String(e) };
         });
     };
