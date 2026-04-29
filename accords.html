@@ -50,7 +50,7 @@
             position: relative; z-index: 1;
             max-width: 1100px;
             margin: 0 auto;
-            padding: 12px 12px 24px;
+            padding: 8px 10px 16px;
             display: flex; flex-direction: column;
             min-height: 100vh; min-height: 100dvh;
         }
@@ -92,64 +92,64 @@
         }
 
         .page-title {
-            font-size: 1.25rem; font-weight: 700;
+            font-size: 1.1rem; font-weight: 700;
             letter-spacing: -0.02em; color: #fff;
             text-align: center;
-            margin-top: 4px;
+            margin-top: 2px;
         }
         .subtitle {
-            font-size: 0.82rem; color: var(--text-muted);
-            text-align: center; margin-top: 2px; margin-bottom: 4px;
+            font-size: 0.78rem; color: var(--text-muted);
+            text-align: center; margin-top: 2px;
+        }
+        @media (max-width: 480px) {
+            .subtitle { display: none; }
         }
 
         /* ═══ Layout principal mobile-first ═══════════════════ */
         .dict-main {
             display: flex; flex-direction: column;
-            gap: 14px;
-            margin-top: 10px;
+            gap: 10px;
+            margin-top: 8px;
         }
 
         /* ── Clavier ─────────────────────────────────────────── */
+        /* Ratio touches blanches 1:5 imposé par viewBox 7:5 (renderKeyboard).
+           Pas de min-height/max-height : on laisse l'aspect-ratio piloter
+           la hauteur (~width × 5/7), pour éviter tout étirement vertical. */
         .kb-section {
             background: var(--bg-card);
             border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 14px;
-            padding: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 35vh;
+            border-radius: 12px;
+            padding: 4px;
         }
         .kb-section svg {
             display: block;
             width: 100%;
             height: auto;
-            min-height: 220px;
-            max-height: 50vh;
             border-radius: 6px;
         }
 
         /* ── Bloc info accord ────────────────────────────────── */
         .info-section {
             text-align: center;
-            padding: 4px 0;
+            padding: 2px 0;
         }
         .chord-name {
-            font-size: 3rem; font-weight: 700;
+            font-size: 2.5rem; font-weight: 700;
             color: var(--v); line-height: 1;
             letter-spacing: -0.02em;
         }
         .chord-notes {
-            font-size: 1.15rem;
+            font-size: 1.1rem;
             color: var(--text);
-            margin-top: 8px;
+            margin-top: 4px;
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         }
         .chord-intervals {
             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-            font-size: 0.92rem;
+            font-size: 0.88rem;
             color: var(--v-light);
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
         /* ── Section labels (uppercase) ──────────────────────── */
@@ -173,7 +173,7 @@
             flex-wrap: wrap;
         }
         .chip {
-            padding: 10px 16px;
+            padding: 8px 14px;
             border-radius: 999px;
             background: var(--bg-card);
             color: var(--text-muted);
@@ -201,18 +201,18 @@
         /* ── Bouton ⚙ Choisir l'accord (mobile only) ─────────── */
         .btn-open-sheet {
             width: 100%;
-            padding: 14px 16px;
+            padding: 12px 14px;
             background: var(--bg-card);
             color: var(--text);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 12px;
             font-family: inherit;
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             font-weight: 500;
             cursor: pointer;
             display: flex; align-items: center; justify-content: center;
             gap: 8px;
-            min-height: 52px;
+            min-height: 48px;
             transition: background 0.15s;
         }
         .btn-open-sheet:hover { background: var(--bg-card-hover); }
@@ -226,13 +226,13 @@
         }
         .btn-action {
             font-family: inherit;
-            font-size: 0.98rem;
+            font-size: 0.95rem;
             font-weight: 600;
-            padding: 16px;
-            border-radius: 14px;
+            padding: 12px 14px;
+            border-radius: 12px;
             cursor: pointer;
             border: none;
-            min-height: 56px;
+            min-height: 52px;
             transition: background 0.15s, transform 0.12s;
         }
         .btn-action:active { transform: scale(0.98); }
@@ -489,8 +489,7 @@
                     "actions  controls";
                 margin-top: 16px;
             }
-            .kb-section        { grid-area: kb; padding: 14px; min-height: 0; }
-            .kb-section svg    { min-height: 280px; max-height: 380px; }
+            .kb-section        { grid-area: kb; padding: 12px; }
             .info-section      { grid-area: info; }
             .inversion-section { grid-area: inv; }
             .action-section    { grid-area: actions; }
@@ -543,7 +542,7 @@
         <main class="dict-main">
 
             <section class="kb-section">
-                <svg id="chord-keyboard" viewBox="0 0 700 110" preserveAspectRatio="none"></svg>
+                <svg id="chord-keyboard" viewBox="0 0 700 500"></svg>
             </section>
 
             <section class="info-section">
