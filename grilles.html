@@ -228,6 +228,36 @@
         .toast.is-visible { opacity: 1; }
 
         /* ═══ PHASE 2 — Résultats ═══════════════════════════════ */
+        /* Tempo bar sticky : reste accessible quand on scrolle les 5 cartes.
+           Pin au top du viewport une fois que le header de page sort. */
+        .tempo-bar {
+            position: sticky; top: 0;
+            z-index: 50;
+            display: flex; align-items: center; gap: 10px;
+            margin: 14px -14px 0; padding: 10px 14px;
+            background: rgba(15, 15, 20, 0.88);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .tempo-bar .tempo-label {
+            font-size: 0.72rem; font-weight: 700;
+            color: var(--text-faint);
+            letter-spacing: 0.12em; text-transform: uppercase;
+            flex-shrink: 0;
+        }
+        .tempo-bar input[type="range"] {
+            flex: 1; min-width: 0;
+            accent-color: var(--v); cursor: pointer;
+        }
+        .tempo-bar .tempo-value {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            color: var(--v); font-weight: 600;
+            min-width: 64px; text-align: right;
+            font-size: 0.88rem;
+            flex-shrink: 0;
+        }
+
         .results-head {
             display: flex; align-items: center; justify-content: space-between;
             gap: 10px; margin-top: 14px; flex-wrap: wrap;

@@ -63,6 +63,7 @@
         notation: persisted.notation || 'fr',
         progressions: [],
         currentlyPlaying: null,
+        currentChordIndex: 0,
         playbackTimers: [],
         loading: false
     };
@@ -189,22 +190,50 @@
         state.playbackTimers = [];
     }
 
-    function stopAllPlayback() {
+    // Stop avec fade-out 150ms (anti-pop).
+    // Note : on NE restaure PAS le volume à 0 dB après fade — ça réveillerait
+    // les notes encore en phase de release. Le volume reste à -Infinity et sera
+    // restauré au prochain playProgression() (cancelScheduledValues + value=0).
+    var FADE_MS = 150;
+    function stopAllPlayback(opts) {
+        opts = opts || {};
         clearTimers();
-        if (sampler) {
-            try { sampler.releaseAll(); } catch (e) {}
-        }
         state.currentlyPlaying = null;
-        renderResults();
+        state.currentChordIndex = 0;
+
+        if (sampler) {
+            if (opts.immediate) {
+                try { sampler.releaseAll(); } catch (e) {}
+                try {
+                    if (sampler.volume.cancelScheduledValues) {
+                        sampler.volume.cancelScheduledValues(Tone.now());
+                    }
+                    sampler.volume.value = 0;
+                } catch (e) {}
+            } else {
+                try { sampler.volume.rampTo(-Infinity, FADE_MS / 1000); } catch (e) {}
+                setTimeout(function () {
+                    try { sampler.releaseAll(); } catch (e) {}
+                }, FADE_MS + 20);
+            }
+        }
+        // Différer le re-render pour que le bouton reste "■ Stop" pendant le fade,
+        // puis bascule en "▶ Jouer" une fois le fade terminé.
+        setTimeout(function () { renderResults(); }, opts.immediate ? 0 : FADE_MS + 10);
     }
 
+    // Lecture récursive : chaque accord programme le suivant via setTimeout en
+    // RELISANT state.tempo à chaque itération. Permet le tempo live.
     function playProgression(idx) {
         if (state.currentlyPlaying === idx) {
             stopAllPlayback();
             return;
         }
         if (state.currentlyPlaying !== null) {
+            // Switch vers une autre progression : stop immédiat (sans fade) pour
+            // démarrer la nouvelle dans la foulée.
             clearTimers();
+            state.currentlyPlaying = null;
             if (sampler) { try { sampler.releaseAll(); } catch (e) {} }
         }
 
@@ -213,39 +242,57 @@
 
         ensureAudio().then(function () {
             if (!sampler) return;
+            // Restaure le volume au cas où un fade-out précédent l'aurait laissé bas
+            try {
+                if (sampler.volume.cancelScheduledValues) {
+                    sampler.volume.cancelScheduledValues(Tone.now());
+                }
+                sampler.volume.value = 0;
+            } catch (e) {}
+
             state.currentlyPlaying = idx;
+            state.currentChordIndex = 0;
             renderResults();
 
-            var beatSec = 60 / state.tempo;
-            var measureSec = beatSec * 4; // 1 accord = 1 mesure 4 temps
-            var releaseRatio = 0.95;      // léger gap entre mesures
-
-            prog.chords.forEach(function (chordName, i) {
-                var t = setTimeout(function () {
-                    if (state.currentlyPlaying !== idx) return; // stop entre-temps
-                    setActiveChip(idx, i);
-                    var notes = chordToNotes(chordName);
-                    if (notes.length && sampler) {
-                        sampler.triggerAttackRelease(notes, measureSec * releaseRatio);
-                    }
-                }, i * measureSec * 1000);
-                state.playbackTimers.push(t);
-            });
-
-            var endT = setTimeout(function () {
-                if (state.currentlyPlaying === idx) {
-                    state.currentlyPlaying = null;
-                    state.playbackTimers = [];
-                    renderResults();
-                }
-            }, prog.chords.length * measureSec * 1000 + 200);
-            state.playbackTimers.push(endT);
+            playNext(idx, prog);
         }).catch(function (err) {
             console.warn('[grilles] audio fail', err);
             showToast('Erreur audio : ' + (err.message || 'sampler'));
             state.currentlyPlaying = null;
+            state.currentChordIndex = 0;
             renderResults();
         });
+    }
+
+    function playNext(idx, prog) {
+        if (state.currentlyPlaying !== idx) return; // stop entre-temps
+        if (state.currentChordIndex >= prog.chords.length) {
+            state.currentlyPlaying = null;
+            state.currentChordIndex = 0;
+            state.playbackTimers = [];
+            renderResults();
+            return;
+        }
+
+        var chordIdx = state.currentChordIndex;
+        var chordName = prog.chords[chordIdx];
+        var notes = chordToNotes(chordName);
+        var beatSec = 60 / state.tempo;        // RELU à chaque itération
+        var measureSec = beatSec * 4;          // 1 accord = 1 mesure 4 temps
+        var releaseRatio = 0.95;               // mini-gap entre mesures
+
+        setActiveChip(idx, chordIdx);
+        if (notes.length && sampler) {
+            try {
+                sampler.triggerAttackRelease(notes, measureSec * releaseRatio);
+            } catch (e) {}
+        }
+
+        var t = setTimeout(function () {
+            state.currentChordIndex++;
+            playNext(idx, prog);
+        }, measureSec * 1000);
+        state.playbackTimers.push(t);
     }
 
     function setActiveChip(progIdx, chordIdx) {
@@ -282,7 +329,7 @@
             }
             state.progressions = r.data.progressions || [];
             state.phase = 'results';
-            stopAllPlayback();
+            stopAllPlayback({ immediate: true });
             renderAll();
         }).catch(function (e) {
             state.loading = false;
@@ -395,9 +442,16 @@
 
     function renderResults() {
         var sub = $('page-subtitle');
-        if (sub) sub.textContent = (DISPLAY[slug] || slug) + ' · ' + state.progressions.length + ' progressions à ' + state.tempo + ' BPM';
+        if (sub) sub.textContent = (DISPLAY[slug] || slug) + ' · ' + state.progressions.length + ' progressions';
 
-        var html = '<div class="results-head">';
+        // Tempo bar sticky en haut de la phase résultats
+        var html = '<div class="tempo-bar">';
+        html +=     '<span class="tempo-label">Tempo</span>';
+        html +=     '<input type="range" id="tempo-slider-results" min="60" max="140" step="1" value="' + state.tempo + '" aria-label="Tempo" />';
+        html +=     '<span class="tempo-value" id="tempo-value-results">' + state.tempo + ' BPM</span>';
+        html += '</div>';
+
+        html += '<div class="results-head">';
         html +=     '<div class="section-label">5 progressions pour toi</div>';
         html +=     '<button type="button" class="btn-modify" id="btn-modify">← Modifier ma sélection</button>';
         html += '</div>';
@@ -434,7 +488,7 @@
         // Wire events
         var btnMod = $('btn-modify');
         if (btnMod) btnMod.addEventListener('click', function () {
-            stopAllPlayback();
+            stopAllPlayback({ immediate: true });
             state.phase = 'selection';
             state.progressions = [];
             renderAll();
@@ -448,6 +502,19 @@
                 var idx = parseInt(btn.getAttribute('data-play'), 10);
                 if (isNaN(idx)) return;
                 playProgression(idx);
+            });
+        }
+
+        // Tempo slider live : si une progression joue, le changement s'applique
+        // à l'accord suivant (le récursif playNext relit state.tempo à chaque
+        // itération). L'accord en cours finit à son tempo initial.
+        var tSlider = $('tempo-slider-results');
+        var tValue  = $('tempo-value-results');
+        if (tSlider && tValue) {
+            tSlider.addEventListener('input', function () {
+                state.tempo = clampTempo(tSlider.value);
+                tValue.textContent = state.tempo + ' BPM';
+                persist();
             });
         }
     }
