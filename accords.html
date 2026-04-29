@@ -115,11 +115,17 @@
             border: 1px solid rgba(255, 255, 255, 0.06);
             border-radius: 14px;
             padding: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 35vh;
         }
         .kb-section svg {
             display: block;
             width: 100%;
             height: auto;
+            min-height: 220px;
+            max-height: 50vh;
             border-radius: 6px;
         }
 
@@ -483,7 +489,8 @@
                     "actions  controls";
                 margin-top: 16px;
             }
-            .kb-section        { grid-area: kb; padding: 14px; }
+            .kb-section        { grid-area: kb; padding: 14px; min-height: 0; }
+            .kb-section svg    { min-height: 280px; max-height: 380px; }
             .info-section      { grid-area: info; }
             .inversion-section { grid-area: inv; }
             .action-section    { grid-area: actions; }

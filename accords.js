@@ -255,8 +255,9 @@
     }
 
     // ─ Clavier SVG adaptatif ─
-    // 1 octave = viewBox 700×110, 7 touches blanches × 100, noires × 60
-    // Si l'accord déborde l'octave courante, on étend à 2 octaves (1400×110).
+    // 1 octave = viewBox 700×400 (ratio 7/4 — touches blanches plus hautes que
+    // larges, rendu proche d'un vrai piano). 2 octaves = 1400×400.
+    // Hauteur conservée constante en unités viewBox ; CSS gère min/max-height.
 
     var WHITE_PER_OCT = ['C','D','E','F','G','A','B'];
     var BLACK_OFFSETS = [
@@ -286,7 +287,7 @@
             hl[name + m[2]] = true;
         });
 
-        var WW = 100, WH = 110, BW = 60, BH = 65;
+        var WW = 100, WH = 400, BW = 60, BH = 240;
         var totalW = octCount * 7 * WW;
         var svg = $('chord-keyboard');
         svg.setAttribute('viewBox', '0 0 ' + totalW + ' ' + WH);
@@ -303,12 +304,12 @@
                 var stroke = hl[key] ? '#8B6FE8' : '#222';
                 parts.push(
                     '<rect x="' + x + '" y="0" width="' + WW + '" height="' + WH +
-                    '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="2" rx="3"/>'
+                    '" fill="' + fill + '" stroke="' + stroke + '" stroke-width="4" rx="6"/>'
                 );
                 if (hl[key]) {
                     parts.push(
-                        '<circle cx="' + (x + WW/2) + '" cy="' + (WH - 18) +
-                        '" r="6" fill="#fff" opacity="0.85"/>'
+                        '<circle cx="' + (x + WW/2) + '" cy="' + (WH - 60) +
+                        '" r="22" fill="#fff" opacity="0.85"/>'
                     );
                 }
             }
@@ -323,12 +324,12 @@
                 var strokeB = hl[keyB] ? '#a48ff0' : '#000';
                 parts.push(
                     '<rect x="' + xB + '" y="0" width="' + BW + '" height="' + BH +
-                    '" fill="' + fillB + '" stroke="' + strokeB + '" stroke-width="1.5" rx="2"/>'
+                    '" fill="' + fillB + '" stroke="' + strokeB + '" stroke-width="3" rx="4"/>'
                 );
                 if (hl[keyB]) {
                     parts.push(
-                        '<circle cx="' + (xB + BW/2) + '" cy="' + (BH - 14) +
-                        '" r="5" fill="#fff" opacity="0.85"/>'
+                        '<circle cx="' + (xB + BW/2) + '" cy="' + (BH - 50) +
+                        '" r="18" fill="#fff" opacity="0.85"/>'
                     );
                 }
             }
