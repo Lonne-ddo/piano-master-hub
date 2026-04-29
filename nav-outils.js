@@ -29,10 +29,10 @@
         accords: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="14" rx="1"/><line x1="7" y1="6" x2="7" y2="20"/><line x1="11" y1="6" x2="11" y2="20"/><line x1="15" y1="6" x2="15" y2="20"/><line x1="19" y1="6" x2="19" y2="20"/></svg>'
     };
 
-    // 4 items : Quiz + Métronome + Accords actifs, Grilles en attente
+    // 4 items : Quiz + Grilles + Métronome + Accords tous actifs
     var ITEMS = [
         { id: 'quiz',    label: 'Quiz',      href: '/quiz' + slugQ },
-        { id: 'grilles', label: 'Grilles',   href: '/outils' + slugQ, soon: true },
+        { id: 'grilles', label: 'Grilles',   href: '/grilles' + slugQ },
         { id: 'metro',   label: 'Métronome', href: '/metronome' + slugQ },
         { id: 'accords', label: 'Accords',   href: '/accords' + slugQ }
     ];

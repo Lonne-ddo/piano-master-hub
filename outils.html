@@ -243,8 +243,9 @@
             id: "grilles",
             icon: "\uD83C\uDFB9",
             title: "Grilles harmoniques",
-            sub: "Bientôt disponible",
-            active: false
+            sub: "Progressions générées par IA selon tes types d'accords",
+            href: function(slug) { return "/grilles?eleve=" + encodeURIComponent(slug); },
+            active: true
         },
         {
             id: "metronome",
