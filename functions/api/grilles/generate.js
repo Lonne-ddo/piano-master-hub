@@ -60,18 +60,43 @@ export async function onRequestPost({ request, env }) {
 
 Génère exactement 5 progressions d'accords cohérentes harmoniquement qui mettent en avant ces types.
 
-Règles strictes :
-- Chaque progression dans une tonalité DIFFÉRENTE, choisie parmi les 24 tonalités (12 majeures + 12 mineures)
-- 4 ou 8 accords par progression (privilégier 8 si la cadence en bénéficie type ii-V-I-vi-ii-V-I-IV ; sinon 4)
-- Inclure au moins 2 occurrences (positions différentes) des types demandés, intégrées dans une progression diatonique idiomatique
-- Style jazz/gospel/pop cohérent (pas atonal aléatoire)
+═══ CONTRAINTES OBLIGATOIRES ═══
 
-Notation OBLIGATOIRE — utilise UNIQUEMENT ces suffixes après la racine ([A-G] avec # ou b optionnel) :
+1. DISTRIBUTION LONGUEUR — sur les 5 progressions :
+   - EXACTEMENT 2 ou 3 progressions à 4 accords
+   - EXACTEMENT 2 ou 3 progressions à 8 accords
+   - Total = 5 (donc soit 2+3 soit 3+2)
+   - INTERDIT : 5×4, 5×8, 1×4+4×8, 4×4+1×8 (toute autre distribution est REJETÉE)
+
+2. DIVERSITÉ DES ARMURES — les 5 tonalités doivent être DIFFÉRENTES, et :
+   - AU MOINS 1 tonalité avec armure simple (0-2 altérations) : C, G, F, D, Bb, Am, Em, Dm
+   - AU MOINS 1 tonalité avec armure intermédiaire (3-4 altérations) : E, A, Eb, Ab, F#m, C#m, Gm, Cm
+   - Si possible (recommandé non obligatoire) : une tonalité avec 5+ altérations (B, F#, Db, Gb, G#m, Bbm)
+   - INTERDIT : 5 tonalités toutes avec ≤ 2 altérations
+
+3. PROGRESSIONS À 8 ACCORDS — INTERDICTION DE RÉPÉTER UNE CADENCE COURTE :
+   - INTERDIT : 2× la même cadence (ex: ii-V-I-vi-ii-V-I-vi, ou I-vi-ii-V-I-vi-ii-V)
+   - REQUIS : suite étendue inédite. Exemples valables :
+     • Turnaround complet I-vi-ii-V-iii-VI-ii-V
+     • Modulation vers le relatif majeur/mineur (ex: en Cmaj → passage par Am en milieu)
+     • Montée chromatique (ex: I-#I°-ii-#ii°-iii-V/V-V-I)
+     • Multi-degrés idiomatique (ex: I-IV-iii-vi-ii-V-I-IV en jazz/gospel)
+     • Cycle de quintes (ex: vi-ii-V-I-IV-vii°-iii-vi)
+   - Chaque accord de la suite de 8 doit avoir une fonction harmonique justifiée par les degrés
+
+4. TYPES DEMANDÉS — chaque progression DOIT contenir AU MOINS 2 occurrences (positions différentes dans la grille) des types choisis par l'élève (${types.join(', ')}), intégrées idiomatiquement.
+
+5. STYLE — jazz, gospel, pop, bossa, ou modal. JAMAIS atonal ni aléatoire.
+
+═══ NOTATION ═══
+
+Suffixes AUTORISÉS uniquement (après la racine [A-G] avec # ou b optionnel) :
 maj (ou rien), m, dim, aug, sus2, sus4, 7, maj7, m7, m7b5, dim7, mMaj7, 6, m6, add9, 9, 13, m11, 7sus4, 7b9, 7#5, 7#9
 
-NE PAS utiliser : ø (écris m7b5), Δ (écris maj7), m9, m13, 11, accords slash type C/E.
+INTERDITS : ø (écris m7b5), Δ (écris maj7), m9, m13, 11, accords slash type C/E.
 
-Format JSON strict :
+═══ FORMAT JSON STRICT ═══
+
 {
   "progressions": [
     {
@@ -83,7 +108,10 @@ Format JSON strict :
   ]
 }
 
-Tonalités mineures : "G minor" / "Sol mineur". Les degrés en chiffres romains ("I","ii","iii","IV","V","vi","vii°"). Réponds avec exactement 5 progressions.`;
+- Tonalités mineures : "G minor" / "Sol mineur"
+- Degrés en chiffres romains : "I","ii","iii","IV","V","vi","vii°" (majuscule = majeur, minuscule = mineur, ° = diminué)
+- Pour les emprunts/secondaires : "V/V","V/ii","#iv°","bVII"
+- EXACTEMENT 5 progressions dans le tableau, aucune de plus, aucune de moins.`;
 
   let groqRes;
   try {
