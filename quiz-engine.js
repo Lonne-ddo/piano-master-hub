@@ -40,18 +40,12 @@
     // Roots utilisés par le quiz (uniquement notes blanches → identiques en sharp/flat).
     var BASE_ROOTS_IV = ['C3','D3','E3','F3','G3','A3'];
 
-    var CHORD_TYPES_QUIZ = [
-        { id: 'maj',   name: 'Majeur',   intervals: [0,4,7]          },
-        { id: 'min',   name: 'Mineur',   intervals: [0,3,7]          },
-        { id: 'dim',   name: 'Diminué',  intervals: [0,3,6]          },
-        { id: 'aug',   name: 'Augmenté', intervals: [0,4,8]          },
-        { id: '7',     name: 'Dom 7',    intervals: [0,4,7,10]       },
-        { id: 'maj7',  name: 'Maj 7',    intervals: [0,4,7,11]       },
-        { id: 'm7',    name: 'Min 7',    intervals: [0,3,7,10]       },
-        { id: 'maj9',  name: 'Maj 9',    intervals: [0,4,7,11,14]    },
-        { id: 'min9',  name: 'Min 9',    intervals: [0,3,7,10,14]    },
-        { id: 'min11', name: 'Min 11',   intervals: [0,3,7,10,14,17] }
-    ];
+    // Pool d'accords pour le quiz : array dérivé de MT.CHORD_TYPES (22 types).
+    // Source unique de vérité = MhTheory.CHORD_TYPES (cf. mh-music-theory.js).
+    var CHORD_LIST = Object.keys(MT.CHORD_TYPES).map(function (id) {
+        var def = MT.CHORD_TYPES[id];
+        return { id: id, name: def.name, intervals: def.intervals };
+    });
 
     var BASE_NOTES_CH = ['C4','D4','E4','F4','G4','A4'];
 
@@ -107,12 +101,13 @@
             levelChoices: { debutant: 3, intermediaire: 4, avance: 6 }
         },
         chords: {
-            CHORD_TYPES: CHORD_TYPES_QUIZ,
+            CHORD_TYPES: CHORD_LIST,
             BASE_NOTES: BASE_NOTES_CH,
+            // Filtres alignés avec MhTheory.CHORD_TYPES (convention 'min', pas 'm').
             levelFilter: {
-                debutant: ['maj','min','dim'],
-                intermediaire: ['maj','min','dim','aug','7','maj7','m7'],
-                avance: null
+                debutant:      ['maj','min','dim'],
+                intermediaire: ['maj','min','dim','aug','7','maj7','min7','sus4'],
+                avance:        ['maj','min','dim','aug','7','maj7','min7','sus2','sus4','min7b5']
             },
             levelChoices: { debutant: 3, intermediaire: 4, avance: 6 }
         },
