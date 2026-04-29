@@ -358,6 +358,102 @@
             margin-top: 28px;
         }
 
+        /* ── Personnaliser accords (custom) ─────────────────── */
+        .custom-toggle-btn {
+            width: 100%;
+            margin-top: 14px;
+            padding: 12px 16px;
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.18s, border-color 0.18s, color 0.18s;
+            min-height: var(--tap-min);
+        }
+
+        .custom-toggle-btn:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--v-border);
+            color: var(--text);
+        }
+
+        .custom-toggle-btn.open {
+            background: var(--v-soft-stronger);
+            border-color: var(--v);
+            color: var(--v);
+        }
+
+        .level-row.custom-mode .level-btn {
+            opacity: 0.4;
+            filter: grayscale(0.4);
+        }
+
+        .level-row.custom-mode .level-btn.selected {
+            opacity: 1;
+            filter: none;
+        }
+
+        .custom-panel {
+            margin-top: 12px;
+            padding: 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--v-border);
+            border-radius: var(--radius);
+        }
+
+        .custom-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        @media (min-width: 600px) {
+            .custom-grid { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        .custom-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: var(--bg);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.88rem;
+            transition: border-color 0.15s, background 0.15s;
+        }
+
+        .custom-check:hover {
+            border-color: var(--v-border);
+        }
+
+        .custom-check.checked {
+            border-color: var(--v);
+            background: var(--v-soft-stronger);
+        }
+
+        .custom-check input[type="checkbox"] {
+            accent-color: var(--v);
+            cursor: pointer;
+        }
+
+        .custom-info {
+            margin-top: 12px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .custom-info .count {
+            color: var(--v);
+            font-weight: 600;
+        }
+
         @media (max-width: 480px) {
             .header h1 { font-size: 1.4rem; }
             .cat-card { padding: 14px 16px; min-height: 86px; }
@@ -404,6 +500,38 @@
         { id: "avance",        label: "Avancé",        dot: "\uD83D\uDD34" }
     ];
 
+    // 10 types d'accords pour la sélection custom (catégorie "accords" uniquement)
+    var CHORD_TYPES = [
+        { id: 'maj',   label: 'Majeur'   },
+        { id: 'min',   label: 'Mineur'   },
+        { id: 'dim',   label: 'Diminué'  },
+        { id: 'aug',   label: 'Augmenté' },
+        { id: '7',     label: 'Dom 7'    },
+        { id: 'maj7',  label: 'Maj 7'    },
+        { id: 'm7',    label: 'Min 7'    },
+        { id: 'maj9',  label: 'Maj 9'    },
+        { id: 'min9',  label: 'Min 9'    },
+        { id: 'min11', label: 'Min 11'   }
+    ];
+
+    var CUSTOM_KEY = 'quiz_custom_chords';
+
+    function loadCustomTypes() {
+        try {
+            var raw = localStorage.getItem(CUSTOM_KEY);
+            if (!raw) return [];
+            var arr = JSON.parse(raw);
+            if (!Array.isArray(arr)) return [];
+            // Sanity : on ne garde que les ids connus
+            var validIds = CHORD_TYPES.map(function (c) { return c.id; });
+            return arr.filter(function (id) { return validIds.indexOf(id) >= 0; });
+        } catch (e) { return []; }
+    }
+
+    function saveCustomTypes(arr) {
+        try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(arr)); } catch (e) {}
+    }
+
     function categoryLabel(id) {
         for (var i = 0; i < CATEGORIES.length; i++) {
             if (CATEGORIES[i].id === id) return CATEGORIES[i].label;
@@ -418,7 +546,7 @@
         return id;
     }
 
-    var state = { category: null, level: null, slug: null };
+    var state = { category: null, level: null, slug: null, customTypes: [] };
     var toastTimer = null;
 
     function showToast(message) {
@@ -432,7 +560,22 @@
     function updateLaunchBtn() {
         var btn = document.getElementById("launch-btn");
         if (!btn) return;
-        btn.disabled = !(state.category && state.level);
+        if (state.level === 'custom') {
+            btn.disabled = !(state.category === 'accords' && state.customTypes.length >= 2);
+        } else {
+            btn.disabled = !(state.category && state.level);
+        }
+    }
+
+    function syncCustomSection() {
+        var section = document.getElementById('custom-section');
+        if (!section) return;
+        section.style.display = (state.category === 'accords') ? '' : 'none';
+        // Si on quitte accords, sortir du mode custom
+        if (state.category !== 'accords' && state.level === 'custom') {
+            state.level = null;
+            closeCustomPanel();
+        }
     }
 
     function selectCategory(id) {
@@ -442,6 +585,7 @@
             card.classList.toggle("selected", card.getAttribute("data-category") === id);
         });
         state.category = id;
+        syncCustomSection();
         updateLaunchBtn();
     }
 
@@ -450,7 +594,52 @@
         btns.forEach(function(btn) {
             btn.classList.toggle("selected", btn.getAttribute("data-level") === id);
         });
+        // Sortir du mode custom si l'utilisateur revient à un niveau standard
+        closeCustomPanel();
         state.level = id;
+        updateLaunchBtn();
+    }
+
+    function openCustomPanel() {
+        var panel = document.getElementById('custom-panel');
+        var toggle = document.getElementById('custom-toggle-btn');
+        var levelRow = document.getElementById('level-row');
+        if (panel) panel.style.display = '';
+        if (toggle) toggle.classList.add('open');
+        if (levelRow) levelRow.classList.add('custom-mode');
+        // Désélectionne les niveaux standards visuellement
+        document.querySelectorAll('.level-btn[data-level]').forEach(function (b) {
+            b.classList.remove('selected');
+        });
+        state.level = 'custom';
+        updateLaunchBtn();
+    }
+
+    function closeCustomPanel() {
+        var panel = document.getElementById('custom-panel');
+        var toggle = document.getElementById('custom-toggle-btn');
+        var levelRow = document.getElementById('level-row');
+        if (panel) panel.style.display = 'none';
+        if (toggle) toggle.classList.remove('open');
+        if (levelRow) levelRow.classList.remove('custom-mode');
+        // Si on était en mode custom, reset le level
+        if (state.level === 'custom') state.level = null;
+    }
+
+    function toggleCustomType(id, el) {
+        var idx = state.customTypes.indexOf(id);
+        if (idx >= 0) {
+            state.customTypes.splice(idx, 1);
+            if (el) el.classList.remove('checked');
+        } else {
+            state.customTypes.push(id);
+            if (el) el.classList.add('checked');
+        }
+        var cb = el ? el.querySelector('input[type="checkbox"]') : null;
+        if (cb) cb.checked = state.customTypes.indexOf(id) >= 0;
+        var countEl = document.getElementById('custom-count');
+        if (countEl) countEl.textContent = state.customTypes.length;
+        saveCustomTypes(state.customTypes);
         updateLaunchBtn();
     }
 
@@ -467,9 +656,16 @@
         if (!state.category || !state.level) return;
         var mode = CATEGORY_TO_MODE[state.category];
         if (!mode) return; // Toutes les cards cliquables sont mappées ; safety net silencieuse.
+        // Mode custom : appendre &types=… (uniquement valide pour accords avec >= 2 types)
+        if (state.level === 'custom') {
+            if (state.category !== 'accords' || state.customTypes.length < 2) return;
+        }
         var url = '/quiz-play?eleve=' + encodeURIComponent(state.slug)
             + '&mode=' + encodeURIComponent(mode)
             + '&level=' + encodeURIComponent(state.level);
+        if (state.level === 'custom') {
+            url += '&types=' + encodeURIComponent(state.customTypes.join(','));
+        }
         window.location.href = url;
     }
 
@@ -525,7 +721,7 @@
         // ── Niveau ──
         html += '<section class="quiz-section">';
         html += '<h2 class="section-title">Niveau</h2>';
-        html += '<div class="level-row">';
+        html += '<div class="level-row" id="level-row">';
         for (var j = 0; j < LEVELS.length; j++) {
             var lv = LEVELS[j];
             html +=
@@ -536,6 +732,26 @@
                 '</button>';
         }
         html += '</div></section>';
+
+        // ── Personnaliser (catégorie Accords uniquement) ──
+        html += '<section class="quiz-section custom-section" id="custom-section" style="display:none">';
+        html += '<button type="button" class="custom-toggle-btn" id="custom-toggle-btn">\u2699 Personnaliser les accords</button>';
+        html += '<div class="custom-panel" id="custom-panel" style="display:none">';
+        html += '<div class="custom-grid">';
+        state.customTypes = loadCustomTypes();
+        for (var k = 0; k < CHORD_TYPES.length; k++) {
+            var ct = CHORD_TYPES[k];
+            var checked = state.customTypes.indexOf(ct.id) >= 0;
+            html +=
+                '<label class="custom-check' + (checked ? ' checked' : '') + '" data-type-id="' + escapeHtml(ct.id) + '">' +
+                    '<input type="checkbox"' + (checked ? ' checked' : '') + ' />' +
+                    '<span>' + escapeHtml(ct.label) + '</span>' +
+                '</label>';
+        }
+        html += '</div>';
+        html += '<div class="custom-info"><span class="count" id="custom-count">' + state.customTypes.length + '</span> sélectionné(s) · minimum 2</div>';
+        html += '</div>';
+        html += '</section>';
 
         // ── Bouton Lancer ──
         html += '<button type="button" class="launch-btn" id="launch-btn" disabled>Lancer le quiz</button>';
@@ -554,6 +770,20 @@
             });
         });
         document.getElementById("launch-btn").addEventListener("click", handleLaunch);
+        document.getElementById("custom-toggle-btn").addEventListener("click", function () {
+            var panel = document.getElementById('custom-panel');
+            if (panel && panel.style.display === 'none') openCustomPanel();
+            else closeCustomPanel();
+            updateLaunchBtn();
+        });
+        document.querySelectorAll(".custom-check[data-type-id]").forEach(function (el) {
+            // Click sur le label → input change auto (comportement natif <label>)
+            // On écoute juste 'change' sur le checkbox pour éviter le double-toggle
+            var cb = el.querySelector('input[type="checkbox"]');
+            if (cb) cb.addEventListener('change', function () {
+                toggleCustomType(el.getAttribute("data-type-id"), el);
+            });
+        });
     })();
     </script>
 

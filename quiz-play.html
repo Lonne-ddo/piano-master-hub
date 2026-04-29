@@ -256,6 +256,37 @@
 
         .hidden { display: none !important; }
 
+        /* Volume slider — en haut de quiz-screen, persistant via localStorage */
+        .volume-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            margin-bottom: 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+        }
+        .volume-bar .volume-icon {
+            font-size: 1.05rem;
+            line-height: 1;
+            flex-shrink: 0;
+        }
+        .volume-bar input[type="range"] {
+            flex: 1;
+            min-width: 0;
+            accent-color: var(--v);
+            cursor: pointer;
+        }
+        .volume-bar .volume-value {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            color: var(--text-muted);
+            min-width: 44px;
+            text-align: right;
+            font-size: 0.82rem;
+            flex-shrink: 0;
+        }
+
         @media (max-width: 480px) {
             .header h1 { font-size: 1.2rem; }
             .play-btn { min-width: 160px; padding: 14px 24px; }
@@ -279,6 +310,11 @@
         </div>
 
         <div id="quiz-screen" class="hidden">
+            <div class="volume-bar">
+                <span class="volume-icon">🔊</span>
+                <input type="range" id="volume-slider" min="0" max="100" step="1" value="70" aria-label="Volume" />
+                <span class="volume-value" id="volume-value">70%</span>
+            </div>
             <div class="progress-wrap">
                 <div class="progress-row">
                     <span id="question-label">Question 1 / 10</span>
@@ -325,12 +361,48 @@
         progressions: 'Progressions'
     };
     var VALID_MODES = ['notes','intervals','chords','scales','progressions'];
-    var LEVEL_LABELS = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé' };
+    var VALID_LEVELS = ['debutant','intermediaire','avance','custom'];
+    var LEVEL_LABELS = { debutant: 'Débutant', intermediaire: 'Intermédiaire', avance: 'Avancé', custom: 'Personnalisé' };
 
     function escapeHtml(str) {
         var d = document.createElement('div');
         d.textContent = str;
         return d.innerHTML;
+    }
+
+    var VOLUME_KEY = 'masterhub_volume';
+
+    function pctToDb(pct) {
+        return pct <= 0 ? -Infinity : 20 * Math.log10(pct / 100);
+    }
+
+    function applyVolume(pct) {
+        try {
+            if (typeof Tone !== 'undefined' && Tone.Destination) {
+                Tone.Destination.volume.value = pctToDb(pct);
+            }
+        } catch (e) {}
+    }
+
+    function initVolumeSlider() {
+        var slider = document.getElementById('volume-slider');
+        var display = document.getElementById('volume-value');
+        if (!slider || !display) return;
+
+        var saved = parseInt(localStorage.getItem(VOLUME_KEY) || '70', 10);
+        if (isNaN(saved) || saved < 0 || saved > 100) saved = 70;
+
+        slider.value = String(saved);
+        display.textContent = saved + '%';
+        applyVolume(saved);
+
+        slider.addEventListener('input', function (e) {
+            var pct = parseInt(e.target.value, 10);
+            if (isNaN(pct)) return;
+            display.textContent = pct + '%';
+            applyVolume(pct);
+            try { localStorage.setItem(VOLUME_KEY, String(pct)); } catch (err) {}
+        });
     }
 
     var engine = null;
@@ -341,6 +413,8 @@
         slug = (params.get('eleve') || '').toLowerCase();
         var mode = params.get('mode');
         var level = params.get('level');
+        var typesParam = params.get('types') || '';
+        var customTypes = typesParam ? typesParam.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [];
 
         if (!slug || ELEVES.indexOf(slug) < 0) {
             console.warn('[quiz-play] slug invalide → redirect /');
@@ -348,20 +422,45 @@
             return;
         }
         if (!mode || VALID_MODES.indexOf(mode) < 0
-            || !level || ['debutant','intermediaire','avance'].indexOf(level) < 0) {
+            || !level || VALID_LEVELS.indexOf(level) < 0) {
             console.warn('[quiz-play] mode/level invalide → redirect quiz');
             window.location.replace('/quiz?eleve=' + encodeURIComponent(slug));
             return;
+        }
+        // Custom requiert >= 2 types valides + mode supporté (chords pour l'instant)
+        if (level === 'custom') {
+            if (mode !== 'chords' || customTypes.length < 2) {
+                console.warn('[quiz-play] custom invalide (mode/types) → redirect quiz');
+                window.location.replace('/quiz?eleve=' + encodeURIComponent(slug));
+                return;
+            }
         }
 
         try { localStorage.setItem('eleve_slug', slug); } catch (e) {}
 
         document.getElementById('back-link').href = '/quiz?eleve=' + encodeURIComponent(slug);
         document.getElementById('back-to-quiz').href = '/quiz?eleve=' + encodeURIComponent(slug);
-        document.getElementById('page-title').textContent = 'Quiz ' + MODE_LABELS[mode];
-        document.getElementById('page-subtitle').textContent = LEVEL_LABELS[level] + ' · 10 questions';
+        var titleBase = 'Quiz ' + MODE_LABELS[mode];
+        var subtitle;
+        if (level === 'custom') {
+            document.getElementById('page-title').textContent = titleBase + ' — Personnalisé';
+            subtitle = customTypes.length + ' types · 10 questions';
+        } else {
+            document.getElementById('page-title').textContent = titleBase;
+            subtitle = LEVEL_LABELS[level] + ' · 10 questions';
+        }
+        document.getElementById('page-subtitle').textContent = subtitle;
 
-        engine = new QuizEngine({ mode: mode, level: level, slug: slug, totalQuestions: 10 });
+        engine = new QuizEngine({
+            mode: mode,
+            level: level,
+            slug: slug,
+            totalQuestions: 10,
+            customTypes: customTypes
+        });
+
+        // Slider volume — load from localStorage, apply, persist on change
+        initVolumeSlider();
 
         engine.init().then(function () {
             engine.generateQuestions();

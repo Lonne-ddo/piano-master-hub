@@ -32,6 +32,17 @@
         'A#': ['Bb3','Bb4','Bb5'],'B':  ['B3','B4','B5']
     };
 
+    // Display labels FR par convention dièse vs bémol (ids restent toujours en
+    // notation dièse côté KV/score pour cohérence interne).
+    var NOTE_NAMES_FR_SHARP = {
+        'C':'Do', 'C#':'Do\u266F', 'D':'Ré', 'D#':'Ré\u266F', 'E':'Mi', 'F':'Fa',
+        'F#':'Fa\u266F', 'G':'Sol', 'G#':'Sol\u266F', 'A':'La', 'A#':'La\u266F', 'B':'Si'
+    };
+    var NOTE_NAMES_FR_FLAT = {
+        'C':'Do', 'C#':'Ré\u266D', 'D':'Ré', 'D#':'Mi\u266D', 'E':'Mi', 'F':'Fa',
+        'F#':'Sol\u266D', 'G':'Sol', 'G#':'La\u266D', 'A':'La', 'A#':'Si\u266D', 'B':'Si'
+    };
+
     var INTERVAL_TYPES = [
         { id: 'm2', name: 'Demi-ton (m2)',    semis: 1  },
         { id: 'M2', name: 'Ton (M2)',         semis: 2  },
@@ -205,14 +216,17 @@
     function QuizEngine(opts) {
         opts = opts || {};
         this.mode = opts.mode;             // notes | intervals | chords | scales | progressions
-        this.level = opts.level;            // debutant | intermediaire | avance
+        this.level = opts.level;            // debutant | intermediaire | avance | custom
         this.slug = opts.slug;
+        // Custom : ids de types valides pour ce mode (ex: ['maj','min','dim'] pour chords)
+        this.customTypes = Array.isArray(opts.customTypes) ? opts.customTypes.slice() : null;
         this.totalQuestions = opts.totalQuestions || 10;
         this.questions = [];
         this.cur = 0;
         this.score = 0;
         this.answered = false;
-        this.replaysUsedForCurrent = 0; // utilisé par mode scales
+        this.replaysUsedForCurrent = 0;
+        this._scheduledTimeouts = []; // setTimeout IDs pour stopper séquences (scales/progressions)
         this.startedAt = Date.now();
         this.sampler = null;
         this.samplerReady = false;
@@ -221,10 +235,14 @@
     QuizEngine.prototype.init = function () {
         var self = this;
         return new Promise(function (resolve, reject) {
-            // Restaure volume sauvegardé
+            // Restaure volume sauvegardé (format % 0..100, converti en dB pour Tone)
             try {
-                var savedVol = parseFloat(localStorage.getItem('masterhub_volume'));
-                if (!isNaN(savedVol)) Tone.Destination.volume.value = savedVol;
+                var savedPct = parseFloat(localStorage.getItem('masterhub_volume'));
+                if (!isNaN(savedPct)) {
+                    Tone.Destination.volume.value = savedPct <= 0
+                        ? -Infinity
+                        : 20 * Math.log10(savedPct / 100);
+                }
             } catch (e) {}
 
             self.sampler = new Tone.Sampler({
@@ -268,7 +286,18 @@
                 .filter(function (n) { return n.id !== correctNote.id; });
             distractors = shuffle(distractors).slice(0, nChoices - 1);
             var choices = shuffle(distractors.concat([correctNote]));
-            return { correct: correctNote, choices: choices, payload: { tone: tone } };
+            // 50/50 dièse vs bémol — cohérent dans toute la question (correct + leurres)
+            var useFlat = Math.random() < 0.5;
+            var labels = useFlat ? NOTE_NAMES_FR_FLAT : NOTE_NAMES_FR_SHARP;
+            var displayChoices = choices.map(function (n) {
+                return { id: n.id, name: labels[n.id] || n.name };
+            });
+            var displayCorrect = { id: correctNote.id, name: labels[correctNote.id] || correctNote.name };
+            return {
+                correct: displayCorrect,
+                choices: displayChoices,
+                payload: { tone: tone, useFlat: useFlat }
+            };
         }
 
         if (this.mode === 'intervals') {
@@ -288,10 +317,20 @@
         }
 
         if (this.mode === 'chords') {
-            var poolCh = this._filterByLevel(data.CHORD_TYPES, data.levelFilter);
+            // Custom : pool = customTypes (ids) si level === 'custom' et au moins 2 types
+            var poolCh;
+            if (this.level === 'custom' && this.customTypes && this.customTypes.length >= 2) {
+                poolCh = data.CHORD_TYPES.filter(function (c) {
+                    return this.customTypes.indexOf(c.id) >= 0;
+                }, this);
+            } else {
+                poolCh = this._filterByLevel(data.CHORD_TYPES, data.levelFilter);
+            }
             var correctCh = pickRandom(poolCh);
             var rootCh = pickRandom(data.BASE_NOTES);
-            var nCC = Math.min(data.levelChoices[this.level] || 4, poolCh.length);
+            // Choix : min(levelChoices, poolSize) — 6 max si custom
+            var maxChoices = (this.level === 'custom') ? Math.min(6, poolCh.length) : (data.levelChoices[this.level] || 4);
+            var nCC = Math.min(maxChoices, poolCh.length);
             var distCh = poolCh.filter(function (c) { return c.id !== correctCh.id; });
             distCh = shuffle(distCh).slice(0, nCC - 1);
             var chChoices = shuffle(distCh.concat([correctCh]));
@@ -375,32 +414,40 @@
                 var maxPlays = QUIZ_DATA.scales.REPLAY_BY_LEVEL[self.level] || 999;
                 if (self.replaysUsedForCurrent >= maxPlays) return;
                 self.replaysUsedForCurrent++;
+                // Stop toute lecture en cours avant de re-démarrer (clic Réécouter)
+                self._clearScheduled();
                 var sd = QUIZ_DATA.scales;
                 var tonic = q.payload.tonic;
                 var oct = sd.OCTAVE;
                 var chrom = sd.CHROMATIC;
                 var baseIdx = chrom.indexOf(tonic);
                 var dur = sd.NOTE_DURATION_S;
-                var nowSc = Tone.now();
                 q.correct.intervals.forEach(function (semis, i) {
                     var totalSc = baseIdx + semis;
                     var noteName = chrom[totalSc % 12];
                     var noteOct = oct + Math.floor(totalSc / 12);
-                    self.sampler.triggerAttackRelease(noteName + noteOct, dur, nowSc + i * dur);
+                    var noteFull = noteName + noteOct;
+                    var id = setTimeout(function () {
+                        if (self.sampler) self.sampler.triggerAttackRelease(noteFull, dur);
+                    }, i * dur * 1000);
+                    self._scheduledTimeouts.push(id);
                 });
             } else if (self.mode === 'progressions') {
+                self._clearScheduled();
                 var pd = QUIZ_DATA.progressions;
                 var triads = pd.TRIADS_C_MAJOR;
                 var durP = pd.CHORD_DURATION_S;
                 var gap = pd.GAP_S;
-                var nowP = Tone.now();
                 q.correct.chords.forEach(function (chordId, i) {
                     var chordNotes = triads[chordId];
                     if (!chordNotes) return;
-                    var t = nowP + i * (durP + gap);
-                    chordNotes.forEach(function (n) {
-                        self.sampler.triggerAttackRelease(n, durP, t);
-                    });
+                    var id = setTimeout(function () {
+                        if (!self.sampler) return;
+                        chordNotes.forEach(function (n) {
+                            self.sampler.triggerAttackRelease(n, durP);
+                        });
+                    }, i * (durP + gap) * 1000);
+                    self._scheduledTimeouts.push(id);
                 });
             }
         });
@@ -422,7 +469,22 @@
         return this.cur >= this.totalQuestions - 1 && this.answered;
     };
 
+    // Coupe net toute séquence audio en cours (scales/progressions) :
+    // - clearTimeout sur les notes scheduled mais pas encore jouées
+    // - releaseAll() sur les notes en cours de jeu
+    QuizEngine.prototype._clearScheduled = function () {
+        if (this._scheduledTimeouts && this._scheduledTimeouts.length) {
+            this._scheduledTimeouts.forEach(function (id) { clearTimeout(id); });
+            this._scheduledTimeouts = [];
+        }
+        if (this.sampler && typeof this.sampler.releaseAll === 'function') {
+            try { this.sampler.releaseAll(); } catch (e) {}
+        }
+    };
+
     QuizEngine.prototype.next = function () {
+        // Stop audio précédent avant la transition
+        this._clearScheduled();
         if (this.cur < this.totalQuestions - 1) {
             this.cur++;
             this.answered = false;
@@ -473,6 +535,7 @@
     // Libère le sampler Tone.js pour éviter le leak mémoire entre sessions.
     // Doit être appelé avant reload / nav out (cf. quiz-play.html beforeunload).
     QuizEngine.prototype.dispose = function () {
+        this._clearScheduled();
         if (this.sampler) {
             try {
                 this.sampler.dispose();
