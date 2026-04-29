@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Master Hub — Métronome</title>
+    <meta name="theme-color" content="#0f0f14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="Master Hub — Métronome (BPM, signature, sons, pré-compte).">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+">
+    <style>
+        :root {
+            --bg: #0f0f14;
+            --bg-card: #1a1a24;
+            --bg-card-hover: #22222f;
+            --text: #eee;
+            --text-muted: #888;
+            --v: #8B6FE8;
+            --v-soft: rgba(139, 111, 232, 0.08);
+            --v-soft-stronger: rgba(139, 111, 232, 0.14);
+            --v-border: rgba(139, 111, 232, 0.3);
+            --border1: rgba(255, 255, 255, 0.08);
+            --radius: 16px;
+            --tap-min: 48px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        #bg-canvas {
+            position: fixed; inset: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative; z-index: 1;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 24px 16px 40px;
+            display: flex; flex-direction: column;
+            min-height: 100vh; min-height: 100dvh;
+        }
+
+        .back-link {
+            align-self: flex-start;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-decoration: none;
+            padding: 6px 8px;
+            margin-bottom: 8px;
+            transition: color 0.15s;
+        }
+        .back-link:hover { color: var(--text); }
+
+        .header {
+            text-align: center;
+            padding: 12px 0 4px;
+        }
+        .header h1 {
+            font-size: 1.6rem; font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #fff;
+        }
+        .header .subtitle {
+            font-size: 0.92rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* ── Card métronome ────────────────────────────────────── */
+        .metro-card {
+            margin-top: 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border1);
+            border-radius: var(--radius);
+            padding: 22px 20px;
+            display: flex; flex-direction: column;
+            gap: 18px;
+            position: relative;
+        }
+
+        /* BPM display + ±1/±10 */
+        .metro-bpm-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 2fr 1fr 1fr;
+            align-items: center;
+            gap: 8px;
+        }
+        .metro-step {
+            background: var(--bg);
+            border: 1px solid var(--border1);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 12px 6px;
+            border-radius: 10px;
+            cursor: pointer;
+            min-height: var(--tap-min);
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .metro-step:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--v-border);
+        }
+        .metro-step:active {
+            transform: scale(0.97);
+        }
+        .metro-bpm-center {
+            text-align: center;
+        }
+        .bpm-big {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 2.4rem;
+            font-weight: 700;
+            color: var(--v);
+            line-height: 1;
+        }
+        .metro-bpm-label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        /* Slider BPM */
+        .metro-slider-full {
+            width: 100%;
+            accent-color: var(--v);
+            cursor: pointer;
+        }
+
+        /* Pendule SVG */
+        .metro-pendulum-wrap {
+            display: flex;
+            justify-content: center;
+            padding: 4px 0;
+        }
+        #metro-pendulum-svg {
+            width: 120px; height: 130px;
+        }
+
+        /* Beats row */
+        .metro-beats-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 4px 0;
+        }
+        .metro-beat-box {
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            background: var(--bg);
+            border: 1px solid var(--border1);
+            transition: background 0.1s, border-color 0.1s, transform 0.1s;
+        }
+        .metro-beat-box.accent {
+            border-color: var(--v-border);
+        }
+        .metro-beat-box.active {
+            background: var(--v);
+            border-color: var(--v);
+            transform: scale(1.1);
+        }
+        .metro-beat-box.accent.active {
+            background: #b69dfb;
+        }
+
+        /* Sélecteurs (signature + son) en boutons groupés */
+        .metro-section-label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .metro-btn-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        .metro-pill {
+            background: var(--bg);
+            border: 1px solid var(--border1);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 11px 6px;
+            border-radius: 10px;
+            cursor: pointer;
+            min-height: var(--tap-min);
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .metro-pill:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--v-border);
+        }
+        .metro-pill.selected {
+            background: var(--v-soft-stronger);
+            border-color: var(--v);
+            color: var(--v);
+        }
+
+        /* Toggle pré-compte */
+        .metro-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 12px;
+            background: var(--bg);
+            border: 1px solid var(--border1);
+            border-radius: 10px;
+        }
+        .metro-toggle-label {
+            font-size: 0.92rem;
+            color: var(--text);
+        }
+        .metro-toggle-label small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            margin-top: 2px;
+        }
+        .metro-toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .metro-toggle-switch input {
+            opacity: 0; width: 0; height: 0;
+        }
+        .metro-toggle-switch .track {
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.1);
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.18s;
+        }
+        .metro-toggle-switch .track::before {
+            content: '';
+            position: absolute;
+            left: 3px; top: 3px;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: var(--text);
+            transition: transform 0.18s;
+        }
+        .metro-toggle-switch input:checked + .track {
+            background: var(--v);
+        }
+        .metro-toggle-switch input:checked + .track::before {
+            transform: translateX(20px);
+            background: #fff;
+        }
+
+        /* Actions : Tap + Start/Stop */
+        .metro-actions {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 10px;
+        }
+        .metro-tap-btn {
+            background: var(--bg);
+            border: 1px solid var(--border1);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 600;
+            padding: 14px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            min-height: 52px;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .metro-tap-btn:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--v-border);
+        }
+        .metro-tap-btn:active { transform: scale(0.97); }
+
+        .metro-start-btn {
+            background: var(--v);
+            color: #fff;
+            border: none;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 600;
+            padding: 14px 18px;
+            border-radius: 12px;
+            cursor: pointer;
+            min-height: 52px;
+            transition: background 0.18s, transform 0.15s;
+        }
+        .metro-start-btn:hover { background: #9b80f0; }
+        .metro-start-btn:active { transform: scale(0.98); }
+        .metro-start-btn.is-stop {
+            background: #e05c6b;
+        }
+        .metro-start-btn.is-stop:hover {
+            background: #ec6f7e;
+        }
+
+        /* Pré-compte overlay */
+        .metro-precount {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 15, 20, 0.9);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: var(--radius);
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 5rem;
+            font-weight: 700;
+            color: var(--v);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.18s;
+            z-index: 5;
+        }
+        .metro-precount.show {
+            opacity: 1;
+        }
+
+        @media (max-width: 480px) {
+            .header h1 { font-size: 1.4rem; }
+            .metro-card { padding: 18px 14px; }
+            .bpm-big { font-size: 2rem; }
+            .metro-precount { font-size: 4rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div class="container">
+        <a href="#" class="back-link" id="back-link">&larr; Retour</a>
+        <header class="header">
+            <h1>Métronome</h1>
+            <p class="subtitle" id="page-subtitle">Règle ton tempo, ta mesure et lance le click</p>
+        </header>
+
+        <div class="metro-card">
+            <!-- BPM row : ±10 ±1 [BPM] +1 +10 -->
+            <div class="metro-bpm-row">
+                <button class="metro-step" type="button" data-delta="-10">−10</button>
+                <button class="metro-step" type="button" data-delta="-1">−1</button>
+                <div class="metro-bpm-center">
+                    <div id="metro-bpm-display" class="bpm-big">100</div>
+                    <div class="metro-bpm-label">BPM</div>
+                </div>
+                <button class="metro-step" type="button" data-delta="1">+1</button>
+                <button class="metro-step" type="button" data-delta="10">+10</button>
+            </div>
+
+            <!-- Slider BPM 40-220 -->
+            <input type="range" id="metro-slider"
+                   min="40" max="220" value="100"
+                   class="metro-slider-full"
+                   aria-label="BPM" />
+
+            <!-- Pendule SVG -->
+            <div class="metro-pendulum-wrap">
+                <svg id="metro-pendulum-svg" viewBox="0 0 120 130" aria-hidden="true">
+                    <path d="M 10 20 Q 60 100 110 20"
+                          fill="none" stroke="var(--border1)" stroke-width="2"/>
+                    <line id="metro-rod" x1="60" y1="10" x2="60" y2="90"
+                          stroke="var(--text-muted)" stroke-width="2"
+                          stroke-linecap="round"/>
+                    <circle id="metro-bob" cx="60" cy="90" r="10"
+                            fill="var(--v)"/>
+                </svg>
+            </div>
+
+            <!-- Beats visuels -->
+            <div id="metro-beats" class="metro-beats-row" aria-label="Visualiseur des temps"></div>
+
+            <!-- Signature -->
+            <div>
+                <div class="metro-section-label">Signature</div>
+                <div class="metro-btn-row" id="metro-sig-row">
+                    <button type="button" class="metro-pill" data-value="4">4/4</button>
+                    <button type="button" class="metro-pill" data-value="3">3/4</button>
+                    <button type="button" class="metro-pill" data-value="2">2/4</button>
+                </div>
+            </div>
+
+            <!-- Son -->
+            <div>
+                <div class="metro-section-label">Son</div>
+                <div class="metro-btn-row" id="metro-sound-row">
+                    <button type="button" class="metro-pill" data-value="beep">Bip</button>
+                    <button type="button" class="metro-pill" data-value="wood">Wood</button>
+                    <button type="button" class="metro-pill" data-value="hihat">Hi-hat</button>
+                </div>
+            </div>
+
+            <!-- Toggle pré-compte 4 temps -->
+            <div class="metro-toggle-row">
+                <div class="metro-toggle-label">
+                    Pré-compte 4 temps
+                    <small>Joue 4 clics avant de démarrer</small>
+                </div>
+                <label class="metro-toggle-switch" aria-label="Activer le pré-compte">
+                    <input type="checkbox" id="metro-precount-toggle" />
+                    <span class="track"></span>
+                </label>
+            </div>
+
+            <!-- Actions : Tap + Start/Stop -->
+            <div class="metro-actions">
+                <button id="metro-tap" type="button" class="metro-tap-btn">Tap</button>
+                <button id="metro-startstop" type="button" class="metro-start-btn">▶ Lancer</button>
+            </div>
+
+            <!-- Overlay pré-compte (chiffre 4-3-2-1) -->
+            <div id="metro-precount" class="metro-precount" aria-hidden="true"></div>
+        </div>
+    </div>
+
+    <script src="/metronome.js"></script>
+
+    <script>
+    (function () {
+        var canvas = document.getElementById("bg-canvas");
+        var ctx = canvas.getContext("2d");
+        var particles = [];
+        var COUNT = 18;
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", resize);
+        resize();
+
+        function createParticle() {
+            var w = 6 + Math.random() * 4;
+            var h = 18 + Math.random() * 10;
+            return {
+                x: Math.random() * canvas.width,
+                y: canvas.height + h,
+                w: w, h: h, r: 2,
+                speed: 0.15 + Math.random() * 0.35,
+                opacity: 0.04 + Math.random() * 0.04,
+                drift: (Math.random() - 0.5) * 0.3
+            };
+        }
+        for (var i = 0; i < COUNT; i++) {
+            var p = createParticle();
+            p.y = Math.random() * canvas.height;
+            particles.push(p);
+        }
+        function drawRoundRect(x, y, w, h, r, alpha) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+        var rafId = null;
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < particles.length; i++) {
+                var p = particles[i];
+                p.y -= p.speed;
+                p.x += p.drift;
+                drawRoundRect(p.x, p.y, p.w, p.h, p.r, p.opacity);
+                if (p.y + p.h < 0) particles[i] = createParticle();
+            }
+            rafId = requestAnimationFrame(animate);
+        }
+        animate();
+        var stopAnim = function () {
+            if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+            window.removeEventListener("resize", resize);
+        };
+        window.addEventListener("beforeunload", stopAnim);
+        window.addEventListener("pagehide", stopAnim);
+    })();
+    </script>
+
+    <script src="/nav-outils.js" data-active="metro"></script>
+
+</body>
+</html>

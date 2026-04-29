@@ -250,8 +250,9 @@
             id: "metronome",
             icon: "\u23F1\uFE0F",
             title: "Métronome",
-            sub: "Bientôt disponible",
-            active: false
+            sub: "BPM, signature, sons, pré-compte",
+            href: function(slug) { return "/metronome?eleve=" + encodeURIComponent(slug); },
+            active: true
         },
         {
             id: "accords",
