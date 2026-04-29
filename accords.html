@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Master Hub — Dictionnaire d'accords</title>
+    <meta name="theme-color" content="#0f0f14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="Dictionnaire d'accords : 22 types, renversements, clavier SVG.">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+">
+    <script src="https://unpkg.com/tone@14.7.77/build/Tone.js"></script>
+    <style>
+        :root {
+            --bg: #0f0f14;
+            --bg-card: #1a1a24;
+            --bg-card-hover: #22222f;
+            --text: #eee;
+            --text-muted: #888;
+            --v: #8B6FE8;
+            --v-light: #a48ff0;
+            --v-soft: rgba(139, 111, 232, 0.08);
+            --v-soft-stronger: rgba(139, 111, 232, 0.14);
+            --v-border: rgba(139, 111, 232, 0.3);
+            --radius: 16px;
+            --tap-min: 48px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh; min-height: 100dvh;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        #bg-canvas {
+            position: fixed; inset: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative; z-index: 1;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px 16px 40px;
+            display: flex; flex-direction: column;
+            min-height: 100vh; min-height: 100dvh;
+        }
+
+        .back-link {
+            align-self: flex-start;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-decoration: none;
+            padding: 6px 8px;
+            margin-bottom: 8px;
+        }
+        .back-link:hover { color: var(--text); }
+
+        .header {
+            text-align: center;
+            padding: 12px 0 4px;
+        }
+        .header h1 {
+            font-size: 1.6rem; font-weight: 700;
+            letter-spacing: -0.02em; color: #fff;
+        }
+        .header .subtitle {
+            font-size: 0.92rem; color: var(--text-muted); margin-top: 4px;
+        }
+
+        /* ── Volume slider (cohérent quiz-play) ─────────────── */
+        .volume-bar {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 14px; margin-top: 18px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+        }
+        .volume-bar .volume-icon { font-size: 1.05rem; line-height: 1; flex-shrink: 0; }
+        .volume-bar input[type="range"] {
+            flex: 1; min-width: 0;
+            accent-color: var(--v); cursor: pointer;
+        }
+        .volume-bar .volume-value {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            color: var(--text-muted);
+            min-width: 44px; text-align: right;
+            font-size: 0.82rem; flex-shrink: 0;
+        }
+
+        /* ── Layout principal : grid responsive ─────────────── */
+        .dict-grid {
+            display: grid; gap: 18px;
+            margin-top: 18px;
+            grid-template-columns: 1fr;
+        }
+
+        @media (min-width: 768px) {
+            .dict-grid { grid-template-columns: 1fr 320px; gap: 24px; }
+        }
+
+        /* ── Card affichage accord ─────────────────────────── */
+        .display-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 22px 20px;
+            display: flex; flex-direction: column; gap: 16px;
+        }
+
+        .display-head {
+            display: flex; align-items: baseline; justify-content: space-between;
+            gap: 12px; flex-wrap: wrap;
+        }
+
+        .chord-name {
+            font-size: 2.4rem; font-weight: 700;
+            color: var(--v); line-height: 1;
+            letter-spacing: -0.02em;
+        }
+
+        .notation-toggle {
+            display: inline-flex;
+            background: var(--bg);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 2px;
+            font-size: 0.78rem;
+        }
+        .notation-toggle button {
+            padding: 5px 10px;
+            border: none; background: transparent;
+            color: var(--text-muted);
+            font-family: inherit; font-size: 0.78rem; font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            min-width: 32px;
+        }
+        .notation-toggle button.active {
+            background: var(--v);
+            color: #fff;
+        }
+
+        .meta-row {
+            display: flex; flex-direction: column; gap: 6px;
+            font-size: 0.95rem;
+        }
+        .meta-label {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            font-weight: 600;
+        }
+        .meta-value {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            color: var(--text);
+            font-size: 1.05rem;
+            letter-spacing: 0.02em;
+        }
+        .meta-value.intervals {
+            color: var(--v-light);
+            font-size: 0.95rem;
+        }
+
+        /* ── Clavier SVG ─────────────────────────────────────── */
+        .keyboard-wrap {
+            background: var(--bg);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .keyboard-wrap svg {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 6px;
+        }
+
+        /* ── Boutons audio ──────────────────────────────────── */
+        .audio-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .audio-btn {
+            background: var(--v);
+            color: #fff;
+            border: none;
+            font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 600;
+            padding: 14px 18px;
+            border-radius: 12px;
+            cursor: pointer;
+            min-height: 52px;
+            transition: background 0.18s, transform 0.15s;
+        }
+        .audio-btn.secondary {
+            background: var(--bg);
+            color: var(--v);
+            border: 1px solid var(--v-border);
+        }
+        .audio-btn:hover { background: #9b80f0; }
+        .audio-btn.secondary:hover {
+            background: var(--v-soft-stronger);
+            border-color: var(--v);
+        }
+        .audio-btn:active { transform: scale(0.98); }
+        .audio-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ── Sidebar contrôles ──────────────────────────────── */
+        .controls-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 18px 16px;
+            display: flex; flex-direction: column; gap: 18px;
+        }
+
+        .ctrl-section {
+            display: flex; flex-direction: column; gap: 8px;
+        }
+
+        .ctrl-section .meta-label {
+            margin-bottom: 2px;
+        }
+
+        .pill-grid {
+            display: grid;
+            gap: 6px;
+        }
+        .pill-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+        .pill-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+        .pill-grid.types {
+            grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+            max-height: 280px;
+            overflow-y: auto;
+            padding: 4px;
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+        }
+
+        .pill {
+            background: var(--bg);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.82rem;
+            font-weight: 500;
+            padding: 9px 4px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+            text-align: center;
+            min-height: 38px;
+        }
+        .pill:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--v-border);
+        }
+        .pill.selected {
+            background: var(--v-soft-stronger);
+            border-color: var(--v);
+            color: var(--v);
+        }
+        .pill.disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .pill.type-pill {
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 1px;
+            padding: 6px 4px;
+            min-height: 44px;
+        }
+        .pill.type-pill .type-id {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 0.76rem;
+            letter-spacing: 0.02em;
+        }
+        .pill.type-pill .type-name {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            line-height: 1.1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+        .pill.type-pill.selected .type-name {
+            color: var(--v-light);
+        }
+
+        .octave-row {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 8px;
+            align-items: center;
+        }
+        .octave-row .pill { min-height: 38px; }
+        .octave-display {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--v);
+            text-align: center;
+            min-width: 60px;
+        }
+
+        @media (max-width: 480px) {
+            .header h1 { font-size: 1.4rem; }
+            .chord-name { font-size: 2rem; }
+            .display-card, .controls-card { padding: 14px 12px; }
+            .pill-grid.types { max-height: 220px; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div class="container">
+        <a href="#" class="back-link" id="back-link">&larr; Retour</a>
+        <header class="header">
+            <h1>Dictionnaire d'accords</h1>
+            <p class="subtitle" id="page-subtitle">22 types · renversements · clavier</p>
+        </header>
+
+        <div class="volume-bar">
+            <span class="volume-icon">🔊</span>
+            <input type="range" id="volume-slider" min="0" max="100" step="1" value="70" aria-label="Volume" />
+            <span class="volume-value" id="volume-value">70%</span>
+        </div>
+
+        <div class="dict-grid">
+            <!-- ═══ Affichage accord ═══ -->
+            <div class="display-card">
+                <div class="display-head">
+                    <div class="chord-name" id="chord-name">C</div>
+                    <div class="notation-toggle" role="tablist" aria-label="Notation">
+                        <button type="button" id="notation-fr" class="active">FR</button>
+                        <button type="button" id="notation-en">EN</button>
+                    </div>
+                </div>
+
+                <div class="meta-row">
+                    <span class="meta-label">Notes</span>
+                    <span class="meta-value" id="chord-notes">Do · Mi · Sol</span>
+                </div>
+
+                <div class="meta-row">
+                    <span class="meta-label">Intervalles</span>
+                    <span class="meta-value intervals" id="chord-intervals">1 · 3 · 5</span>
+                </div>
+
+                <div class="keyboard-wrap" id="keyboard-wrap">
+                    <svg id="chord-keyboard" viewBox="0 0 700 110" preserveAspectRatio="none"></svg>
+                </div>
+
+                <div class="audio-row">
+                    <button type="button" class="audio-btn" id="btn-play">▶ Jouer</button>
+                    <button type="button" class="audio-btn secondary" id="btn-arpeggio">♬ Arpège</button>
+                </div>
+            </div>
+
+            <!-- ═══ Sidebar contrôles ═══ -->
+            <div class="controls-card">
+                <div class="ctrl-section">
+                    <span class="meta-label">Tonique</span>
+                    <div class="pill-grid cols-4" id="root-grid"></div>
+                </div>
+
+                <div class="ctrl-section">
+                    <span class="meta-label">Type</span>
+                    <div class="pill-grid types" id="type-grid"></div>
+                </div>
+
+                <div class="ctrl-section">
+                    <span class="meta-label">Renversement</span>
+                    <div class="pill-grid cols-4" id="inv-grid"></div>
+                </div>
+
+                <div class="ctrl-section">
+                    <span class="meta-label">Octave</span>
+                    <div class="octave-row">
+                        <button type="button" class="pill" id="oct-down">−</button>
+                        <div class="octave-display" id="oct-display">4</div>
+                        <button type="button" class="pill" id="oct-up">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/mh-music-theory.js"></script>
+    <script src="/accords.js"></script>
+
+    <script>
+    (function () {
+        var canvas = document.getElementById("bg-canvas");
+        var ctx = canvas.getContext("2d");
+        var particles = [];
+        var COUNT = 18;
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener("resize", resize);
+        resize();
+        function createParticle() {
+            var w = 6 + Math.random() * 4;
+            var h = 18 + Math.random() * 10;
+            return {
+                x: Math.random() * canvas.width,
+                y: canvas.height + h,
+                w: w, h: h, r: 2,
+                speed: 0.15 + Math.random() * 0.35,
+                opacity: 0.04 + Math.random() * 0.04,
+                drift: (Math.random() - 0.5) * 0.3
+            };
+        }
+        for (var i = 0; i < COUNT; i++) { var p = createParticle(); p.y = Math.random() * canvas.height; particles.push(p); }
+        function drawRoundRect(x, y, w, h, r, alpha) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+        var rafId = null;
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < particles.length; i++) {
+                var p = particles[i];
+                p.y -= p.speed;
+                p.x += p.drift;
+                drawRoundRect(p.x, p.y, p.w, p.h, p.r, p.opacity);
+                if (p.y + p.h < 0) particles[i] = createParticle();
+            }
+            rafId = requestAnimationFrame(animate);
+        }
+        animate();
+        var stopAnim = function () {
+            if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+            window.removeEventListener("resize", resize);
+        };
+        window.addEventListener("beforeunload", stopAnim);
+        window.addEventListener("pagehide", stopAnim);
+    })();
+    </script>
+
+    <script src="/nav-outils.js" data-active="accords"></script>
+
+</body>
+</html>

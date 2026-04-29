@@ -258,8 +258,9 @@
             id: "accords",
             icon: "\uD83C\uDFBC",
             title: "Dictionnaire d'accords",
-            sub: "Bientôt disponible",
-            active: false
+            sub: "22 types · renversements · clavier interactif",
+            href: function(slug) { return "/accords?eleve=" + encodeURIComponent(slug); },
+            active: true
         }
     ];
 
