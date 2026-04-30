@@ -571,7 +571,8 @@
 
     <script>
     // ──────────────────────────────────────────────
-    //  WHITELIST ÉLÈVES — slugs + prénom + alias only.
+    //  WHITELIST ÉLÈVES — fallback hardcodé. Remplacé au boot par
+    //  /api/eleves (source de vérité KV eleves:list). Cf bootstrap() plus bas.
     //  Aucune URL Drive/Telegram/Koalendar custom ici :
     //  les données privées sont servies par /api/eleves/{slug}/...
     // ──────────────────────────────────────────────
@@ -630,9 +631,9 @@
     };
 
     // ──────────────────────────────────────────────
-    //  Init — détection slug par URL puis fallback localStorage
+    //  Init — fetch /api/eleves (KV) puis détection slug par URL / localStorage
     // ──────────────────────────────────────────────
-    (function init() {
+    function runInit() {
         var pathMatch = window.location.pathname.match(/^\/([^\/]+)\/?$/);
         var pathSlug = pathMatch ? normalize(pathMatch[1]) : null;
         var eleve = pathSlug ? findEleveBySlug(pathSlug) : null;
@@ -648,7 +649,22 @@
         } else {
             renderPrenomInput();
         }
-    })();
+    }
+
+    // Source de vérité : /api/eleves (KV eleves:list). Fallback ELEVES_WHITELIST
+    // hardcodé en cas de KV/réseau down.
+    fetch('/api/eleves').then(function(r) { return r.json(); }).then(function(j) {
+        if (j && j.ok && Array.isArray(j.eleves) && j.eleves.length) {
+            var fresh = {};
+            j.eleves.forEach(function(s) {
+                var key = normalize(s);
+                if (!key) return;
+                var display = key.charAt(0).toUpperCase() + key.slice(1);
+                fresh[key] = { display: display, aliases: [key] };
+            });
+            ELEVES_WHITELIST = fresh;
+        }
+    }).catch(function() { /* fallback hardcodé */ }).then(runInit, runInit);
 
     // ──────────────────────────────────────────────
     //  Mode 1 — élève non identifié : input prénom

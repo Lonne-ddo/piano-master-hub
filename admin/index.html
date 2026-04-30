@@ -667,7 +667,9 @@
 <!-- ═══ SCRIPTS ═══════════════════════════════════════════════ -->
 <script>
 // ─── App logic ─────────────────────────────────────────────────
-const STUDENT_LIST = [
+// Fallback hardcodé — remplacé par /api/eleves au boot (cf init()).
+// En cas de KV/réseau down, le fallback garantit le rendu des onglets.
+let STUDENT_LIST = [
   { id: 'japhet', nom: 'Japhet' },
   { id: 'messon', nom: 'Messon' },
   { id: 'dexter', nom: 'Dexter' },
@@ -1179,12 +1181,23 @@ function toggleTheory(el, studentId, index) {
 }
 window.toggleTheory = toggleTheory;
 
-function init() {
+async function init() {
+  // Source de vérité : /api/eleves (KV eleves:list). Fallback STUDENT_LIST hardcodé.
+  try {
+    const r = await fetch('/api/eleves');
+    const j = await r.json();
+    if (j && j.ok && Array.isArray(j.eleves) && j.eleves.length) {
+      STUDENT_LIST = j.eleves.map(slug => ({
+        id: String(slug).toLowerCase(),
+        nom: String(slug).charAt(0).toUpperCase() + String(slug).slice(1),
+      }));
+    }
+  } catch (e) { /* fallback hardcodé */ }
   renderTabs();
   const params = new URLSearchParams(window.location.search);
   const eleveParam = (params.get('eleve') || '').toLowerCase();
   const valid = STUDENT_LIST.find(s => s.id === eleveParam);
-  const targetId = valid ? valid.id : 'japhet';
+  const targetId = valid ? valid.id : (STUDENT_LIST[0]?.id || 'japhet');
   renderEmpty();
   setTimeout(() => selectStudent(targetId), 200);
 }

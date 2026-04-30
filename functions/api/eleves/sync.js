@@ -29,12 +29,35 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-const DOCS = {
+// Source primaire : KV (`eleves:list` + `eleve:<slug>.doc_id`).
+// FALLBACK_DOCS ne sert qu'en dégradation gracieuse (KV down ou clés absentes
+// avant le bootstrap GET /api/eleves + POST seed-doc-ids).
+const FALLBACK_DOCS = {
   japhet: '19xGdQoE2k2tSFYp_MykzDL-7vxIz5HYr4DR3wRuQ3TM',
   messon: '1LovxCWAtCaJeLjBvLVsnG-jz-PGRETNfdm8C4BZRqJI',
   dexter: '1Ik6W8bSfwBxUMZhzS7NmDhREPq3xlbsr5ihFnva-D7A',
   tara:   '1EKB8q-NeC4C3qt6xhOfS3QN27Ip4zpAU-X4-yWUIjxY',
 };
+
+async function loadDocsMap(env) {
+  let slugs;
+  try {
+    const list = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
+    slugs = Array.isArray(list) && list.length ? list : Object.keys(FALLBACK_DOCS);
+  } catch {
+    slugs = Object.keys(FALLBACK_DOCS);
+  }
+  const out = {};
+  for (const slug of slugs) {
+    let cached = null;
+    try {
+      cached = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`, { type: 'json' });
+    } catch { /* fallback ci-dessous */ }
+    const docId = cached?.doc_id || FALLBACK_DOCS[slug];
+    if (docId) out[slug] = docId;
+  }
+  return out;
+}
 
 // Champs préservés par le `...existing` spread lors du merge (statut, programme,
 // notes, manualDates, theorie, progression calculée, canaux, repertoire, etc.).
@@ -340,6 +363,7 @@ export async function onRequestPost(context) {
   const results = {};
   const llmFailed = [];
 
+  const DOCS = await loadDocsMap(env);
   for (const [name, docId] of Object.entries(DOCS)) {
     const startMs = Date.now();
     try {

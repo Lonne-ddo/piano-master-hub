@@ -3,7 +3,18 @@
 // Whitelist STRICTE des champs exposés. PAS d'observations (privé coach).
 // Whitelist des 4 slugs autorisés.
 
-const VALID_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
+// Source primaire : KV `eleves:list`. FALLBACK_SLUGS pour dégradation gracieuse.
+const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
+
+async function isValidSlug(slug, env) {
+  try {
+    const list = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
+    const valid = Array.isArray(list) && list.length ? list : FALLBACK_SLUGS;
+    return valid.includes(slug);
+  } catch {
+    return FALLBACK_SLUGS.includes(slug);
+  }
+}
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -24,7 +35,7 @@ export async function onRequestOptions() {
 
 export async function onRequestGet({ params, env }) {
   const slug = String(params.slug || '').toLowerCase();
-  if (!VALID_SLUGS.includes(slug)) {
+  if (!await isValidSlug(slug, env)) {
     return jsonResponse({ error: 'invalid_slug' }, 400);
   }
 

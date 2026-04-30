@@ -1,10 +1,42 @@
 // ─── REGISTRE DES ÉLÈVES ─────────────────────────────────────────
-const STUDENT_REGISTRY = {
+// Source primaire : KV (`eleves:list` + `eleve:<slug>.doc_id`).
+// FALLBACK_REGISTRY ne sert qu'en dégradation gracieuse (KV down ou clé
+// `eleves:list` absente avant le bootstrap GET /api/eleves).
+const FALLBACK_REGISTRY = {
   japhet: { id: "japhet", nom: "Japhet", programme: "Piano Master", statut: "actif", docId: "19xGdQoE2k2tSFYp_MykzDL-7vxIz5HYr4DR3wRuQ3TM" },
   messon: { id: "messon", nom: "Messon", programme: "Piano Master", statut: "actif", docId: "1LovxCWAtCaJeLjBvLVsnG-jz-PGRETNfdm8C4BZRqJI" },
   dexter: { id: "dexter", nom: "Dexter", programme: "Piano Master", statut: "actif", docId: "1Ik6W8bSfwBxUMZhzS7NmDhREPq3xlbsr5ihFnva-D7A" },
   tara:   { id: "tara",   nom: "Tara",   programme: "Piano Master", statut: "actif", docId: "1EKB8q-NeC4C3qt6xhOfS3QN27Ip4zpAU-X4-yWUIjxY" },
 };
+
+async function resolveStudent(id, env) {
+  // 1. Membership : `eleves:list` (KV) → fallback clés FALLBACK_REGISTRY
+  let validSlugs;
+  try {
+    const list = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
+    validSlugs = Array.isArray(list) && list.length ? list : Object.keys(FALLBACK_REGISTRY);
+  } catch {
+    validSlugs = Object.keys(FALLBACK_REGISTRY);
+  }
+  if (!validSlugs.includes(id)) return null;
+
+  // 2. doc_id : `eleve:<id>.doc_id` (KV) → fallback FALLBACK_REGISTRY[id].docId
+  let cached = null;
+  try {
+    cached = await env.MASTERHUB_STUDENTS.get(`eleve:${id}`, { type: 'json' });
+  } catch { /* fallback ci-dessous */ }
+  const fb = FALLBACK_REGISTRY[id] || {};
+  const docId = cached?.doc_id || fb.docId;
+  if (!docId) return null;
+
+  return {
+    id,
+    nom: cached?.nom || fb.nom || (id.charAt(0).toUpperCase() + id.slice(1)),
+    programme: cached?.programme || fb.programme || 'Piano Master',
+    statut: cached?.statut || fb.statut || 'actif',
+    docId,
+  };
+}
 
 // Champs saisis manuellement OU calculés par sync.js → jamais écrasés par un re-sync LLM
 // (parseDoc ne renvoie que des champs LLM bruts, sans stats ni override)
@@ -283,7 +315,7 @@ export async function onRequestGet({ params, request, env }) {
   const url = new URL(request.url);
   const forceSync = url.searchParams.get('sync') === 'true';
 
-  const student = STUDENT_REGISTRY[id];
+  const student = await resolveStudent(id, env);
   if (!student) return jsonResponse({ error: 'Élève introuvable' }, 404);
 
   const cacheKey = `eleve:${id}`;
@@ -360,7 +392,8 @@ export async function onRequestPatch({ params, request, env }) {
   if (authErr) return authErr;
 
   const id = params.id;
-  if (!STUDENT_REGISTRY[id]) return jsonResponse({ error: 'Élève introuvable' }, 404);
+  const exists = await resolveStudent(id, env);
+  if (!exists) return jsonResponse({ error: 'Élève introuvable' }, 404);
 
   let body;
   try { body = await request.json(); }
