@@ -307,7 +307,7 @@
 
     // ═══ API call ═══
     function generate() {
-        if (state.selectedTypes.length === 0) return;
+        if (state.selectedTypes.length < 2) return;
         if (state.loading) return;
 
         state.loading = true;
@@ -358,12 +358,21 @@
         if (sub) sub.textContent = 'Choisis les types à travailler';
 
         var counter = state.selectedTypes.length;
-        var counterText = counter === 0
-            ? '<span>Aucun type sélectionné</span>'
-            : '<strong>' + counter + '</strong> type' + (counter > 1 ? 's' : '') + ' sélectionné' + (counter > 1 ? 's' : '');
+        var counterText, hint = '';
+        if (counter === 0) {
+            counterText = 'Aucun type sélectionné';
+            hint = 'Choisis au moins 2 types pour générer une grille variée';
+        } else if (counter === 1) {
+            counterText = '<strong>1</strong> type sélectionné';
+            hint = 'Choisis-en au moins 2 pour générer la grille';
+        } else {
+            counterText = '<strong>' + counter + '</strong> types sélectionnés';
+        }
 
         var html = '<div class="selection-card">';
-        html +=     '<div class="types-counter">' + counterText + '</div>';
+        html +=     '<div class="types-counter">' + counterText +
+                    (hint ? '<div class="types-hint">' + hint + '</div>' : '') +
+                    '</div>';
 
         // Familles de types
         html += '<div class="ctrl-section">';
@@ -400,8 +409,8 @@
         html +=     '</div>';
         html += '</div>';
 
-        // Generate button
-        var disabled = (state.selectedTypes.length === 0 || state.loading) ? 'disabled' : '';
+        // Generate button — minimum 2 types pour garantir la variété de la grille
+        var disabled = (state.selectedTypes.length < 2 || state.loading) ? 'disabled' : '';
         var loadingClass = state.loading ? ' loading' : '';
         var btnLabel = state.loading ? '⏳ Génération en cours…' : '🎲 Générer 5 progressions';
         html += '<button type="button" class="btn-generate' + loadingClass +

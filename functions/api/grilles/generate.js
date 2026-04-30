@@ -23,6 +23,46 @@ const VALID_TYPES = [
   '7sus4','7b9','7#5','7#9'
 ];
 
+// Niveau de complexité par type (1 = triade simple, 4 = altéré/extension).
+// Le ceiling de la palette d'une grille = max(level) des types cochés.
+const TYPE_LEVELS = {
+  // Niveau 1 — Triades simples
+  'maj': 1, 'min': 1, 'dim': 1, 'aug': 1, 'sus2': 1, 'sus4': 1,
+  // Niveau 2 — Septièmes
+  '7': 2, 'maj7': 2, 'min7': 2, 'min7b5': 2, 'dim7': 2, 'mMaj7': 2,
+  // Niveau 3 — Sixtes + ajouts
+  '6': 3, 'min6': 3, 'add9': 3,
+  // Niveau 4 — Extensions et altérées
+  '9': 4, '13': 4, 'min11': 4, '7sus4': 4, '7b9': 4, '7#5': 4, '7#9': 4
+};
+
+// Mapping id MhTheory → suffixe LLM (notation jazz standard).
+// Le LLM utilise "m7" et non "min7" ; on mappe pour la palette.
+const TYPE_TO_LLM_SUFFIX = {
+  'maj':    'maj (ou rien)',
+  'min':    'm',
+  'dim':    'dim',
+  'aug':    'aug',
+  'sus2':   'sus2',
+  'sus4':   'sus4',
+  '7':      '7',
+  'maj7':   'maj7',
+  'min7':   'm7',
+  'min7b5': 'm7b5',
+  'dim7':   'dim7',
+  'mMaj7':  'mMaj7',
+  '6':      '6',
+  'min6':   'm6',
+  'add9':   'add9',
+  '9':      '9',
+  '13':     '13',
+  'min11':  'm11',
+  '7sus4':  '7sus4',
+  '7b9':    '7b9',
+  '7#5':    '7#5',
+  '7#9':    '7#9'
+};
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -43,7 +83,8 @@ export async function onRequestPost({ request, env }) {
   }
 
   const types = Array.isArray(body.types) ? body.types : [];
-  if (types.length === 0 || types.length > 22) {
+  // Minimum 2 types pour garantir la variété pédagogique de la grille.
+  if (types.length < 2 || types.length > 22) {
     return json({ error: 'invalid_types_count' }, 400);
   }
   if (!types.every(t => VALID_TYPES.includes(t))) {
@@ -54,11 +95,29 @@ export async function onRequestPost({ request, env }) {
     return json({ error: 'groq_not_configured' }, 500);
   }
 
+  // Ceiling de complexité : le niveau le plus élevé parmi les types cochés.
+  // La palette autorisée pour la grille = tous les types ≤ ce niveau.
+  const maxLevel = Math.max(...types.map(t => TYPE_LEVELS[t] || 1));
+  const allowedTypes = VALID_TYPES.filter(t => TYPE_LEVELS[t] <= maxLevel);
+  const allowedSuffixes = allowedTypes.map(t => TYPE_TO_LLM_SUFFIX[t]).join(', ');
+
   const systemPrompt = `Tu es un expert en harmonie musicale (jazz, gospel, pop). Tu réponds UNIQUEMENT en JSON pur valide, sans markdown ni texte autour.`;
 
   const userPrompt = `L'élève veut travailler les types d'accords suivants : ${types.join(', ')}.
+Niveau de complexité maximum de la sélection : ${maxLevel} sur 4.
 
 Génère exactement 5 progressions d'accords cohérentes harmoniquement qui mettent en avant ces types.
+
+═══ PALETTE D'ACCORDS AUTORISÉE (CEILING DE COMPLEXITÉ) ═══
+
+Tu DOIS UNIQUEMENT utiliser des accords avec ces suffixes (après la racine [A-G] avec # ou b optionnel) :
+
+${allowedSuffixes}
+
+INTERDIT FORMELLEMENT : tout autre suffixe en dehors de cette palette.
+Cette règle est PRIORITAIRE sur tout le reste : pas un seul accord ne doit utiliser un suffixe hors palette.
+
+Pourquoi : l'élève travaille des types simples ou intermédiaires ; lui infliger un 7#9 ou un 13 hors palette serait pédagogiquement incohérent. Reste dans le niveau ≤ ${maxLevel}.
 
 ═══ CONTRAINTES OBLIGATOIRES ═══
 
@@ -88,12 +147,9 @@ Génère exactement 5 progressions d'accords cohérentes harmoniquement qui mett
 
 5. STYLE — jazz, gospel, pop, bossa, ou modal. JAMAIS atonal ni aléatoire.
 
-═══ NOTATION ═══
+═══ AUTRES INTERDITS DE NOTATION ═══
 
-Suffixes AUTORISÉS uniquement (après la racine [A-G] avec # ou b optionnel) :
-maj (ou rien), m, dim, aug, sus2, sus4, 7, maj7, m7, m7b5, dim7, mMaj7, 6, m6, add9, 9, 13, m11, 7sus4, 7b9, 7#5, 7#9
-
-INTERDITS : ø (écris m7b5), Δ (écris maj7), m9, m13, 11, accords slash type C/E.
+NE JAMAIS utiliser : ø (écris m7b5 si dans la palette), Δ (écris maj7 si dans la palette), m9, m13, 11, accords slash type C/E.
 
 ═══ FORMAT JSON STRICT ═══
 
