@@ -53,6 +53,8 @@ const PROTECTED_FIELDS = [
   'stats_auto_raw',
   'derniere_seance',
   'doc_id',
+  'doc_url',
+  'canaux',
   '_patchedAt',
 ];
 
@@ -450,6 +452,48 @@ export async function onRequestPatch({ params, request, env }) {
     updated.stats = stats;
     updated.sessionCount = stats.nb_cours;
     updated.progression = stats.progression_pct;
+  }
+
+  // ── Handle doc_id patch (admin édite l'URL Google Doc) ──────
+  // body.doc_id = string (ID Google Doc) | null | '' (pour supprimer le lien)
+  if (body.doc_id !== undefined) {
+    if (body.doc_id === null || body.doc_id === '') {
+      delete updated.doc_id;
+      delete updated.doc_url;
+    } else if (typeof body.doc_id !== 'string' || !/^[A-Za-z0-9_-]{20,}$/.test(body.doc_id)) {
+      return jsonResponse({ error: 'doc_id invalide (attendu : ID Google Doc, ex 1AbCdEf...)' }, 400);
+    } else {
+      updated.doc_id = body.doc_id;
+      updated.doc_url = `https://docs.google.com/document/d/${body.doc_id}/edit`;
+    }
+  }
+
+  // ── Handle canaux partial merge (telegram/discord/bonzai) ────
+  // body.canaux = { telegram?: { url?, handle? }|null, discord?: ..., bonzai?: ... }
+  // url = '' ou null → vide le lien (handle préservé sauf override)
+  if (body.canaux !== undefined) {
+    if (!body.canaux || typeof body.canaux !== 'object' || Array.isArray(body.canaux)) {
+      return jsonResponse({ error: 'canaux invalide (attendu : objet)' }, 400);
+    }
+    const existingCanaux = (existing.canaux && typeof existing.canaux === 'object') ? existing.canaux : {};
+    const merged = { ...existingCanaux };
+    for (const channel of ['telegram', 'discord', 'bonzai']) {
+      const patch = body.canaux[channel];
+      if (patch === undefined) continue;
+      if (patch === null) { delete merged[channel]; continue; }
+      if (typeof patch !== 'object' || Array.isArray(patch)) {
+        return jsonResponse({ error: `canaux.${channel} invalide` }, 400);
+      }
+      if (patch.url !== undefined && patch.url !== null && patch.url !== '') {
+        if (typeof patch.url !== 'string' || !/^https?:\/\//i.test(patch.url)) {
+          return jsonResponse({ error: `canaux.${channel}.url invalide (attendu : https://...)` }, 400);
+        }
+      }
+      const next = { ...(existingCanaux[channel] || {}), ...patch };
+      if (patch.url === '' || patch.url === null) next.url = null;
+      merged[channel] = next;
+    }
+    updated.canaux = merged;
   }
 
   // ── Backwards-compat : permet PATCH de champs libres (notes, statut, programme) ──

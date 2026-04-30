@@ -421,8 +421,12 @@ export async function onRequestPost(context) {
         // Overrides canoniques
         id: name,
         nom: capitalize(name),
-        doc_id: docId,
-        doc_url: docUrl,
+        // doc_id/doc_url : préserve l'édition admin (existing) sur le fallback (docId
+        // venant de loadDocsMap, qui lit déjà KV mais retombe sur FALLBACK_DOCS si
+        // KV vide). Belt-and-suspenders : empêche tout retour au hardcoded même
+        // en cas d'incohérence KV.
+        doc_id: existing.doc_id || docId,
+        doc_url: existing.doc_url || docUrl,
         derniere_seance: extracted.parsed,
         // Stats : bloc fusionné + bloc raw (pour reset) + override (persistant)
         stats,
