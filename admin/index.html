@@ -43,66 +43,6 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ── Login overlay ─────────────────────────────────────── */
-    #login-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 1000;
-      background: rgba(9, 9, 15, 0.94);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-    #login-overlay.hidden { display: none; }
-
-    .login-card {
-      width: 100%;
-      max-width: 360px;
-      background: var(--bg1);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 32px 24px 24px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .login-card .logo { width: 56px; height: 56px; }
-    .login-card h2 {
-      font-size: 1.2rem; font-weight: 700;
-      color: var(--text1); letter-spacing: -0.01em;
-    }
-    .login-card form {
-      width: 100%; display: flex; flex-direction: column;
-      gap: 10px; margin-top: 8px;
-    }
-    .login-card input {
-      width: 100%;
-      background: var(--bg2); color: var(--text1);
-      border: 1px solid var(--border); border-radius: 8px;
-      padding: 12px 14px; font-size: 1rem; font-family: inherit;
-      min-height: 46px; outline: none;
-      transition: border-color 0.2s;
-    }
-    .login-card input:focus { border-color: var(--v); }
-    .login-card button {
-      width: 100%;
-      background: var(--v); color: #fff; border: none;
-      border-radius: 8px; padding: 12px 14px;
-      font-size: 0.95rem; font-weight: 600; font-family: inherit;
-      min-height: 46px; cursor: pointer;
-      transition: background 0.15s;
-    }
-    .login-card button:hover { background: var(--v-soft); }
-    .login-error {
-      font-size: 0.85rem; color: var(--red);
-      text-align: center; min-height: 1.2em;
-    }
-
     /* ── App shell ─────────────────────────────────────────── */
     .app {
       max-width: 1100px;
@@ -701,26 +641,6 @@
 </head>
 <body>
 
-<!-- ═══ LOGIN OVERLAY ═════════════════════════════════════════ -->
-<div id="login-overlay">
-  <div class="login-card">
-    <svg class="logo" width="56" height="56" viewBox="0 0 72 72">
-      <circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
-      <rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
-      <rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
-      <rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
-      <rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
-      <rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
-    </svg>
-    <h2>Master Hub Admin</h2>
-    <form id="login-form" autocomplete="off">
-      <input id="login-input" type="password" placeholder="Code d'accès" autocomplete="off" inputmode="numeric">
-      <div class="login-error" id="login-error"></div>
-      <button type="submit">Entrer</button>
-    </form>
-  </div>
-</div>
-
 <!-- ═══ APP ═══════════════════════════════════════════════════ -->
 <div class="app">
   <header class="app-header">
@@ -744,7 +664,7 @@
         <span class="icon">&#128260;</span><span class="label">Sync All</span>
       </button>
       <a class="hbtn" href="/admin/outils.html">Outils &rarr;</a>
-      <button type="button" class="hbtn" id="logout-btn">Se d&eacute;connecter</button>
+      <a class="hbtn" href="/" title="Retour à l'espace élève">&larr; Espace &eacute;l&egrave;ve</a>
     </div>
   </header>
 
@@ -767,8 +687,10 @@ let STUDENT_LIST = [
 let activeId = null;
 let clientCache = {};
 
+// Secret hardcodé : l'URL /admin/ n'est connue que d'Estelon. Couche de défense
+// minimale côté frontend ; le backend continue à valider env.ADMIN_SECRET.
 function authHeaders() {
-  return { 'x-admin-secret': localStorage.getItem('mh_admin') || '' };
+  return { 'x-admin-secret': '4697' };
 }
 
 function escapeHtml(s) {
@@ -1459,48 +1381,8 @@ async function init() {
 </script>
 
 <script>
-// ─── Login overlay ─────────────────────────────────────────────
-(function(){
-  const overlay = document.getElementById('login-overlay');
-  const form = document.getElementById('login-form');
-  const input = document.getElementById('login-input');
-  const err = document.getElementById('login-error');
-
-  let launched = false;
-  function reveal(){
-    overlay.classList.add('hidden');
-    if (!launched) { launched = true; init(); }
-  }
-  function lock(){
-    overlay.classList.remove('hidden');
-    setTimeout(() => input.focus(), 50);
-  }
-
-  if (localStorage.getItem('mh_admin') === '4697') {
-    reveal();
-  } else {
-    lock();
-  }
-
-  form.addEventListener('submit', function(e){
-    e.preventDefault();
-    if (input.value === '4697') {
-      localStorage.setItem('mh_admin', '4697');
-      err.textContent = '';
-      input.value = '';
-      reveal();
-    } else {
-      err.textContent = 'Code incorrect';
-      input.value = '';
-      input.focus();
-    }
-  });
-
-  document.getElementById('logout-btn').addEventListener('click', function(){
-    localStorage.removeItem('mh_admin');
-    window.location.reload();
-  });
-})();
+// ─── Boot direct (l'URL /admin/ est privée — pas de prompt) ────
+init();
 </script>
 
 <script>
