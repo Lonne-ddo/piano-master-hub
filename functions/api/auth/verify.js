@@ -5,7 +5,7 @@
 //
 // Échecs (token absent / expiré) : redirige vers /?error=missing_token|expired.
 
-import { generateToken } from '../_lib/session.js';
+import { generateToken, isAdminEmail } from '../_lib/session.js';
 
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
@@ -36,6 +36,13 @@ export async function onRequestGet({ request, env }) {
 
   // Le magic link doit être soit admin, soit lié à un slug
   if (!data.is_admin && !data.slug) {
+    return Response.redirect(`${url.origin}/?error=expired`, 302);
+  }
+
+  // Defense-in-depth : si le magic_link était admin mais l'email a été retiré
+  // de ADMIN_EMAILS dans la fenêtre 15 min, ne pas créer de session admin.
+  if (data.is_admin && !isAdminEmail(data.email, env)) {
+    console.warn('[auth/verify] admin email removed from ADMIN_EMAILS during 15-min window:', data.email);
     return Response.redirect(`${url.origin}/?error=expired`, 302);
   }
 

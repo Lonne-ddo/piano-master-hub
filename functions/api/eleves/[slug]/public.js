@@ -3,7 +3,7 @@
 // L'élève doit être authentifié ET la session doit correspondre au slug demandé.
 // Whitelist STRICTE des champs exposés. PAS d'observations (privé coach).
 
-import { getSessionFromRequest } from '../../_lib/session.js';
+import { getSessionFromRequest, isAdminEmail } from '../../_lib/session.js';
 
 // Source primaire : KV `eleves:list`. FALLBACK_SLUGS pour dégradation gracieuse.
 const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
@@ -43,9 +43,16 @@ export async function onRequestGet({ params, request, env }) {
 
   // ── Auth : cookie session valide. Super-admin peut consulter n'importe
   //   quel slug ; un élève ne peut consulter que sa propre fiche.
+  // Defense-in-depth : revalidation isAdminEmail à chaque accès admin —
+  // gère l'offboarding pendant la fenêtre de 90j de la session.
   const session = await getSessionFromRequest(request, env);
   if (!session) return jsonResponse({ error: 'unauthorized' }, 401);
-  if (!session.is_admin && session.slug !== slug) {
+  if (session.is_admin) {
+    if (!isAdminEmail(session.email, env)) {
+      return jsonResponse({ error: 'unauthorized' }, 401);
+    }
+    // OK admin valide → bypass slug check
+  } else if (session.slug !== slug) {
     return jsonResponse({ error: 'unauthorized' }, 401);
   }
 
