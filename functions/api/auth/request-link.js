@@ -71,8 +71,11 @@ export async function onRequestPost({ request, env }) {
     }
 
     // Anti-énumération : si email inconnu, on retourne ok=true sans envoyer.
+    // Délai aléatoire 400-1500ms pour égaliser les latences (sans ce délai,
+    // la branche silent ~5ms vs valide ~300-1500ms permet du timing-attack).
     if (!foundSlug) {
       console.log('[auth/request-link] unknown_email_silent_ok');
+      await randomDelayMs(400, 1500);
       return jsonResponse({ ok: true, message: 'email_sent_if_valid' });
     }
   }
@@ -125,6 +128,13 @@ export async function onRequestPost({ request, env }) {
   }
 
   return jsonResponse({ ok: true, message: 'email_sent' });
+}
+
+// Délai async avec timing aléatoire — Workers acceptent setTimeout (await sleep
+// = idle time, pas de CPU). Distribution uniforme pour ne pas être détectable.
+function randomDelayMs(minMs, maxMs) {
+  const ms = minMs + Math.floor(Math.random() * Math.max(1, maxMs - minMs));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function buildEmailHtml(verifyUrl, slug, isAdmin) {

@@ -389,11 +389,19 @@
     // ═══ API call ═══
     function searchSong() {
         if (state.phase === 'loading') return;
-        var titre = state.search.titre.trim();
+        // Sanitize côté client (strip controls + brackets, limit length) — backend revalide
+        var titre = sanitizeText(state.search.titre, 100);
+        var artiste = sanitizeText(state.search.artiste, 50);
+        state.search.titre = titre;
+        state.search.artiste = artiste;
         if (titre.length < 2) {
-            showToast('Entre un titre (2 caractères minimum)');
+            showToast('Entre un titre (2 caractères minimum, sans crochets ni < >)');
             return;
         }
+        // Reset audio + transposition + tempo : nouveau morceau = état neutre
+        stopPlayback({ immediate: true });
+        state.transposition = 0;
+        state.tempo = 100; // sentinel : sera remplacé par r.data.bpm en succès
         state.phase = 'loading';
         renderAll();
 
@@ -437,6 +445,14 @@
             state.phase = 'search';
             renderAll();
         });
+    }
+
+    // Strip caractères de contrôle + brackets ChordPro/HTML — pareil au backend.
+    function sanitizeText(s, maxLen) {
+        if (typeof s !== 'string') return '';
+        var out = s.replace(/[\x00-\x1F\x7F\[\]{}<>]/g, '');
+        out = out.replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '');
+        return out.slice(0, maxLen);
     }
 
     function clampTempo(v) {

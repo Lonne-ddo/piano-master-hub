@@ -14,7 +14,19 @@
 //   questions: [{ asked, asked_name, given, correct: bool }, …] (10 entrées)
 // }
 
-const VALID_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
+// Source primaire : KV `eleves:list`. FALLBACK pour dégradation gracieuse.
+const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
+
+async function isValidSlug(slug, env) {
+  if (!env || !env.MASTERHUB_STUDENTS) return FALLBACK_SLUGS.includes(slug);
+  try {
+    const list = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
+    const valid = Array.isArray(list) && list.length ? list : FALLBACK_SLUGS;
+    return valid.includes(slug);
+  } catch {
+    return FALLBACK_SLUGS.includes(slug);
+  }
+}
 const VALID_MODES = ['notes', 'intervals', 'chords', 'scales', 'progressions'];
 const VALID_LEVELS = ['debutant', 'intermediaire', 'avance', 'custom'];
 
@@ -42,7 +54,7 @@ export async function onRequestPost({ request, env }) {
 
   // Validation stricte
   const slug = String(data.slug || '').toLowerCase();
-  if (!VALID_SLUGS.includes(slug)) {
+  if (!await isValidSlug(slug, env)) {
     return json({ ok: false, error: 'invalid_slug' }, 400);
   }
   if (!VALID_MODES.includes(data.mode)) {

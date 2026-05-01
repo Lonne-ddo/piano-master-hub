@@ -28,6 +28,16 @@ const NIVEAU_PALETTES = {
   avance: ['(rien)', 'm', 'dim', 'aug', 'sus2', 'sus4', '7', 'maj7', 'm7', 'm7b5', 'dim7', 'mMaj7', '6', 'm6', 'add9', '9', '13', 'm11', '7sus4', '7b9', '7#5', '7#9'],
 };
 
+// Strip caractères de contrôle + brackets ChordPro ([], {}) + tags HTML (<, >).
+// Réduit prompt injection vers le LLM et garantit que les paroles ne contiennent
+// pas de marqueurs ChordPro injectés via le titre/artiste.
+function sanitizeFreeText(s, maxLen) {
+  if (typeof s !== 'string') return '';
+  let out = s.replace(/[\x00-\x1F\x7F\[\]{}<>]/g, '');
+  out = out.replace(/\s+/g, ' ').trim();
+  return out.slice(0, maxLen);
+}
+
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -44,11 +54,13 @@ export async function onRequestPost({ request, env }) {
   try { body = await request.json(); }
   catch { return json({ error: 'invalid_json' }, 400); }
 
-  const titre = String(body.titre || '').trim();
-  if (titre.length < 2 || titre.length > 150) {
+  // Sanitize : strip caractères de contrôle + brackets ChordPro/HTML pour fermer
+  // toute fenêtre de prompt injection vers le LLM. Limites de longueur strictes.
+  const titre = sanitizeFreeText(body.titre, 100);
+  if (titre.length < 2) {
     return json({ error: 'invalid_titre' }, 400);
   }
-  const artiste = body.artiste ? String(body.artiste).trim().slice(0, 100) : '';
+  const artiste = sanitizeFreeText(body.artiste, 50);
   const genre = body.genre ? String(body.genre).trim().toLowerCase() : '';
   if (genre && !VALID_GENRES.includes(genre)) {
     return json({ error: 'invalid_genre' }, 400);
