@@ -782,6 +782,17 @@
     // ──────────────────────────────────────────────
     //  Mode super-admin — écran "Choisir un élève"
     // ──────────────────────────────────────────────
+    // Helper global pour l'onclick inline des boutons chooser admin.
+    // Dans le scope window (script non-IIFE) → accessible depuis l'onclick.
+    function adminChooserGo(slug) {
+        try {
+            window.location.assign("/" + encodeURIComponent(slug));
+        } catch (err) {
+            console.error("[admin-chooser] navigation failed:", err);
+            window.location.href = "/" + encodeURIComponent(slug);
+        }
+    }
+
     function renderAdminChooser(adminEmail) {
         var greeting = document.getElementById("greeting");
         if (greeting) greeting.innerHTML = '<p class="greeting">Connecté super-admin · ' + escapeHtml(adminEmail || '') + '</p>';
@@ -790,35 +801,22 @@
         var html = '<div class="login-section">' +
             '<h2>Choisir un élève</h2>' +
             '<p class="lead">Sélectionne la fiche à consulter.</p>' +
-            '<div class="admin-chooser-grid" id="admin-chooser-grid">';
+            '<div class="admin-chooser-grid">';
         for (var i = 0; i < slugs.length; i++) {
             var key = slugs[i];
             var disp = (ELEVES_WHITELIST[key] && ELEVES_WHITELIST[key].display) || (key.charAt(0).toUpperCase() + key.slice(1));
-            // Boutons + event delegation (au lieu de <a href> qui pouvait être bloqué
-            // par un overlay ou un default-prevented quelque part dans la chaîne).
-            html += '<button type="button" class="admin-chooser-item" data-slug="' + escapeHtml(key) + '">' +
+            // onclick inline direct (delegation abandonnée — n'a pas marché en prod).
+            // Le slug est déjà ASCII whitelist côté API, donc safe pour interpolation
+            // dans l'attribut onclick (mais on passe par encodeURIComponent côté handler).
+            var safeKey = key.replace(/[^a-z0-9_-]/gi, '');
+            html += '<button type="button" class="admin-chooser-item" ' +
+                        'onclick="adminChooserGo(\'' + safeKey + '\')">' +
                         '<span class="admin-chooser-avatar">' + escapeHtml(disp.charAt(0)) + '</span>' +
                         '<span class="admin-chooser-name">' + escapeHtml(disp) + '</span>' +
                     '</button>';
         }
         html += '</div></div>';
         content.innerHTML = html;
-
-        var grid = document.getElementById("admin-chooser-grid");
-        if (grid) {
-            grid.addEventListener("click", function(e) {
-                var btn = e.target.closest("button[data-slug]");
-                if (!btn) return;
-                var slug = btn.getAttribute("data-slug");
-                if (!slug) return;
-                try {
-                    window.location.assign("/" + encodeURIComponent(slug));
-                } catch (err) {
-                    console.error("[admin-chooser] navigation failed:", err);
-                    window.location.href = "/" + encodeURIComponent(slug);
-                }
-            });
-        }
 
         var footer = document.getElementById("footer");
         if (footer) {
