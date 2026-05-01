@@ -383,7 +383,12 @@
             background: var(--bg);
             border: 1px solid rgba(255,255,255,0.1);
             border-radius: 12px;
-            text-decoration: none; color: var(--text);
+            text-decoration: none;
+            color: var(--text);
+            font-family: inherit;
+            font-size: inherit;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
             transition: border-color 0.2s, transform 0.15s, background 0.2s;
             min-height: 96px;
         }
@@ -785,17 +790,35 @@
         var html = '<div class="login-section">' +
             '<h2>Choisir un élève</h2>' +
             '<p class="lead">Sélectionne la fiche à consulter.</p>' +
-            '<div class="admin-chooser-grid">';
+            '<div class="admin-chooser-grid" id="admin-chooser-grid">';
         for (var i = 0; i < slugs.length; i++) {
             var key = slugs[i];
             var disp = (ELEVES_WHITELIST[key] && ELEVES_WHITELIST[key].display) || (key.charAt(0).toUpperCase() + key.slice(1));
-            html += '<a class="admin-chooser-item" href="/' + encodeURIComponent(key) + '">' +
+            // Boutons + event delegation (au lieu de <a href> qui pouvait être bloqué
+            // par un overlay ou un default-prevented quelque part dans la chaîne).
+            html += '<button type="button" class="admin-chooser-item" data-slug="' + escapeHtml(key) + '">' +
                         '<span class="admin-chooser-avatar">' + escapeHtml(disp.charAt(0)) + '</span>' +
                         '<span class="admin-chooser-name">' + escapeHtml(disp) + '</span>' +
-                    '</a>';
+                    '</button>';
         }
         html += '</div></div>';
         content.innerHTML = html;
+
+        var grid = document.getElementById("admin-chooser-grid");
+        if (grid) {
+            grid.addEventListener("click", function(e) {
+                var btn = e.target.closest("button[data-slug]");
+                if (!btn) return;
+                var slug = btn.getAttribute("data-slug");
+                if (!slug) return;
+                try {
+                    window.location.assign("/" + encodeURIComponent(slug));
+                } catch (err) {
+                    console.error("[admin-chooser] navigation failed:", err);
+                    window.location.href = "/" + encodeURIComponent(slug);
+                }
+            });
+        }
 
         var footer = document.getElementById("footer");
         if (footer) {
