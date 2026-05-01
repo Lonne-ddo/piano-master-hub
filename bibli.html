@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Master Hub — Bibliothèque musicale</title>
+    <meta name="theme-color" content="#0f0f14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="Bibliothèque musicale : paroles + accords ChordPro avec lecture audio block et transpose.">
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/tone@14.7.77/build/Tone.js"></script>
+    <style>
+        :root {
+            --bg: #0f0f14;
+            --bg-card: #1a1a24;
+            --bg-card-hover: #22222f;
+            --text: #eee;
+            --text-muted: #888;
+            --text-faint: #666;
+            --v: #8B6FE8;
+            --v-light: #a48ff0;
+            --v-soft: rgba(139, 111, 232, 0.08);
+            --v-soft-stronger: rgba(139, 111, 232, 0.15);
+            --v-border: rgba(139, 111, 232, 0.3);
+            --green: #3dd68c;
+            --red:   #e85a5a;
+            --radius: 16px;
+            --tap-min: 44px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh; min-height: 100dvh;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow-x: hidden;
+        }
+        #bg-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .container {
+            position: relative; z-index: 1;
+            max-width: 900px; margin: 0 auto;
+            padding: 12px 14px 24px;
+            display: flex; flex-direction: column;
+            min-height: 100vh; min-height: 100dvh;
+        }
+
+        /* ── Top bar (back + volume) ────────────────────────────── */
+        .top-bar { display: flex; align-items: center; gap: 10px; padding: 4px 0 8px; }
+        .back-link {
+            color: var(--text-muted); font-size: 1.1rem; text-decoration: none;
+            min-width: 40px; min-height: 40px;
+            display: inline-flex; align-items: center; justify-content: center;
+            border-radius: 10px; flex-shrink: 0;
+        }
+        .back-link:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+        .volume-bar {
+            flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+        }
+        .volume-bar .volume-icon { font-size: 0.95rem; line-height: 1; flex-shrink: 0; }
+        .volume-bar input[type="range"] { flex: 1; min-width: 0; accent-color: var(--v); cursor: pointer; }
+        .volume-bar .volume-value {
+            font-family: 'DM Mono', ui-monospace, monospace;
+            color: var(--text-muted); min-width: 38px; text-align: right;
+            font-size: 0.78rem; flex-shrink: 0;
+        }
+
+        .header { text-align: center; padding: 6px 0 2px; }
+        .header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+        .header .subtitle { font-size: 0.85rem; color: var(--text-muted); margin-top: 4px; }
+
+        .section-label {
+            font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em;
+            color: var(--text-faint); text-transform: uppercase; margin-bottom: 8px;
+        }
+
+        /* ═══ PHASE 1 — Recherche ═══════════════════════════════ */
+        .search-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 18px 16px;
+            margin-top: 14px;
+            display: flex; flex-direction: column; gap: 14px;
+        }
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        .field label {
+            font-size: 0.72rem; font-weight: 600; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.08em;
+        }
+        .field input[type="text"], .field select {
+            width: 100%; padding: 12px 14px;
+            background: var(--bg); color: var(--text);
+            border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px;
+            font-size: 0.95rem; font-family: inherit; min-height: var(--tap-min);
+            outline: none; transition: border-color 0.2s;
+        }
+        .field input[type="text"]:focus, .field select:focus { border-color: var(--v); }
+        .niveau-pills {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+        }
+        .niveau-pill {
+            padding: 12px 8px;
+            background: var(--bg);
+            color: var(--text-muted);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            font-family: inherit; font-size: 0.85rem; font-weight: 500;
+            cursor: pointer; min-height: var(--tap-min);
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .niveau-pill:hover { background: var(--bg-card-hover); }
+        .niveau-pill.active {
+            background: var(--v-soft-stronger); color: var(--v); border-color: var(--v);
+        }
+        .btn-primary {
+            width: 100%; padding: 16px;
+            background: var(--v); color: #fff;
+            border: none; border-radius: 12px;
+            font-family: inherit; font-size: 1rem; font-weight: 600;
+            cursor: pointer; min-height: var(--tap-min);
+            transition: opacity 0.2s, transform 0.15s;
+        }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary:not(:disabled):active { transform: scale(0.98); }
+        .btn-primary.loading { opacity: 0.7; cursor: wait; }
+
+        .suggestions {
+            margin-top: 18px;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .suggestion-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .suggestion-chip {
+            padding: 8px 12px;
+            background: var(--bg);
+            color: var(--text-muted);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 999px;
+            font-family: inherit; font-size: 0.78rem; font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .suggestion-chip:hover {
+            background: var(--v-soft-stronger);
+            color: var(--v); border-color: var(--v-border);
+        }
+
+        /* ═══ PHASE 2 — Résultats ═══════════════════════════════ */
+        .result-head {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-top: 14px;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .result-head .titre {
+            font-size: 1.25rem; font-weight: 700; color: #fff;
+        }
+        .result-head .artiste {
+            font-size: 0.95rem; color: var(--text-muted);
+        }
+        .result-head .meta {
+            display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px;
+            font-size: 0.78rem; color: var(--v-light);
+            font-family: 'DM Mono', ui-monospace, monospace;
+        }
+        .result-head .meta span { padding: 2px 8px; background: var(--v-soft); border-radius: 6px; }
+
+        .toolbar {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 12px;
+            margin-top: 10px;
+            display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+        }
+        .toolbar .tool-row {
+            display: flex; align-items: center; gap: 8px;
+            flex: 1 1 auto; min-width: 0;
+        }
+        .toolbar .tempo-row { min-width: 200px; }
+        .toolbar input[type="range"] { flex: 1; min-width: 80px; accent-color: var(--v); }
+        .toolbar .tempo-value, .toolbar .transpose-value {
+            font-family: 'DM Mono', monospace; color: var(--v);
+            font-size: 0.85rem; font-weight: 600; min-width: 56px; text-align: right;
+        }
+        .btn-secondary {
+            padding: 8px 14px;
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 8px;
+            font-family: inherit; font-size: 0.82rem; font-weight: 500;
+            cursor: pointer; min-height: 36px;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .btn-secondary:hover { background: var(--bg-card-hover); border-color: var(--v-border); color: var(--v); }
+        .btn-secondary.is-playing { background: var(--v); color: #fff; border-color: var(--v); }
+        .btn-secondary[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+        .transpose-row { display: flex; align-items: center; gap: 4px; }
+        .btn-transpose {
+            width: 36px; height: 36px;
+            background: var(--bg); color: var(--text);
+            border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+            font-size: 1rem; cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .btn-transpose:hover { background: var(--bg-card-hover); border-color: var(--v-border); color: var(--v); }
+
+        /* ═══ ChordPro rendering ═══════════════════════════════ */
+        .sections-wrap { margin-top: 14px; display: flex; flex-direction: column; gap: 16px; }
+        .section-block {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 16px;
+        }
+        .section-label-prog {
+            font-size: 0.78rem; font-weight: 700;
+            color: var(--v); letter-spacing: 0.06em;
+            margin-bottom: 12px; text-transform: uppercase;
+        }
+        .cp-line {
+            margin-bottom: 6px;
+            font-family: 'DM Mono', ui-monospace, monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.4;
+            overflow-x: auto;
+            scrollbar-width: thin;
+        }
+        .cp-chords {
+            color: var(--v);
+            font-weight: 700;
+            font-size: 0.86rem;
+            min-height: 18px;
+            white-space: pre;
+        }
+        .cp-chords .chord-tok {
+            display: inline-block;
+            padding: 0 1px;
+            border-radius: 3px;
+            transition: background 0.1s;
+        }
+        .cp-chords .chord-tok.is-playing {
+            background: var(--v); color: #fff;
+            box-shadow: 0 0 0 2px var(--v);
+        }
+        .cp-lyrics {
+            color: var(--text);
+            font-size: 0.92rem;
+            white-space: pre;
+            line-height: 1.4;
+        }
+
+        /* ═══ États (loading, not found) ═══════════════════════════════ */
+        .state-card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 28px 16px;
+            margin-top: 14px;
+            text-align: center;
+            display: flex; flex-direction: column; gap: 12px; align-items: center;
+        }
+        .state-card .icon { font-size: 2rem; opacity: 0.6; }
+        .state-card .msg { font-size: 0.95rem; color: var(--text); line-height: 1.45; }
+        .state-card .sub { font-size: 0.82rem; color: var(--text-muted); }
+        .spinner {
+            width: 28px; height: 28px;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-top-color: var(--v);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ═══ Toast ═══════════════════════════════════════════════ */
+        .toast {
+            position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+            background: rgba(15,15,20,0.95);
+            backdrop-filter: blur(12px);
+            color: var(--text); padding: 10px 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px; font-size: 0.85rem;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.25s, transform 0.25s;
+            z-index: 200; max-width: 90vw;
+            font-family: inherit;
+        }
+        .toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+
+        @media (max-width: 480px) {
+            .header h1 { font-size: 1.2rem; }
+            .header .subtitle { font-size: 0.78rem; }
+            .search-card, .result-head, .section-block { padding: 14px 12px; }
+            .cp-chords { font-size: 0.78rem; }
+            .cp-lyrics { font-size: 0.85rem; }
+            .niveau-pill { padding: 10px 4px; font-size: 0.78rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div class="container">
+
+        <header class="top-bar">
+            <a href="#" class="back-link" id="back-link" aria-label="Retour">&larr;</a>
+            <div class="volume-bar">
+                <span class="volume-icon">🔊</span>
+                <input type="range" id="volume-slider" min="0" max="100" step="1" value="70" aria-label="Volume" />
+                <span class="volume-value" id="volume-value">70%</span>
+            </div>
+        </header>
+
+        <header class="header" id="page-header">
+            <h1 id="page-title">Bibliothèque musicale</h1>
+            <p class="subtitle" id="page-subtitle">Trouve un morceau, joue les accords</p>
+        </header>
+
+        <main id="main-area">
+            <!-- Rendu dynamique : phase = search | loading | results | not-found -->
+        </main>
+
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="/mh-music-theory.js"></script>
+    <script src="/bibli.js"></script>
+
+    <script>
+    (function () {
+        var canvas = document.getElementById("bg-canvas");
+        var ctx = canvas.getContext("2d");
+        var particles = [];
+        var COUNT = 18;
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener("resize", resize);
+        resize();
+        function createParticle() {
+            var w = 6 + Math.random() * 4;
+            var h = 18 + Math.random() * 10;
+            return {
+                x: Math.random() * canvas.width,
+                y: canvas.height + h,
+                w: w, h: h, r: 2,
+                speed: 0.15 + Math.random() * 0.35,
+                opacity: 0.04 + Math.random() * 0.04,
+                drift: (Math.random() - 0.5) * 0.3
+            };
+        }
+        for (var i = 0; i < COUNT; i++) { var p = createParticle(); p.y = Math.random() * canvas.height; particles.push(p); }
+        function drawRoundRect(x, y, w, h, r, alpha) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
+        }
+        var rafId = null;
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < particles.length; i++) {
+                var p = particles[i];
+                p.y -= p.speed;
+                p.x += p.drift;
+                drawRoundRect(p.x, p.y, p.w, p.h, p.r, p.opacity);
+                if (p.y + p.h < 0) particles[i] = createParticle();
+            }
+            rafId = requestAnimationFrame(animate);
+        }
+        animate();
+        var stopAnim = function () {
+            if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+            window.removeEventListener("resize", resize);
+        };
+        window.addEventListener("beforeunload", stopAnim);
+        window.addEventListener("pagehide", stopAnim);
+    })();
+    </script>
+
+    <script src="/nav-outils.js" data-active="bibli"></script>
+
+</body>
+</html>
