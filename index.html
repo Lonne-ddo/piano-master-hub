@@ -739,27 +739,50 @@
 
         var pathMatch = window.location.pathname.match(/^\/([^\/]+)\/?$/);
         var pathSlug = pathMatch ? normalize(pathMatch[1]) : null;
-        var eleve = pathSlug ? findEleveBySlug(pathSlug) : null;
 
-        if (eleve) {
-            // L'URL contient un slug — on rend la coquille puis fetchDashboardData
-            // gère le 401 → renderLoginEmail si pas de cookie valide.
-            localStorage.setItem("eleve_slug", eleve.slug);
-            renderEspaceEleve(eleve);
-            return;
-        }
-
-        // Pas de slug dans l'URL → check whoami
+        // Routing déterministe basé sur whoami AVANT tout rendu :
+        //   - admin + pathSlug    → renderEspaceEleve (fiche du slug demandé)
+        //   - admin + sans slug   → renderAdminChooser
+        //   - élève + slug match  → renderEspaceEleve (sa fiche)
+        //   - élève + slug autre  → redirect vers /{son slug} (sécurité)
+        //   - élève + sans slug   → redirect vers /{son slug}
+        //   - pas auth + slug     → renderLoginEmail (URL préservée)
+        //   - pas auth + sans slug → renderLoginEmail
         fetch("/api/auth/whoami", { credentials: "include" })
             .then(function(r) { return r.ok ? r.json() : null; })
             .then(function(j) {
-                if (j && j.ok && j.is_admin) {
-                    renderAdminChooser(j.email);
-                } else if (j && j.ok && j.slug) {
-                    window.location.href = "/" + j.slug;
-                } else {
-                    renderLoginEmail(initialError);
+                var authed = j && j.ok;
+                if (authed && j.is_admin) {
+                    if (pathSlug) {
+                        var eleve = findEleveBySlug(pathSlug)
+                            || { slug: pathSlug, display: pathSlug.charAt(0).toUpperCase() + pathSlug.slice(1) };
+                        localStorage.setItem("eleve_slug", eleve.slug);
+                        renderEspaceEleve(eleve);
+                    } else {
+                        renderAdminChooser(j.email);
+                    }
+                    return;
                 }
+                if (authed && j.slug) {
+                    if (pathSlug && pathSlug === j.slug) {
+                        var meEleve = findEleveBySlug(j.slug)
+                            || { slug: j.slug, display: j.slug.charAt(0).toUpperCase() + j.slug.slice(1) };
+                        localStorage.setItem("eleve_slug", meEleve.slug);
+                        renderEspaceEleve(meEleve);
+                    } else {
+                        // pathSlug absent OU slug ne matche pas → redirect vers sa propre fiche
+                        if (window.location.pathname !== "/" + j.slug) {
+                            window.location.replace("/" + j.slug);
+                        } else {
+                            var meEleve2 = findEleveBySlug(j.slug)
+                                || { slug: j.slug, display: j.slug.charAt(0).toUpperCase() + j.slug.slice(1) };
+                            renderEspaceEleve(meEleve2);
+                        }
+                    }
+                    return;
+                }
+                // Non authentifié — afficher login (URL préservée si /japhet)
+                renderLoginEmail(initialError);
             })
             .catch(function() { renderLoginEmail(initialError); });
     }
