@@ -249,8 +249,8 @@
             transform: rotate(180deg);
         }
 
-        /* Prénom input (élève non identifié) */
-        .prenom-section {
+        /* Écran login (email magic link — Chantier C) */
+        .login-section {
             width: 100%;
             margin-top: 28px;
             background: var(--bg-card);
@@ -259,26 +259,37 @@
             padding: 24px 20px;
         }
 
-        .prenom-section h2 {
+        .login-section h2 {
             font-size: 1.1rem;
             font-weight: 600;
             color: #fff;
             margin-bottom: 6px;
         }
 
-        .prenom-section .lead {
+        .login-section .lead {
             font-size: 0.88rem;
             color: var(--text-muted);
             margin-bottom: 18px;
         }
 
-        .prenom-form {
+        .login-error-msg {
+            background: rgba(255, 107, 107, 0.08);
+            border: 1px solid rgba(255, 107, 107, 0.25);
+            color: #ff8a8a;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 14px;
+            line-height: 1.4;
+        }
+
+        .login-form {
             display: flex;
             flex-direction: column;
             gap: 12px;
         }
 
-        .prenom-input {
+        .login-input {
             width: 100%;
             padding: 14px 16px;
             background: var(--bg);
@@ -291,11 +302,15 @@
             transition: border-color 0.2s;
         }
 
-        .prenom-input:focus {
+        .login-input:focus {
             border-color: var(--accent);
         }
 
-        .prenom-submit {
+        .login-input:disabled {
+            opacity: 0.6;
+        }
+
+        .login-submit {
             width: 100%;
             padding: 14px 16px;
             background: var(--accent);
@@ -310,17 +325,47 @@
             transition: opacity 0.2s, transform 0.15s;
         }
 
-        .prenom-submit:active {
+        .login-submit:active {
             transform: scale(0.97);
             opacity: 0.85;
         }
 
-        .prenom-error {
-            color: #ff6b6b;
-            font-size: 0.82rem;
-            margin-top: 4px;
-            min-height: 1em;
+        .login-submit[disabled] {
+            opacity: 0.6;
+            cursor: wait;
         }
+
+        .login-status {
+            font-size: 0.88rem;
+            margin-top: 14px;
+            min-height: 1em;
+            line-height: 1.45;
+        }
+
+        .login-status.ok {
+            color: #5ecb8b;
+            background: rgba(94, 203, 139, 0.08);
+            border: 1px solid rgba(94, 203, 139, 0.25);
+            padding: 12px 14px;
+            border-radius: 8px;
+        }
+
+        .login-status.err {
+            color: #ff8a8a;
+        }
+
+        .login-help {
+            margin-top: 18px;
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        .login-help a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .login-help a:hover { text-decoration: underline; }
 
         /* Footer "Changer de profil" */
         .footer-actions {
@@ -600,20 +645,6 @@
         return { slug: key, display: ELEVES_WHITELIST[key].display };
     }
 
-    function findEleveByName(name) {
-        var norm = normalize(name);
-        if (!norm) return null;
-        for (var slug in ELEVES_WHITELIST) {
-            var aliases = ELEVES_WHITELIST[slug].aliases || [];
-            for (var i = 0; i < aliases.length; i++) {
-                if (normalize(aliases[i]) === norm) {
-                    return { slug: slug, display: ELEVES_WHITELIST[slug].display };
-                }
-            }
-        }
-        return null;
-    }
-
     function escapeHtml(str) {
         var d = document.createElement("div");
         d.textContent = str;
@@ -631,24 +662,42 @@
     };
 
     // ──────────────────────────────────────────────
-    //  Init — fetch /api/eleves (KV) puis détection slug par URL / localStorage
+    //  Init — auth magic link (Chantier C)
+    //  Si URL = /{slug} → fetch /api/eleves/{slug}/public avec cookie
+    //                      → 200 = render dashboard ; 401 = écran login
+    //  Si URL = / → check whoami → si auth, redirect /{slug} ; sinon écran login
     // ──────────────────────────────────────────────
     function runInit() {
+        // Lecture des params (?error=expired|missing_token|...) puis nettoyage URL.
+        var params = new URLSearchParams(window.location.search);
+        var initialError = params.get("error");
+        if (initialError) {
+            history.replaceState(null, "", window.location.pathname);
+        }
+
         var pathMatch = window.location.pathname.match(/^\/([^\/]+)\/?$/);
         var pathSlug = pathMatch ? normalize(pathMatch[1]) : null;
         var eleve = pathSlug ? findEleveBySlug(pathSlug) : null;
 
-        if (!eleve) {
-            var stored = localStorage.getItem("eleve_slug");
-            if (stored) eleve = findEleveBySlug(stored);
-        }
-
         if (eleve) {
+            // L'URL contient un slug — on rend la coquille puis fetchDashboardData
+            // gère le 401 → renderLoginEmail si pas de cookie valide.
             localStorage.setItem("eleve_slug", eleve.slug);
             renderEspaceEleve(eleve);
-        } else {
-            renderPrenomInput();
+            return;
         }
+
+        // Pas de slug dans l'URL → check whoami
+        fetch("/api/auth/whoami", { credentials: "include" })
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(j) {
+                if (j && j.ok && j.slug) {
+                    window.location.href = "/" + j.slug;
+                } else {
+                    renderLoginEmail(initialError);
+                }
+            })
+            .catch(function() { renderLoginEmail(initialError); });
     }
 
     // Source de vérité : /api/eleves (KV eleves:list). Fallback ELEVES_WHITELIST
@@ -667,35 +716,82 @@
     }).catch(function() { /* fallback hardcodé */ }).then(runInit, runInit);
 
     // ──────────────────────────────────────────────
-    //  Mode 1 — élève non identifié : input prénom
+    //  Mode 1 — élève non identifié : login email (magic link)
     // ──────────────────────────────────────────────
-    function renderPrenomInput() {
+    function renderLoginEmail(error) {
+        var greeting = document.getElementById("greeting");
+        if (greeting) greeting.innerHTML = '';
+        var footer = document.getElementById("footer");
+        if (footer) footer.innerHTML = '';
+
+        var errorMsg = '';
+        if (error === 'expired') errorMsg = 'Le lien a expiré. Demande un nouveau lien ci-dessous.';
+        else if (error === 'missing_token') errorMsg = 'Lien invalide. Demande un nouveau lien ci-dessous.';
+        else if (error === 'kv_error') errorMsg = 'Erreur temporaire. Réessaie dans un instant.';
+
         var content = document.getElementById("content");
         content.innerHTML =
-            '<div class="prenom-section">' +
+            '<div class="login-section">' +
                 '<h2>Bienvenue</h2>' +
-                '<p class="lead">Entre ton prénom pour accéder à ton espace.</p>' +
-                '<form class="prenom-form" id="prenom-form" autocomplete="off">' +
-                    '<input type="text" class="prenom-input" id="prenom-input" placeholder="Ton prénom" autocapitalize="words" autocomplete="given-name" />' +
-                    '<button type="submit" class="prenom-submit">Entrer</button>' +
-                    '<div class="prenom-error" id="prenom-error"></div>' +
+                '<p class="lead">Entre ton email pour recevoir ton lien de connexion.</p>' +
+                (errorMsg ? '<div class="login-error-msg">' + escapeHtml(errorMsg) + '</div>' : '') +
+                '<form class="login-form" id="login-form" autocomplete="on">' +
+                    '<input type="email" class="login-input" id="login-input" placeholder="ton@email.com" autocomplete="email" required />' +
+                    '<button type="submit" class="login-submit" id="login-submit">Recevoir mon lien</button>' +
                 '</form>' +
+                '<div class="login-status" id="login-status"></div>' +
+                '<p class="login-help">Pas encore inscrit ? <a href="https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master" target="_blank" rel="noopener noreferrer">Découvrir Piano Master</a></p>' +
             '</div>';
 
-        var form = document.getElementById("prenom-form");
-        var input = document.getElementById("prenom-input");
-        var errorBox = document.getElementById("prenom-error");
+        var form = document.getElementById("login-form");
+        var input = document.getElementById("login-input");
+        var btn = document.getElementById("login-submit");
+        var status = document.getElementById("login-status");
 
         form.addEventListener("submit", function(e) {
             e.preventDefault();
-            errorBox.textContent = "";
-            var match = findEleveByName(input.value);
-            if (!match) {
-                errorBox.textContent = "Prénom inconnu. Vérifie l'orthographe.";
+            status.textContent = '';
+            status.className = 'login-status';
+            var email = (input.value || '').trim().toLowerCase();
+            if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                status.textContent = 'Email invalide.';
+                status.className = 'login-status err';
                 return;
             }
-            localStorage.setItem("eleve_slug", match.slug);
-            window.location.href = "/" + match.slug;
+            btn.disabled = true;
+            btn.textContent = 'Envoi…';
+            fetch('/api/auth/request-link', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email })
+            })
+            .then(function(r) {
+                return r.json().catch(function() { return {}; }).then(function(j) {
+                    return { ok: r.ok, data: j, status: r.status };
+                });
+            })
+            .then(function(res) {
+                if (res.ok && res.data && res.data.ok) {
+                    input.disabled = true;
+                    btn.style.display = 'none';
+                    status.innerHTML = '📧 Email envoyé ! Vérifie ta boîte de réception. Le lien expire dans 15 minutes.';
+                    status.className = 'login-status ok';
+                } else {
+                    var msg = (res.data && res.data.error === 'invalid_email')
+                        ? 'Email invalide.'
+                        : 'Erreur d\'envoi. Réessaie plus tard.';
+                    status.textContent = msg;
+                    status.className = 'login-status err';
+                    btn.disabled = false;
+                    btn.textContent = 'Recevoir mon lien';
+                }
+            })
+            .catch(function() {
+                status.textContent = 'Erreur réseau. Réessaie plus tard.';
+                status.className = 'login-status err';
+                btn.disabled = false;
+                btn.textContent = 'Recevoir mon lien';
+            });
         });
 
         setTimeout(function() { try { input.focus(); } catch (e) {} }, 200);
@@ -746,8 +842,13 @@
     }
 
     function fetchDashboardData(eleve) {
-        fetch('/api/eleves/' + eleve.slug + '/public', { credentials: 'omit' })
+        fetch('/api/eleves/' + eleve.slug + '/public', { credentials: 'include' })
             .then(function(r) {
+                if (r.status === 401) {
+                    var err = new Error('unauthorized');
+                    err.unauthorized = true;
+                    throw err;
+                }
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.json();
             })
@@ -757,6 +858,10 @@
                 renderResume(data && data.derniere_seance, data && data.doc_url);
             })
             .catch(function(e) {
+                if (e && e.unauthorized) {
+                    renderLoginEmail('expired');
+                    return;
+                }
                 console.error('[espace] fetch failed:', e && e.message ? e.message : e);
                 document.getElementById("programme-zone").innerHTML = '';
                 document.getElementById("devoirs-zone").innerHTML =
@@ -932,11 +1037,16 @@
         var footer = document.getElementById("footer");
         footer.innerHTML =
             '<div class="footer-actions">' +
-                '<button type="button" id="change-profile-btn">Changer de profil</button>' +
+                '<button type="button" id="logout-btn">Se déconnecter</button>' +
             '</div>';
-        document.getElementById("change-profile-btn").addEventListener("click", function() {
-            localStorage.removeItem("eleve_slug");
-            window.location.href = "/";
+        document.getElementById("logout-btn").addEventListener("click", function() {
+            // Logout best-effort : on supprime la session côté serveur puis on rentre.
+            fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+                .catch(function() { /* best effort */ })
+                .then(function() {
+                    localStorage.removeItem("eleve_slug");
+                    window.location.href = "/";
+                });
         });
     }
 

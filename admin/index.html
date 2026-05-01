@@ -1056,6 +1056,23 @@ function renderProfile(s) {
               </button>
             `}
           </div>
+          <!-- Email (éditable, pour magic link auth) -->
+          <div data-row="email">
+            ${s.email ? `
+              <div class="link-item editable" data-channel="email">
+                <div class="link-icon" style="background:#5ecb8b1a;">📧</div>
+                <div class="link-info">
+                  <div class="link-name">Email (magic link)</div>
+                  <div class="link-sub">${escapeHtml(s.email)}</div>
+                </div>
+                <button type="button" class="link-edit-btn" onclick="editChannel('${s.id}','email')" title="Éditer l'email">✏️</button>
+              </div>
+            ` : `
+              <button type="button" class="link-add" onclick="editChannel('${s.id}','email')">
+                <span style="font-size:14px;">📧</span> + Ajouter Email (magic link)
+              </button>
+            `}
+          </div>
         </div>
       </div>
     </div>
@@ -1307,16 +1324,20 @@ function editChannel(studentId, channel) {
   const placeholders = {
     doc: 'https://docs.google.com/document/d/...',
     telegram: 'https://t.me/handle',
+    email: 'eleve@email.com',
   };
-  const currentUrl = (channel === 'doc')
+  const currentValue = (channel === 'doc')
     ? (data.doc_url || (data.doc_id ? `https://docs.google.com/document/d/${data.doc_id}/edit` : ''))
-    : (data.canaux?.[channel]?.url || '');
+    : (channel === 'email')
+      ? (data.email || '')
+      : (data.canaux?.[channel]?.url || '');
+  const inputType = channel === 'email' ? 'email' : 'url';
 
   const originalHtml = wrap.innerHTML;
 
   wrap.innerHTML = `
     <div class="link-edit-row">
-      <input type="url" placeholder="${escapeHtml(placeholders[channel] || 'https://')}" value="${escapeHtml(currentUrl)}" />
+      <input type="${inputType}" placeholder="${escapeHtml(placeholders[channel] || 'https://')}" value="${escapeHtml(currentValue)}" />
       <div class="err"></div>
       <div class="actions">
         <button type="button" class="cancel">Annuler</button>
@@ -1362,6 +1383,16 @@ function editChannel(studentId, channel) {
         const handle = tgm ? tgm[1] : (data.canaux?.telegram?.handle || '');
         body = { canaux: { telegram: { url: raw, handle: handle } } };
       }
+    } else if (channel === 'email') {
+      if (raw === '') {
+        body = { email: null };
+      } else {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
+          showErr('Email invalide');
+          return;
+        }
+        body = { email: raw.toLowerCase() };
+      }
     } else {
       cancel(); return;
     }
@@ -1385,7 +1416,11 @@ function editChannel(studentId, channel) {
         renderProfile(fresh);
         window.scrollTo(0, scrollY);
       }
-      showToast(channel === 'doc' ? 'Lien Google Doc mis à jour ✓' : 'Telegram mis à jour ✓');
+      showToast(
+        channel === 'doc' ? 'Lien Google Doc mis à jour ✓' :
+        channel === 'email' ? 'Email mis à jour ✓' :
+        'Telegram mis à jour ✓'
+      );
     } catch (e) {
       saveBtn.disabled = false; cancelBtn.disabled = false;
       showErr('Erreur : ' + (e.message || 'inconnue'));

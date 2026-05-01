@@ -55,6 +55,7 @@ const PROTECTED_FIELDS = [
   'doc_id',
   'doc_url',
   'canaux',
+  'email',
   '_patchedAt',
 ];
 
@@ -494,6 +495,18 @@ export async function onRequestPatch({ params, request, env }) {
       merged[channel] = next;
     }
     updated.canaux = merged;
+  }
+
+  // ── Handle email patch (admin saisit l'email pour le magic link) ─
+  // body.email = string | null | '' (pour supprimer)
+  if (body.email !== undefined) {
+    if (body.email === null || body.email === '') {
+      delete updated.email;
+    } else if (typeof body.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.email).trim())) {
+      return jsonResponse({ error: 'email invalide' }, 400);
+    } else {
+      updated.email = String(body.email).trim().toLowerCase();
+    }
   }
 
   // ── Backwards-compat : permet PATCH de champs libres (notes, statut, programme) ──

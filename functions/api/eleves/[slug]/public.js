@@ -1,7 +1,9 @@
 // ─── GET /api/eleves/{slug}/public ──────────────────────────────
-// Endpoint PUBLIC (pas d'auth) consommé par /index.html dashboard élève.
+// Endpoint protégé par cookie de session `mh_session` (Chantier C — magic link).
+// L'élève doit être authentifié ET la session doit correspondre au slug demandé.
 // Whitelist STRICTE des champs exposés. PAS d'observations (privé coach).
-// Whitelist des 4 slugs autorisés.
+
+import { getSessionFromRequest } from '../../_lib/session.js';
 
 // Source primaire : KV `eleves:list`. FALLBACK_SLUGS pour dégradation gracieuse.
 const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
@@ -33,10 +35,16 @@ export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
-export async function onRequestGet({ params, env }) {
+export async function onRequestGet({ params, request, env }) {
   const slug = String(params.slug || '').toLowerCase();
   if (!await isValidSlug(slug, env)) {
     return jsonResponse({ error: 'invalid_slug' }, 400);
+  }
+
+  // ── Auth : cookie session valide + slug match ──
+  const session = await getSessionFromRequest(request, env);
+  if (!session || session.slug !== slug) {
+    return jsonResponse({ error: 'unauthorized' }, 401);
   }
 
   let data = null;
