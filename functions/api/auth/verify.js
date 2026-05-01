@@ -34,20 +34,29 @@ export async function onRequestGet({ request, env }) {
   try { await env.MASTERHUB_STUDENTS.delete(`magic_link:${token}`); }
   catch (e) { console.error('[auth/verify] KV delete (non-fatal):', e?.message || e); }
 
-  if (!data.slug) {
+  // Le magic link doit être soit admin, soit lié à un slug
+  if (!data.is_admin && !data.slug) {
     return Response.redirect(`${url.origin}/?error=expired`, 302);
   }
 
-  // Création de la session 90j
+  // Création de la session 90j (admin = pas de slug)
   const sessionToken = generateToken(48);
   const ua = request.headers.get('user-agent') || 'unknown';
-  const sessionData = {
-    slug: data.slug,
-    email: data.email || null,
-    createdAt: Date.now(),
-    lastSeenAt: Date.now(),
-    ua: String(ua).slice(0, 200),
-  };
+  const sessionData = data.is_admin
+    ? {
+        is_admin: true,
+        email: data.email || null,
+        createdAt: Date.now(),
+        lastSeenAt: Date.now(),
+        ua: String(ua).slice(0, 200),
+      }
+    : {
+        slug: data.slug,
+        email: data.email || null,
+        createdAt: Date.now(),
+        lastSeenAt: Date.now(),
+        ua: String(ua).slice(0, 200),
+      };
   const ninetyDaysSec = 90 * 24 * 60 * 60;
   try {
     await env.MASTERHUB_STUDENTS.put(
@@ -65,7 +74,8 @@ export async function onRequestGet({ request, env }) {
   return new Response(null, {
     status: 302,
     headers: {
-      'Location': `${url.origin}/${data.slug}`,
+      // Admin → atterrit sur / (écran "Choisir un élève") ; élève → /{slug}
+      'Location': data.is_admin ? `${url.origin}/` : `${url.origin}/${data.slug}`,
       'Set-Cookie': cookie,
     },
   });

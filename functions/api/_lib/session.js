@@ -24,6 +24,19 @@ export async function getSessionFromRequest(request, env) {
   }
 }
 
+// Vérifie si un email appartient à la whitelist super-admin (env var
+// ADMIN_EMAILS, CSV insensible à la casse). Retourne false si var absente.
+export function isAdminEmail(email, env) {
+  if (!email || !env || !env.ADMIN_EMAILS) return false;
+  const norm = String(email).trim().toLowerCase();
+  if (!norm) return false;
+  return String(env.ADMIN_EMAILS)
+    .split(',')
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(norm);
+}
+
 // Génère un token random base64url (32 ou 48 bytes selon usage).
 export function generateToken(bytes = 32) {
   const buf = new Uint8Array(bytes);

@@ -41,9 +41,11 @@ export async function onRequestGet({ params, request, env }) {
     return jsonResponse({ error: 'invalid_slug' }, 400);
   }
 
-  // ── Auth : cookie session valide + slug match ──
+  // ── Auth : cookie session valide. Super-admin peut consulter n'importe
+  //   quel slug ; un élève ne peut consulter que sa propre fiche.
   const session = await getSessionFromRequest(request, env);
-  if (!session || session.slug !== slug) {
+  if (!session) return jsonResponse({ error: 'unauthorized' }, 401);
+  if (!session.is_admin && session.slug !== slug) {
     return jsonResponse({ error: 'unauthorized' }, 401);
   }
 

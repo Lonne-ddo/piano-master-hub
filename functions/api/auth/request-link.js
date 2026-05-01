@@ -7,7 +7,7 @@
 // valide, qu'il existe ou non en KV. Aucun moyen pour un attaquant de savoir
 // quels emails sont enregistrés.
 
-import { generateToken } from '../_lib/session.js';
+import { generateToken, isAdminEmail } from '../_lib/session.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -43,40 +43,45 @@ export async function onRequestPost({ request, env }) {
     return jsonResponse({ error: 'invalid_email' }, 400);
   }
 
-  // Charge la liste des slugs (KV `eleves:list` avec fallback hardcoded)
-  let slugs;
-  try {
-    const listRaw = await env.MASTERHUB_STUDENTS.get('eleves:list');
-    slugs = listRaw ? JSON.parse(listRaw) : ['japhet', 'messon', 'dexter', 'tara'];
-  } catch {
-    slugs = ['japhet', 'messon', 'dexter', 'tara'];
-  }
+  // ── Branche super-admin (ADMIN_EMAILS env var) ─────────────────
+  const adminMatch = isAdminEmail(email, env);
 
-  // Cherche l'élève dont email correspond
+  // Si pas admin, recherche l'élève par email dans le KV
   let foundSlug = null;
-  for (const slug of slugs) {
-    let raw;
-    try { raw = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`); }
-    catch { continue; }
-    if (!raw) continue;
+  if (!adminMatch) {
+    let slugs;
     try {
-      const data = JSON.parse(raw);
-      if (data.email && String(data.email).toLowerCase() === email) {
-        foundSlug = slug;
-        break;
-      }
-    } catch { /* skip */ }
-  }
+      const listRaw = await env.MASTERHUB_STUDENTS.get('eleves:list');
+      slugs = listRaw ? JSON.parse(listRaw) : ['japhet', 'messon', 'dexter', 'tara'];
+    } catch {
+      slugs = ['japhet', 'messon', 'dexter', 'tara'];
+    }
+    for (const slug of slugs) {
+      let raw;
+      try { raw = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`); }
+      catch { continue; }
+      if (!raw) continue;
+      try {
+        const data = JSON.parse(raw);
+        if (data.email && String(data.email).toLowerCase() === email) {
+          foundSlug = slug;
+          break;
+        }
+      } catch { /* skip */ }
+    }
 
-  // Anti-énumération : si email inconnu, on retourne ok=true sans envoyer.
-  if (!foundSlug) {
-    console.log('[auth/request-link] unknown_email_silent_ok');
-    return jsonResponse({ ok: true, message: 'email_sent_if_valid' });
+    // Anti-énumération : si email inconnu, on retourne ok=true sans envoyer.
+    if (!foundSlug) {
+      console.log('[auth/request-link] unknown_email_silent_ok');
+      return jsonResponse({ ok: true, message: 'email_sent_if_valid' });
+    }
   }
 
   // Génère + stocke le magic link (TTL 15 min, single-use via delete au verify)
   const token = generateToken(32);
-  const magicLink = { slug: foundSlug, email, createdAt: Date.now() };
+  const magicLink = adminMatch
+    ? { is_admin: true, email, createdAt: Date.now() }
+    : { slug: foundSlug, email, createdAt: Date.now() };
   try {
     await env.MASTERHUB_STUDENTS.put(
       `magic_link:${token}`,
@@ -103,8 +108,8 @@ export async function onRequestPost({ request, env }) {
       body: JSON.stringify({
         from: 'Master Hub <onboarding@resend.dev>',
         to: [email],
-        subject: 'Connexion à Master Hub',
-        html: buildEmailHtml(verifyUrl, foundSlug),
+        subject: adminMatch ? 'Connexion super-admin Master Hub' : 'Connexion à Master Hub',
+        html: buildEmailHtml(verifyUrl, foundSlug, adminMatch),
       }),
     });
 
@@ -122,17 +127,21 @@ export async function onRequestPost({ request, env }) {
   return jsonResponse({ ok: true, message: 'email_sent' });
 }
 
-function buildEmailHtml(verifyUrl, slug) {
-  const display = slug.charAt(0).toUpperCase() + slug.slice(1);
+function buildEmailHtml(verifyUrl, slug, isAdmin) {
+  const display = isAdmin
+    ? 'super-admin'
+    : (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : '');
   const safeUrl = String(verifyUrl).replace(/"/g, '%22');
+  const intro = isAdmin
+    ? 'Voici ton lien de connexion super-admin à Master Hub. Il expire dans 15 minutes.'
+    : `Bonjour ${display},<br><br>Voici ton lien de connexion à Master Hub. Il expire dans 15 minutes.`;
   return `<!DOCTYPE html>
 <html>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f7; padding: 40px 20px; margin: 0;">
   <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 40px 32px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
-    <h1 style="color: #1a1a24; font-size: 22px; margin: 0 0 8px; font-weight: 700;">Master Hub</h1>
+    <h1 style="color: #1a1a24; font-size: 22px; margin: 0 0 8px; font-weight: 700;">Master Hub${isAdmin ? ' — Super-admin' : ''}</h1>
     <p style="color: #555; font-size: 15px; line-height: 1.55; margin: 16px 0;">
-      Bonjour ${display},<br><br>
-      Voici ton lien de connexion à Master Hub. Il expire dans 15 minutes.
+      ${intro}
     </p>
     <a href="${safeUrl}" style="display: inline-block; margin-top: 16px; background: #8B6FE8; color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">Se connecter</a>
     <p style="color: #888; font-size: 12px; margin-top: 32px; line-height: 1.5;">

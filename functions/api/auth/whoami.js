@@ -24,8 +24,11 @@ export async function onRequestOptions() {
 
 export async function onRequestGet({ request, env }) {
   const session = await getSessionFromRequest(request, env);
-  if (!session || !session.slug) {
+  if (!session || (!session.slug && !session.is_admin)) {
     return jsonResponse({ ok: false }, 401);
+  }
+  if (session.is_admin) {
+    return jsonResponse({ ok: true, is_admin: true, email: session.email || null });
   }
   return jsonResponse({ ok: true, slug: session.slug, email: session.email || null });
 }
