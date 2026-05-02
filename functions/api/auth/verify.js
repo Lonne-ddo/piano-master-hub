@@ -81,8 +81,11 @@ export async function onRequestGet({ request, env }) {
   return new Response(null, {
     status: 302,
     headers: {
-      // Admin → atterrit sur / (écran "Choisir un élève") ; élève → /{slug}
-      'Location': data.is_admin ? `${url.origin}/` : `${url.origin}/${data.slug}`,
+      // Admin → atterrit sur / (chooser) ; élève → /?eleve=slug (query string
+      // car CF Pages rewrite /{slug} de façon non fiable, cf commit fix routing).
+      'Location': data.is_admin
+        ? `${url.origin}/`
+        : `${url.origin}/?eleve=${encodeURIComponent(data.slug)}`,
       'Set-Cookie': cookie,
     },
   });
