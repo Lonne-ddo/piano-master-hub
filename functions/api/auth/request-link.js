@@ -124,7 +124,7 @@ export async function onRequestPost({ request, env }) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Master Hub <onboarding@resend.dev>',
+        from: 'Master Hub <noreply@piano-key.com>',
         to: [email],
         subject: adminMatch ? 'Connexion super-admin Master Hub' : 'Connexion à Master Hub',
         html: buildEmailHtml(verifyUrl, foundSlug, adminMatch),
