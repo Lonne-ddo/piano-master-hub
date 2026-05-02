@@ -262,13 +262,14 @@
                 </div>
                 <span class="card-arrow">&rsaquo;</span>
             </a>
-            <div class="card disabled">
-                <div class="card-icon">&#127898;</div>
+            <a class="card" href="/admin/stems.html">
+                <div class="card-icon">&#127898;&#65039;</div>
                 <div class="card-body">
                     <div class="card-title">S&eacute;parateur de pistes</div>
-                    <div class="card-sub">&Agrave; venir</div>
+                    <div class="card-sub" id="stems-sub">Demucs &middot; isole chant / batterie / basse</div>
                 </div>
-            </div>
+                <span class="card-arrow">&rsaquo;</span>
+            </a>
             <a class="card" href="/admin/">
                 <div class="card-icon">&#128101;</div>
                 <div class="card-body">
@@ -287,6 +288,28 @@
         localStorage.removeItem('mh_admin');
         window.location.replace('/admin/');
     });
+    </script>
+
+    <script>
+    // ── Compteur stems mensuel — fail silently si pas de session admin ──
+    (function () {
+        var sub = document.getElementById('stems-sub');
+        if (!sub) return;
+        var defaultLabel = sub.textContent;
+        fetch('/api/stems/stats', { credentials: 'same-origin' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) {
+                if (!j || !j.ok) return;
+                var n = j.count || 0;
+                var cost = (j.costEUR || 0).toLocaleString('fr-FR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                });
+                var word = n === 1 ? 'séparation' : 'séparations';
+                sub.textContent = 'Ce mois : ' + n + ' ' + word + ' · ~' + cost + ' €';
+            })
+            .catch(function () { /* fail silently — sub reste sur defaultLabel */ });
+    })();
     </script>
 
     <script>

@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Master Hub Admin — Séparateur de pistes</title>
+  <meta name="theme-color" content="#0f0f14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MH Admin" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --v:       #8B6FE8;
+      --v-dim:   rgba(139,111,232,0.14);
+      --v-soft:  #6b54c4;
+      --bg0:     #09090f;
+      --bg1:     #0f0e18;
+      --bg2:     #161524;
+      --bg3:     #1e1c30;
+      --text1:   #eeeaf8;
+      --text2:   #9d9ab5;
+      --text3:   #5a5870;
+      --border:  #25233a;
+      --green:   #5ecb8b;
+      --amber:   #f0b429;
+      --red:     #e05c6b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg0);
+      color: var(--text1);
+      min-height: 100vh; min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app { max-width: 900px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    .admin-banner {
+      background: var(--v-dim);
+      border: 1px solid rgba(139,111,232,0.35);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 12px;
+      color: var(--v);
+      letter-spacing: .04em;
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .admin-banner .sep { opacity: .4; }
+    .admin-banner a { color: var(--text2); text-decoration: none; transition: color .15s; }
+    .admin-banner a:hover { color: var(--v); }
+    .admin-banner .email { color: var(--text2); text-transform: none; letter-spacing: 0; }
+
+    .ph { margin-bottom: 18px; }
+    .ph-title {
+      font-size: 22px; font-weight: 700; color: var(--text1);
+      letter-spacing: -.01em;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10.5px; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 20px;
+      background: var(--v-dim); color: var(--v);
+    }
+    .ph-desc {
+      font-size: 13.5px; color: var(--text2);
+      margin-top: 6px; line-height: 1.5;
+    }
+    .ph-meta {
+      margin-top: 10px; font-size: 11.5px;
+      color: var(--text3); font-family: 'DM Mono', monospace;
+      display: flex; flex-wrap: wrap; gap: 12px;
+    }
+    .ph-meta span::before {
+      content: '·'; margin-right: 8px; color: var(--text3); opacity: .5;
+    }
+    .ph-meta span:first-child::before { content: ''; margin: 0; }
+
+    /* ── Drop zone ─────────────────────────────────────────── */
+    .st-drop-zone {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 8px;
+      border: 2px dashed var(--border);
+      border-radius: 14px;
+      padding: 48px 24px;
+      cursor: pointer;
+      transition: all .15s;
+      text-align: center;
+      background: var(--bg1);
+    }
+    .st-drop-zone.disabled { opacity: .5; cursor: not-allowed; }
+    .st-drop-zone:not(.disabled):hover,
+    .st-drop-zone.drag-over { border-color: var(--v); background: var(--v-dim); }
+    .st-drop-icon { font-size: 36px; }
+    .st-drop-text { font-size: 15px; font-weight: 600; color: var(--text1); }
+    .st-drop-sub  { font-size: 12px; color: var(--text3); }
+
+    .st-file-info {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-top: 12px;
+      font-size: 13px; color: var(--text1);
+    }
+    .st-file-info .meta { color: var(--text3); font-size: 12px; }
+    .st-file-info button {
+      margin-left: auto;
+      background: transparent; border: none;
+      color: var(--text3);
+      cursor: pointer; font-size: 16px;
+      padding: 4px 8px;
+    }
+    .st-file-info button:hover { color: var(--red); }
+
+    .gen-btn {
+      width: 100%;
+      padding: 12px 18px;
+      border-radius: 10px;
+      border: none;
+      background: var(--v);
+      color: #fff;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      transition: opacity .15s, background .15s;
+      margin-top: 14px;
+    }
+    .gen-btn:hover:not(:disabled) { background: var(--v-soft); }
+    .gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Progression ───────────────────────────────────────── */
+    .st-progress-wrap {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+    }
+    .st-progress-label { font-size: 13.5px; color: var(--text1); margin-bottom: 14px; }
+    .st-progress-bar-wrap {
+      background: var(--bg2);
+      border-radius: 20px;
+      height: 6px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .st-progress-bar {
+      height: 100%;
+      background: var(--v);
+      border-radius: 20px;
+      transition: width .3s ease;
+    }
+    .st-progress-hint {
+      font-size: 11.5px; color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      margin-bottom: 12px;
+    }
+    #st-cancel-btn {
+      font-size: 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer; font-family: inherit;
+    }
+    #st-cancel-btn:hover { color: var(--text1); border-color: var(--v); }
+
+    /* ── Résultat ──────────────────────────────────────────── */
+    .st-result-header {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 18px; flex-wrap: wrap;
+    }
+    .st-back-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 7px 14px;
+      border-radius: 8px;
+      cursor: pointer; font-size: 12px; font-family: inherit;
+    }
+    .st-back-btn:hover { color: var(--text1); border-color: var(--v); }
+    .st-song-title { font-size: 14.5px; font-weight: 700; color: var(--text1); }
+
+    .st-tracks { display: flex; flex-direction: column; gap: 10px; }
+    .st-track {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 14px;
+      flex-wrap: wrap;
+    }
+    .st-track-label {
+      font-size: 14px; font-weight: 600;
+      min-width: 90px; flex-shrink: 0;
+    }
+    .st-track audio { flex: 1; min-width: 220px; height: 36px; }
+    .st-track-download {
+      font-size: 12px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 7px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center; gap: 5px;
+      transition: all .15s;
+      font-family: inherit;
+    }
+    .st-track-download:hover {
+      background: var(--v-dim);
+      color: var(--v);
+      border-color: var(--v);
+    }
+    .st-track[data-stem="vocals"] .st-track-label { color: var(--green); }
+    .st-track[data-stem="drums"]  .st-track-label { color: var(--v); }
+    .st-track[data-stem="bass"]   .st-track-label { color: #60a5fa; }
+    .st-track[data-stem="other"]  .st-track-label { color: var(--amber); }
+
+    /* ── Erreur ────────────────────────────────────────────── */
+    .st-error {
+      background: rgba(224,92,107,0.08);
+      border: 1px solid rgba(224,92,107,0.3);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex; align-items: center; gap: 12px;
+      font-size: 13px; color: var(--red);
+    }
+    #st-retry-btn {
+      margin-left: auto;
+      background: transparent;
+      border: 1px solid var(--red);
+      color: var(--red);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer; font-size: 12px; font-family: inherit;
+    }
+
+    /* ── Toast ─────────────────────────────────────────────── */
+    .st-toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--bg2);
+      color: var(--text1);
+      border: 1px solid rgba(224,92,107,0.4);
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      z-index: 9999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .st-toast.show { opacity: 1; }
+
+    /* ── Boot loader (pendant whoami) ──────────────────────── */
+    .st-boot {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 12px;
+      padding: 80px 20px;
+      color: var(--text3);
+    }
+    .st-boot .spinner {
+      width: 28px; height: 28px;
+      border: 2px solid var(--border);
+      border-top-color: var(--v);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 600px) {
+      .app { padding: 18px 14px 40px; }
+      .st-drop-zone { padding: 36px 16px; }
+      .st-track { padding: 12px; }
+      .st-track-label { min-width: auto; }
+      .st-track audio { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Phase boot : visible le temps de vérifier l'auth admin via /api/auth/whoami -->
+<div class="app" id="boot-section">
+  <div class="st-boot">
+    <div class="spinner"></div>
+    <p>Vérification de l'accès…</p>
+  </div>
+</div>
+
+<!-- Phase app : injectée après auth OK -->
+<div class="app" id="main-section" style="display:none">
+
+  <div class="admin-banner">
+    <span>🔒 Super-admin</span>
+    <span class="sep">·</span>
+    <span class="email" id="admin-email"></span>
+    <span class="sep">·</span>
+    <a href="/admin/outils.html">← Outils</a>
+  </div>
+
+  <div class="ph">
+    <div class="ph-title">
+      Séparateur de pistes
+      <span class="badge">Demucs · Replicate</span>
+    </div>
+    <p class="ph-desc">
+      Upload un fichier audio pour isoler automatiquement les 4 pistes :
+      Chant · Batterie · Basse · Autres (instruments + ambiance).
+    </p>
+    <div class="ph-meta">
+      <span>≈ 1–3 min selon durée</span>
+      <span>💰 Coût estimé : ~0,02 € / séparation</span>
+      <span>Max 50 Mo · 15 min</span>
+    </div>
+  </div>
+
+  <!-- Upload -->
+  <div id="st-upload-section">
+    <label class="st-drop-zone" id="st-drop-zone">
+      <input type="file" id="st-file-input" accept=".mp3,.wav,.m4a,.ogg" hidden />
+      <div class="st-drop-icon">🎵</div>
+      <div class="st-drop-text">Dépose ton fichier audio ici</div>
+      <div class="st-drop-sub">.mp3 · .wav · .m4a — max 50 Mo · 15 min</div>
+    </label>
+    <div id="st-file-info" style="display:none" class="st-file-info">
+      <span id="st-file-name"></span>
+      <span class="meta" id="st-file-meta"></span>
+      <button type="button" id="st-clear-btn" title="Retirer">✕</button>
+    </div>
+    <button type="button" id="st-analyze-btn" disabled class="gen-btn">
+      Séparer les pistes →
+    </button>
+  </div>
+
+  <!-- Progression -->
+  <div id="st-progress-section" style="display:none" class="st-progress-wrap">
+    <div class="st-progress-label" id="st-progress-label">Upload du fichier…</div>
+    <div class="st-progress-bar-wrap">
+      <div class="st-progress-bar" id="st-progress-bar" style="width:0%"></div>
+    </div>
+    <div class="st-progress-hint">⏱ ≈ 1 à 3 min selon la durée du morceau</div>
+    <button type="button" id="st-cancel-btn">Annuler</button>
+  </div>
+
+  <!-- Résultat -->
+  <div id="st-result-section" style="display:none">
+    <div class="st-result-header">
+      <button class="st-back-btn" id="st-reset-btn">← Nouvelle séparation</button>
+      <span class="st-song-title" id="st-song-title"></span>
+    </div>
+    <div class="st-tracks" id="st-tracks-list"></div>
+  </div>
+
+  <!-- Erreur -->
+  <div id="st-error-section" style="display:none" class="st-error">
+    <span id="st-error-msg"></span>
+    <button type="button" id="st-retry-btn">Réessayer</button>
+  </div>
+</div>
+
+<script>
+// ─── Séparateur de pistes — Master Hub Admin ─────────────────────
+// 1) Vérifie l'auth admin via /api/auth/whoami → redirect / si pas admin
+// 2) Drop zone → validation client (50 Mo / 15 min) → POST predict
+// 3) Polling status (3s) jusqu'à statut terminal → 4 lecteurs + downloads
+// 4) Lock UI pendant traitement (un seul run à la fois)
+
+// Constantes — synchro avec backend (functions/api/stems.js)
+const MAX_SIZE_MB     = 50;
+const MAX_DURATION_S  = 900;
+const POLL_INTERVAL_MS = 3000;
+
+// Labels FR + ordre d'affichage (htdemucs : 4 stems)
+const STEM_LABELS = {
+  vocals: 'Chant',
+  drums:  'Batterie',
+  bass:   'Basse',
+  other:  'Autres',
+};
+const STEM_ORDER = ['vocals', 'drums', 'bass', 'other'];
+
+// État
+let selectedFile  = null;
+let audioDuration = null;
+let predictionId  = null;
+let pollHandle    = null;
+let isProcessing  = false;  // lock UI
+
+// ─── Boot — vérifier l'auth ────────────────────────────────
+(async function boot() {
+  try {
+    const r = await fetch('/api/auth/whoami', { credentials: 'same-origin' });
+    if (!r.ok) throw new Error('not_admin');
+    const j = await r.json();
+    if (!j.ok || !j.is_admin) throw new Error('not_admin');
+    document.getElementById('admin-email').textContent = j.email || '';
+    document.getElementById('boot-section').style.display = 'none';
+    document.getElementById('main-section').style.display = '';
+    bindUi();
+  } catch {
+    // Redirige vers le chooser : il proposera le login admin si l'email n'a pas de session.
+    window.location.replace('/?stems_login=1');
+  }
+})();
+
+// ─── UI bindings ─────────────────────────────────────────────
+function bindUi() {
+  const dropZone   = document.getElementById('st-drop-zone');
+  const fileInput  = document.getElementById('st-file-input');
+  const analyzeBtn = document.getElementById('st-analyze-btn');
+
+  dropZone.addEventListener('dragover', (e) => {
+    if (isProcessing) return;
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', (e) => {
+    if (isProcessing) return;
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const f = e.dataTransfer?.files?.[0];
+    if (f) setFile(f);
+  });
+  fileInput.addEventListener('change', (e) => {
+    const f = e.target.files?.[0];
+    if (f) setFile(f);
+  });
+
+  document.getElementById('st-clear-btn').onclick = clearFile;
+  analyzeBtn.addEventListener('click', startAnalysis);
+  document.getElementById('st-cancel-btn').onclick = () => {
+    cancelPolling();
+    isProcessing = false;
+    showSection('upload');
+  };
+  document.getElementById('st-reset-btn').addEventListener('click', () => {
+    clearFile();
+    document.getElementById('st-tracks-list').innerHTML = '';
+    showSection('upload');
+  });
+  document.getElementById('st-retry-btn').onclick = () => {
+    isProcessing = false;
+    showSection('upload');
+  };
+}
+
+// ─── File handling + validation ──────────────────────────────
+function setFile(file) {
+  // Taille
+  const sizeMB = file.size / 1024 / 1024;
+  if (sizeMB > MAX_SIZE_MB) {
+    toast(`Fichier trop volumineux (${sizeMB.toFixed(1)} Mo, max ${MAX_SIZE_MB} Mo)`);
+    return;
+  }
+  // Durée — async via Audio metadata
+  const url = URL.createObjectURL(file);
+  const probe = document.createElement('audio');
+  probe.preload = 'metadata';
+  probe.src = url;
+  probe.addEventListener('loadedmetadata', () => {
+    URL.revokeObjectURL(url);
+    const d = probe.duration || 0;
+    if (d > MAX_DURATION_S) {
+      toast(`Morceau trop long (${Math.round(d / 60)} min, max ${MAX_DURATION_S / 60} min)`);
+      return;
+    }
+    if (!d || !isFinite(d)) {
+      toast('Impossible de lire la durée du fichier — fichier audio valide ?');
+      return;
+    }
+    selectedFile = file;
+    audioDuration = d;
+    document.getElementById('st-file-name').textContent = file.name;
+    document.getElementById('st-file-meta').textContent =
+      `${sizeMB.toFixed(1)} Mo · ${formatDuration(d)}`;
+    document.getElementById('st-file-info').style.display = 'flex';
+    document.getElementById('st-analyze-btn').disabled = false;
+  });
+  probe.addEventListener('error', () => {
+    URL.revokeObjectURL(url);
+    toast('Fichier audio illisible');
+  });
+}
+
+function clearFile() {
+  if (isProcessing) return;
+  selectedFile = null;
+  audioDuration = null;
+  document.getElementById('st-file-input').value = '';
+  document.getElementById('st-file-info').style.display = 'none';
+  document.getElementById('st-analyze-btn').disabled = true;
+}
+
+function formatDuration(s) {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+// ─── Pipeline analyse ────────────────────────────────────────
+async function startAnalysis() {
+  if (!selectedFile || isProcessing) return;
+  isProcessing = true;
+  document.getElementById('st-analyze-btn').disabled = true;
+  document.getElementById('st-drop-zone').classList.add('disabled');
+
+  showSection('progress');
+  setProgress(5, 'Lecture du fichier…');
+
+  try {
+    const base64 = await readAsDataURL(selectedFile);
+
+    setProgress(20, 'Upload vers Replicate…');
+
+    const resp = await fetch('/api/stems?action=predict', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audio: base64,
+        filename: selectedFile.name,
+        duration: audioDuration,
+      }),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok || data.error) {
+      const msg = data.error === 'file_too_large' ? `Fichier trop volumineux (max ${MAX_SIZE_MB} Mo)`
+                : data.error === 'duration_too_long' ? `Morceau trop long (max ${MAX_DURATION_S / 60} min)`
+                : data.error === 'unauthorized' ? 'Session admin expirée — reconnecte-toi via le magic link'
+                : data.error === 'replicate_token_missing' ? 'Replicate non configuré côté serveur'
+                : data.detail || data.error || `Erreur ${resp.status}`;
+      throw new Error(msg);
+    }
+
+    if (data.status === 'succeeded') {
+      handleSuccess(data.output);
+      return;
+    }
+
+    predictionId = data.id;
+    setProgress(35, 'Séparation en cours (~30–90 s)…');
+    startPolling();
+  } catch (err) {
+    isProcessing = false;
+    document.getElementById('st-drop-zone').classList.remove('disabled');
+    showError(err.message || 'Erreur inconnue');
+  }
+}
+
+function readAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function startPolling() {
+  let dotCount = 0;
+  pollHandle = setInterval(async () => {
+    dotCount = (dotCount + 1) % 4;
+
+    try {
+      const params = new URLSearchParams({
+        action: 'status',
+        id: predictionId,
+        filename: selectedFile?.name || '',
+        duration: String(Math.round(audioDuration || 0)),
+        size: String((selectedFile?.size || 0) / 1024 / 1024),
+      });
+      const resp = await fetch(`/api/stems?${params}`, {
+        credentials: 'same-origin',
+      });
+      const data = await resp.json();
+
+      if (data.status === 'succeeded') {
+        cancelPolling();
+        setProgress(95, 'Finalisation…');
+        handleSuccess(data.output);
+      } else if (data.status === 'failed' || data.status === 'canceled') {
+        cancelPolling();
+        isProcessing = false;
+        document.getElementById('st-drop-zone').classList.remove('disabled');
+        showError(data.error || `Échec de la séparation (${data.status})`);
+      } else {
+        const elapsed = data.metrics?.predict_time || 0;
+        const dots = '.'.repeat(dotCount + 1);
+        setProgress(
+          Math.min(92, 35 + elapsed * 0.6),
+          `Séparation en cours${dots}`
+        );
+      }
+    } catch (err) {
+      cancelPolling();
+      isProcessing = false;
+      document.getElementById('st-drop-zone').classList.remove('disabled');
+      showError(err.message || 'Erreur réseau');
+    }
+  }, POLL_INTERVAL_MS);
+}
+
+function cancelPolling() {
+  if (pollHandle) {
+    clearInterval(pollHandle);
+    pollHandle = null;
+  }
+}
+
+// ─── Résultat ────────────────────────────────────────────────
+function handleSuccess(output) {
+  // Replicate retourne un objet { vocals, drums, bass, other } ou un array.
+  const stemUrls = {};
+  if (Array.isArray(output)) {
+    const fallback = ['vocals', 'drums', 'bass', 'other'];
+    output.forEach((url, i) => { if (fallback[i]) stemUrls[fallback[i]] = url; });
+  } else if (output && typeof output === 'object') {
+    Object.assign(stemUrls, output);
+  }
+
+  const presentKeys = STEM_ORDER.filter((k) => stemUrls[k]);
+  if (!presentKeys.length) {
+    isProcessing = false;
+    document.getElementById('st-drop-zone').classList.remove('disabled');
+    showError('Aucune piste reçue de Replicate');
+    return;
+  }
+
+  setProgress(100, 'Pistes prêtes ✓');
+
+  const songTitle = selectedFile?.name?.replace(/\.[^.]+$/, '') || 'Analyse';
+  document.getElementById('st-song-title').textContent = songTitle;
+
+  const list = document.getElementById('st-tracks-list');
+  list.innerHTML = presentKeys.map((key) => {
+    const url = stemUrls[key];
+    const label = STEM_LABELS[key] || key;
+    const fname = `${songTitle} — ${label}.mp3`.replace(/"/g, '');
+    return `
+      <div class="st-track" data-stem="${key}">
+        <span class="st-track-label">${escapeHtml(label)}</span>
+        <audio controls preload="metadata" src="${escapeAttr(url)}"></audio>
+        <a class="st-track-download" href="${escapeAttr(url)}" download="${escapeAttr(fname)}">
+          ↓ Télécharger
+        </a>
+      </div>
+    `;
+  }).join('');
+
+  setTimeout(() => {
+    isProcessing = false;
+    document.getElementById('st-drop-zone').classList.remove('disabled');
+    showSection('result');
+  }, 250);
+}
+
+// ─── Helpers UI ──────────────────────────────────────────────
+function showSection(name) {
+  ['upload', 'progress', 'result', 'error'].forEach((n) => {
+    const el = document.getElementById(`st-${n}-section`);
+    if (el) el.style.display = n === name ? '' : 'none';
+  });
+}
+
+function setProgress(pct, label) {
+  document.getElementById('st-progress-bar').style.width = pct + '%';
+  document.getElementById('st-progress-label').textContent = label;
+}
+
+function showError(msg) {
+  document.getElementById('st-error-msg').textContent = '✗ ' + msg;
+  showSection('error');
+}
+
+function toast(msg) {
+  let t = document.querySelector('.st-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.className = 'st-toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  requestAnimationFrame(() => t.classList.add('show'));
+  clearTimeout(toast._tid);
+  toast._tid = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+function escapeAttr(s) {
+  return String(s == null ? '' : s).replace(/"/g, '&quot;');
+}
+</script>
+
+</body>
+</html>
