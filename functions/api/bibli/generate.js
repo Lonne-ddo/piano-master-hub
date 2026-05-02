@@ -52,6 +52,68 @@ function json(data, status = 200) {
   });
 }
 
+// ─── LLM providers (JSON natif forcé) ─────────────────────────────
+// Cascade Gemini → Groq pour Bibli : Gemini Flash a un meilleur corpus
+// pour les morceaux moins mainstream (afrobeats, gospel non-anglophone, etc.).
+// Groq Llama 3.3 70B reste le fallback rapide.
+
+async function callGemini(systemPrompt, userMessage, apiKey, opts = {}) {
+  if (!apiKey) throw new Error('GEMINI_API_KEY manquante');
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey.trim()}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: opts.temperature ?? 0.3,
+          maxOutputTokens: opts.maxTokens || 3500,
+        },
+      }),
+    }
+  );
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Gemini HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Gemini: réponse vide');
+  return text;
+}
+
+async function callGroq(systemPrompt, userMessage, apiKey, opts = {}) {
+  if (!apiKey) throw new Error('GROQ_API_KEY manquante');
+  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey.trim()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      response_format: { type: 'json_object' },
+      temperature: opts.temperature ?? 0.3,
+      max_tokens: opts.maxTokens || 3500,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user',   content: userMessage },
+      ],
+    }),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`Groq HTTP ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error('Groq: réponse vide');
+  return text;
+}
+
 export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS });
 }
@@ -142,92 +204,112 @@ TOUJOURS retourner un JSON valide. JAMAIS de "found: false" ou autre format.
 
 Réponds UNIQUEMENT avec le JSON.`;
 
-  let groqRes;
-  try {
-    groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${env.GROQ_API_KEY.trim()}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user',   content: userPrompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 3500,
-        response_format: { type: 'json_object' },
-      }),
-    });
-  } catch (e) {
-    console.error('[bibli/generate] fetch failed:', e?.message);
-    return json({ error: 'groq_unreachable' }, 502);
-  }
+  // ── Cascade Groq → Gemini ─────────────────────────────────────
+  // Stratégie : Groq en primary (rapide, bon corpus mainstream). Si Groq retourne
+  // 'suggestions' (morceau pas connu) OU si Groq fail, on tente Gemini Flash
+  // (corpus plus large pour les niches afrobeats / gospel non-anglo / etc.).
+  // On garde la meilleure réponse (exact > suggestions).
+  const opts = { temperature: 0.3, maxTokens: 3500 };
+  let groqOutcome = null, geminiOutcome = null;
 
-  if (!groqRes.ok) {
-    const errText = await groqRes.text().catch(() => '');
-    console.error('[bibli/generate] Groq HTTP', groqRes.status, errText.slice(0, 200));
-    return json({ error: 'groq_failed', status: groqRes.status }, 502);
-  }
-
-  let groqData;
-  try { groqData = await groqRes.json(); }
-  catch { return json({ error: 'invalid_groq_response' }, 502); }
-
-  const text = groqData?.choices?.[0]?.message?.content || '';
-  let parsed;
-  try { parsed = JSON.parse(text); }
-  catch {
-    console.error('[bibli/generate] JSON parse failed, raw:', text.slice(0, 300));
-    return json({ error: 'invalid_llm_output' }, 502);
-  }
-
-  if (!parsed || typeof parsed !== 'object') {
-    return json({ error: 'invalid_structure' }, 502);
-  }
-
-  // Détection du format de réponse (LLM peut omettre le `type` explicite)
-  const isSuggestions = parsed.type === 'suggestions' || Array.isArray(parsed.suggestions);
-  const isExact = parsed.type === 'exact' || Array.isArray(parsed.sections);
-
-  if (isSuggestions) {
-    const rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
-    const suggestions = rawSuggestions
-      .filter(s => s && typeof s === 'object')
-      .map(s => ({
-        titre: sanitizeFreeText(s.titre || '', 100),
-        artiste: sanitizeFreeText(s.artiste || '', 50),
-        raison: sanitizeFreeText(s.raison || '', 200),
-      }))
-      .filter(s => s.titre.length > 0)
-      .slice(0, 5);
-
-    if (suggestions.length === 0) {
-      return json({ error: 'no_valid_suggestions' }, 502);
+  if (env.GROQ_API_KEY) {
+    try {
+      const raw = await callGroq(systemPrompt, userPrompt, env.GROQ_API_KEY, opts);
+      groqOutcome = parseAndClassify(raw);
+    } catch (e) {
+      console.warn('[bibli/generate] Groq failed:', e?.message);
     }
+  }
 
-    return json({
-      ok: true,
-      type: 'suggestions',
-      message: typeof parsed.message === 'string'
-        ? parsed.message.slice(0, 250)
-        : 'Je ne connais pas ce morceau précis. Voici des alternatives proches :',
-      suggestions,
+  // Si Groq a trouvé un exact, on retourne tout de suite (rapide).
+  if (groqOutcome && groqOutcome.kind === 'exact') {
+    return jsonExact(groqOutcome.parsed, titre, artiste, genre, 'groq');
+  }
+
+  // Sinon, on tente Gemini (soit Groq a renvoyé suggestions, soit fail).
+  if (env.GEMINI_API_KEY) {
+    try {
+      const raw = await callGemini(systemPrompt, userPrompt, env.GEMINI_API_KEY, opts);
+      geminiOutcome = parseAndClassify(raw);
+    } catch (e) {
+      console.warn('[bibli/generate] Gemini failed:', e?.message);
+    }
+  }
+
+  // Préférence : exact > suggestions ; Gemini > Groq pour les suggestions
+  // (corpus plus large = alternatives potentiellement plus pertinentes).
+  if (geminiOutcome && geminiOutcome.kind === 'exact') {
+    return jsonExact(geminiOutcome.parsed, titre, artiste, genre, 'gemini');
+  }
+  if (geminiOutcome && geminiOutcome.kind === 'suggestions') {
+    return jsonSuggestions(geminiOutcome.parsed, 'gemini');
+  }
+  if (groqOutcome && groqOutcome.kind === 'suggestions') {
+    return jsonSuggestions(groqOutcome.parsed, 'groq');
+  }
+
+  // Aucun provider n'a renvoyé quelque chose d'exploitable
+  return json({ error: 'all_llms_failed', tried: ['groq', 'gemini'] }, 502);
+}
+
+// ─── Helpers parse/classify/format ────────────────────────────────
+
+function parseAndClassify(rawText) {
+  let parsed;
+  try { parsed = JSON.parse(rawText); }
+  catch {
+    console.warn('[bibli/generate] JSON parse failed, raw:', String(rawText).slice(0, 200));
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  const isExact = parsed.type === 'exact' || Array.isArray(parsed.sections);
+  if (isExact && Array.isArray(parsed.sections) && parsed.sections.length > 0) {
+    return { kind: 'exact', parsed };
+  }
+
+  const isSuggestions = parsed.type === 'suggestions' || Array.isArray(parsed.suggestions);
+  if (isSuggestions && Array.isArray(parsed.suggestions) && parsed.suggestions.length > 0) {
+    return { kind: 'suggestions', parsed };
+  }
+  return null;
+}
+
+function jsonSuggestions(parsed, provider) {
+  const rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+  const suggestions = rawSuggestions
+    .filter(s => s && typeof s === 'object')
+    .map(s => ({
+      titre: sanitizeFreeText(s.titre || '', 100),
+      artiste: sanitizeFreeText(s.artiste || '', 50),
+      raison: sanitizeFreeText(s.raison || '', 200),
+    }))
+    .filter(s => s.titre.length > 0)
+    .slice(0, 5);
+
+  if (suggestions.length === 0) {
+    return new Response(JSON.stringify({ error: 'no_valid_suggestions' }), {
+      status: 502,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
 
-  if (!isExact) {
-    return json({ error: 'invalid_structure' }, 502);
-  }
+  return new Response(JSON.stringify({
+    ok: true,
+    type: 'suggestions',
+    message: typeof parsed.message === 'string'
+      ? parsed.message.slice(0, 250)
+      : 'Je ne connais pas ce morceau précis. Voici des alternatives proches :',
+    suggestions,
+    _provider: provider,
+  }), {
+    status: 200,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
+  });
+}
 
-  // Validation post-LLM (cas exact)
-  if (!Array.isArray(parsed.sections) || parsed.sections.length === 0) {
-    return json({ error: 'invalid_sections' }, 502);
-  }
-
-  const sections = parsed.sections
+function jsonExact(parsed, titre, artiste, genre, provider) {
+  const sections = (Array.isArray(parsed.sections) ? parsed.sections : [])
     .filter(s => s && typeof s === 'object' && Array.isArray(s.lines) && s.lines.length > 0)
     .map(s => ({
       type: typeof s.type === 'string' ? s.type : 'couplet',
@@ -237,10 +319,12 @@ Réponds UNIQUEMENT avec le JSON.`;
     .filter(s => s.lines.length > 0);
 
   if (sections.length === 0) {
-    return json({ error: 'no_valid_sections' }, 502);
+    return new Response(JSON.stringify({ error: 'no_valid_sections' }), {
+      status: 502,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
   }
 
-  // Compte total des accords (pour stats / debug)
   const chordRe = /\[([^\]]+)\]/g;
   let chordCount = 0;
   for (const section of sections) {
@@ -250,10 +334,13 @@ Réponds UNIQUEMENT avec le JSON.`;
     }
   }
   if (chordCount === 0) {
-    return json({ error: 'no_chords_found' }, 502);
+    return new Response(JSON.stringify({ error: 'no_chords_found' }), {
+      status: 502,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
   }
 
-  return json({
+  return new Response(JSON.stringify({
     ok: true,
     type: 'exact',
     titre: typeof parsed.titre === 'string' ? parsed.titre : titre,
@@ -264,5 +351,9 @@ Réponds UNIQUEMENT avec le JSON.`;
     genre: typeof parsed.genre === 'string' ? parsed.genre : (genre || ''),
     sections,
     chord_count: chordCount,
+    _provider: provider,
+  }), {
+    status: 200,
+    headers: { ...CORS, 'Content-Type': 'application/json' },
   });
 }

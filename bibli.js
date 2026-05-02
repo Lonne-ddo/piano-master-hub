@@ -443,6 +443,8 @@
                 renderAll();
                 return;
             }
+            // Log léger : provider qui a répondu (groq | gemini)
+            console.log('[bibli] result via ' + (r.data._provider || 'unknown') + ', type=' + r.data.type);
             // Nouveau contrat : type 'exact' ou 'suggestions'
             if (r.data.type === 'suggestions') {
                 state.result = r.data;
