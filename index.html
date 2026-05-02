@@ -729,6 +729,9 @@
     //                      → 200 = render dashboard ; 401 = écran login
     //  Si URL = / → check whoami → si auth, redirect /{slug} ; sinon écran login
     // ──────────────────────────────────────────────
+    // Stocke la dernière réponse whoami pour les guards de sécurité (chooser).
+    var _lastWhoami = null;
+
     function runInit() {
         // Routing par query string (?eleve=slug) au lieu de path /{slug} — contourne
         // un bug observé sur CF Pages où le rewrite _redirects ne fonctionne pas
@@ -736,7 +739,6 @@
         var params = new URLSearchParams(window.location.search);
         var initialError = params.get("error");
         if (initialError) {
-            // Nettoie ?error=... mais préserve ?eleve=... si présent
             params.delete("error");
             var qs = params.toString();
             history.replaceState(null, "", window.location.pathname + (qs ? "?" + qs : ""));
@@ -746,9 +748,15 @@
         fetch("/api/auth/whoami", { credentials: "include" })
             .then(function(r) { return r.ok ? r.json() : null; })
             .then(function(j) {
+                _lastWhoami = j;
                 var authed = j && j.ok;
 
-                if (authed && j.is_admin) {
+                if (!authed) {
+                    renderLoginEmail(initialError);
+                    return;
+                }
+
+                if (j.is_admin) {
                     if (slugParam) {
                         var eleve = findEleveBySlug(slugParam)
                             || { slug: slugParam, display: slugParam.charAt(0).toUpperCase() + slugParam.slice(1) };
@@ -759,26 +767,22 @@
                     }
                     return;
                 }
-                if (authed && j.slug) {
-                    if (slugParam && slugParam === j.slug) {
-                        var meEleve = findEleveBySlug(j.slug)
-                            || { slug: j.slug, display: j.slug.charAt(0).toUpperCase() + j.slug.slice(1) };
-                        localStorage.setItem("eleve_slug", meEleve.slug);
-                        renderEspaceEleve(meEleve);
-                    } else if (slugParam && slugParam !== j.slug) {
-                        // Élève qui tente d'accéder à un autre slug → redirect vers le sien
-                        window.location.replace("/?eleve=" + encodeURIComponent(j.slug));
-                    } else {
-                        // Pas de slugParam → render directement sa fiche (URL reste /)
-                        var meEleve2 = findEleveBySlug(j.slug)
-                            || { slug: j.slug, display: j.slug.charAt(0).toUpperCase() + j.slug.slice(1) };
-                        localStorage.setItem("eleve_slug", meEleve2.slug);
-                        renderEspaceEleve(meEleve2);
-                    }
+
+                // ÉLÈVE NORMAL : ne JAMAIS afficher le chooser. Redirect immédiat
+                // vers sa propre fiche (pas de flash visuel).
+                if (!j.slug) {
+                    // Cas anormal (session sans slug et sans is_admin) → login
+                    renderLoginEmail(initialError);
                     return;
                 }
-                // Non authentifié → écran login (URL préservée)
-                renderLoginEmail(initialError);
+                if (!slugParam || slugParam !== j.slug) {
+                    window.location.replace("/?eleve=" + encodeURIComponent(j.slug));
+                    return;
+                }
+                var meEleve = findEleveBySlug(j.slug)
+                    || { slug: j.slug, display: j.slug.charAt(0).toUpperCase() + j.slug.slice(1) };
+                localStorage.setItem("eleve_slug", meEleve.slug);
+                renderEspaceEleve(meEleve);
             })
             .catch(function() { renderLoginEmail(initialError); });
     }
@@ -804,6 +808,13 @@
     //  Le browser navigate natively. Aucune chance d'interception possible.
     // ──────────────────────────────────────────────
     function renderAdminChooser(adminEmail) {
+        // Guard absolu : ne JAMAIS afficher le chooser sans is_admin confirmé
+        // côté serveur. Protège contre tout appel direct accidentel.
+        if (!_lastWhoami || _lastWhoami.is_admin !== true) {
+            console.error('[security] renderAdminChooser appelé sans is_admin');
+            window.location.replace('/');
+            return;
+        }
         var greeting = document.getElementById("greeting");
         if (greeting) greeting.innerHTML = '<p class="greeting">Connecté super-admin · ' + escapeHtml(adminEmail || '') + '</p>';
         var content = document.getElementById("content");

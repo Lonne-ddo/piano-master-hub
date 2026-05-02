@@ -28,7 +28,8 @@
 
     var STORAGE_KEY = 'mh_bibli:' + slug;
     var DEFAULT_STATE = {
-        lastSearch: { titre: '', artiste: '', genre: '', niveau: 'intermediaire' },
+        lastSearch: { titre: '', artiste: '', genre: '' },
+        lastMode: 'original',
         lastTempo: null,
         lastTransposition: 0
     };
@@ -40,6 +41,7 @@
             var p = JSON.parse(raw);
             return {
                 lastSearch: Object.assign({}, DEFAULT_STATE.lastSearch, p.lastSearch || {}),
+                lastMode: (p.lastMode === 'simplifie') ? 'simplifie' : 'original',
                 lastTempo: typeof p.lastTempo === 'number' ? p.lastTempo : null,
                 lastTransposition: typeof p.lastTransposition === 'number' ? p.lastTransposition : 0,
             };
@@ -52,6 +54,7 @@
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 lastSearch: state.search,
+                lastMode: state.mode,
                 lastTempo: state.tempo,
                 lastTransposition: state.transposition
             }));
@@ -61,26 +64,17 @@
     // ═══ State ═══
     var persisted = loadPersisted();
     var state = {
-        phase: 'search',                    // search | loading | results | not-found
+        phase: 'search',                    // search | loading | results | suggestions
         search: persisted.lastSearch,
-        result: null,                       // payload from API
+        mode: persisted.lastMode,           // 'original' | 'simplifie'
+        result: null,                       // payload from API (type:exact)
         tempo: persisted.lastTempo || 100,
-        transposition: persisted.lastTransposition,  // demi-tons
+        transposition: persisted.lastTransposition,
         currentlyPlaying: false,
         currentChordIndex: 0,
         playbackTimers: [],
-        flatChords: []                      // accords aplatis pour playback (avec ref ligne/section)
+        flatChords: []
     };
-
-    // ═══ Suggestions de morceaux ═══
-    var SUGGESTIONS = [
-        { titre: 'La Bohème',      artiste: 'Aznavour' },
-        { titre: 'Imagine',        artiste: 'Lennon' },
-        { titre: 'Hallelujah',     artiste: 'Cohen' },
-        { titre: 'Amazing Grace',  artiste: '' },
-        { titre: 'Cantaloupe Island', artiste: 'Hancock' },
-        { titre: 'Let It Be',      artiste: 'Beatles' }
-    ];
 
     var GENRES = [
         { id: '',                   label: '— Aucun —' },
@@ -92,11 +86,33 @@
         { id: 'autre',              label: 'Autre' }
     ];
 
-    var NIVEAUX = [
-        { id: 'debutant',       label: 'Débutant' },
-        { id: 'intermediaire',  label: 'Intermédiaire' },
-        { id: 'avance',         label: 'Avancé' }
+    var MODES = [
+        { id: 'original',  label: 'Original' },
+        { id: 'simplifie', label: 'Simplifié' }
     ];
+
+    // ═══ Simplification d'accord (mode 'simplifie') ═══
+    // Mappe les types complexes vers les plus proches dans la palette débutant.
+    // Garde : maj, min, dim, aug, 7, maj7, min7, dim7, min7b5.
+    var TYPE_SIMPLIFY = {
+        'sus2': 'maj', 'sus4': 'maj', 'aug': 'maj',
+        '6': 'maj', 'add9': 'maj', '9': '7', '13': '7',
+        '7sus4': '7', '7b9': '7', '7#5': '7', '7#9': '7',
+        'min6': 'min', 'min11': 'min7', 'mMaj7': 'min7'
+    };
+
+    function simplifyChord(chord) {
+        if (state.mode !== 'simplifie') return chord;
+        var parsed = MT.parseChord(normalizeChord(chord));
+        if (!parsed) return chord;
+        var newType = TYPE_SIMPLIFY[parsed.type];
+        if (!newType) return chord; // déjà simple ou type inconnu → garde
+        if (newType === 'maj') return parsed.root;
+        if (newType === 'min') return parsed.root + 'm';
+        if (newType === 'min7') return parsed.root + 'm7';
+        if (newType === 'min7b5') return parsed.root + 'm7b5';
+        return parsed.root + newType; // 7, maj7, dim7
+    }
 
     // ═══ Sampler (lazy-init, pattern grilles.js) ═══
     var sampler = null;
@@ -220,7 +236,9 @@
             if (tok.type === 'chord') {
                 // Pad chordsRow jusqu'à la longueur visible courante de lyricsRow
                 while (visibleLen(chordsRow) < lyricsRow.length) chordsRow += ' ';
-                var displayChord = transposeChordName(tok.value, transposeSemis);
+                // Mode simplifié : map vers le type le plus proche AVANT transpose
+                var srcChord = simplifyChord(tok.value);
+                var displayChord = transposeChordName(srcChord, transposeSemis);
                 var globalIdx = chordIdxStart + chordCounter;
                 chordsRow += '<span class="chord-tok" data-cidx="' + globalIdx + '">' + escapeHtml(displayChord) + '</span> ';
                 chordCounter++;
@@ -343,7 +361,9 @@
 
         var idx = state.currentChordIndex;
         var entry = state.flatChords[idx];
-        var transposed = transposeChordName(entry.chord, state.transposition);
+        // Cohérence audio = visuel : simplify (si mode actif) AVANT transpose.
+        var srcChord = simplifyChord(entry.chord);
+        var transposed = transposeChordName(srcChord, state.transposition);
         var notes = chordToNotes(transposed);
         var beatSec = 60 / state.tempo;
         var measureSec = beatSec * 4;
@@ -411,8 +431,7 @@
             body: JSON.stringify({
                 titre: titre,
                 artiste: state.search.artiste || '',
-                genre: state.search.genre || '',
-                niveau: state.search.niveau
+                genre: state.search.genre || ''
             })
         }).then(function (res) {
             return res.json().then(function (data) { return { ok: res.ok, data: data }; });
@@ -424,16 +443,22 @@
                 renderAll();
                 return;
             }
-            if (r.data.found === false) {
+            // Nouveau contrat : type 'exact' ou 'suggestions'
+            if (r.data.type === 'suggestions') {
                 state.result = r.data;
-                state.phase = 'not-found';
+                state.phase = 'suggestions';
+                renderAll();
+                return;
+            }
+            if (r.data.type !== 'exact') {
+                showToast('Réponse LLM inattendue');
+                state.phase = 'search';
                 renderAll();
                 return;
             }
             state.result = r.data;
             state.flatChords = buildFlatChords(r.data.sections);
             state.phase = 'results';
-            // Tempo : si l'utilisateur n'a pas explicitement persisté un tempo, prendre celui du LLM
             if (state.tempo === 100 && r.data.bpm) {
                 state.tempo = clampTempo(r.data.bpm);
             }
@@ -470,10 +495,10 @@
     }
 
     function renderAll() {
-        if (state.phase === 'search')         renderSearch();
-        else if (state.phase === 'loading')   renderLoading();
-        else if (state.phase === 'not-found') renderNotFound();
-        else                                  renderResults();
+        if (state.phase === 'search')           renderSearch();
+        else if (state.phase === 'loading')     renderLoading();
+        else if (state.phase === 'suggestions') renderSuggestions();
+        else                                    renderResults();
     }
 
     function renderSearch() {
@@ -505,29 +530,17 @@
         html += '</div>';
 
         html += '<div class="field">';
-        html +=   '<label>Niveau de difficulté <span style="color:var(--red)">*</span></label>';
-        html +=   '<div class="niveau-pills" id="niveau-pills">';
-        for (var j = 0; j < NIVEAUX.length; j++) {
-            var n = NIVEAUX[j];
-            var act = n.id === s.niveau ? ' active' : '';
-            html +=    '<button type="button" class="niveau-pill' + act + '" data-niveau="' + n.id + '">' + escapeHtml(n.label) + '</button>';
+        html +=   '<label>Mode des accords</label>';
+        html +=   '<div class="mode-toggle" id="mode-toggle">';
+        for (var j = 0; j < MODES.length; j++) {
+            var m = MODES[j];
+            var act = m.id === state.mode ? ' active' : '';
+            html +=    '<button type="button" class="mode-btn' + act + '" data-mode="' + m.id + '">' + escapeHtml(m.label) + '</button>';
         }
         html +=   '</div>';
         html += '</div>';
 
         html += '<button type="button" class="btn-primary" id="btn-search">🔍 Chercher</button>';
-        html += '</div>';
-
-        // Suggestions
-        html += '<div class="suggestions">';
-        html +=   '<div class="section-label">Idées de morceaux</div>';
-        html +=   '<div class="suggestion-chips">';
-        for (var k = 0; k < SUGGESTIONS.length; k++) {
-            var sug = SUGGESTIONS[k];
-            var lab = sug.titre + (sug.artiste ? ' (' + sug.artiste + ')' : '');
-            html += '<button type="button" class="suggestion-chip" data-sug="' + k + '">' + escapeHtml(lab) + '</button>';
-        }
-        html +=   '</div>';
         html += '</div>';
 
         $('main-area').innerHTML = html;
@@ -537,11 +550,12 @@
         $('f-artiste').addEventListener('input', function (e) { state.search.artiste = e.target.value; });
         $('f-genre').addEventListener('change', function (e) { state.search.genre = e.target.value; });
 
-        $('niveau-pills').addEventListener('click', function (e) {
-            var b = e.target.closest('button[data-niveau]');
+        $('mode-toggle').addEventListener('click', function (e) {
+            var b = e.target.closest('button[data-mode]');
             if (!b) return;
-            state.search.niveau = b.getAttribute('data-niveau');
-            renderSearch(); // re-render pour mettre à jour la pill active
+            state.mode = b.getAttribute('data-mode');
+            persist();
+            renderSearch();
         });
 
         $('btn-search').addEventListener('click', searchSong);
@@ -550,18 +564,6 @@
         });
         $('f-artiste').addEventListener('keydown', function (e) {
             if (e.key === 'Enter') { e.preventDefault(); searchSong(); }
-        });
-
-        document.querySelector('.suggestion-chips').addEventListener('click', function (e) {
-            var b = e.target.closest('button[data-sug]');
-            if (!b) return;
-            var idx = parseInt(b.getAttribute('data-sug'), 10);
-            var sug = SUGGESTIONS[idx];
-            if (!sug) return;
-            state.search.titre = sug.titre;
-            state.search.artiste = sug.artiste;
-            persist();
-            searchSong();
         });
     }
 
@@ -576,17 +578,46 @@
             '</div>';
     }
 
-    function renderNotFound() {
+    function renderSuggestions() {
+        var r = state.result;
+        if (!r || !Array.isArray(r.suggestions) || r.suggestions.length === 0) {
+            state.phase = 'search';
+            renderAll();
+            return;
+        }
         var sub = $('page-subtitle');
-        if (sub) sub.textContent = 'Morceau introuvable';
-        var msg = (state.result && state.result.message) || 'Morceau non trouvé. Essaie un autre titre ou ajoute le nom de l\'artiste.';
-        $('main-area').innerHTML =
-            '<div class="state-card">' +
-                '<div class="icon">🔍</div>' +
-                '<div class="msg">' + escapeHtml(msg) + '</div>' +
-                '<button type="button" class="btn-secondary" id="btn-back-search">← Nouvelle recherche</button>' +
-            '</div>';
-        $('btn-back-search').addEventListener('click', function () {
+        if (sub) sub.textContent = 'Morceau inconnu — alternatives proposées';
+
+        var msg = r.message || 'Je ne connais pas ce morceau. Voici des alternatives proches :';
+        var html = '<div class="llm-suggestions">';
+        html +=   '<div class="llm-suggestions-msg">' + escapeHtml(msg) + '</div>';
+        for (var i = 0; i < r.suggestions.length; i++) {
+            var s = r.suggestions[i];
+            html += '<button type="button" class="llm-suggestion-item" data-idx="' + i + '">';
+            html +=   '<span class="llm-suggestion-titre">' + escapeHtml(s.titre || '') + '</span>';
+            if (s.artiste) html += '<span class="llm-suggestion-artiste">' + escapeHtml(s.artiste) + '</span>';
+            if (s.raison)  html += '<span class="llm-suggestion-raison">' + escapeHtml(s.raison) + '</span>';
+            html += '</button>';
+        }
+        html += '<button type="button" class="btn-secondary" id="btn-back-search" style="margin-top:6px;">← Nouvelle recherche</button>';
+        html += '</div>';
+        $('main-area').innerHTML = html;
+
+        // Click sur une suggestion → remplit le form + relance la recherche
+        var items = document.querySelectorAll('.llm-suggestion-item');
+        items.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var idx = parseInt(btn.getAttribute('data-idx'), 10);
+                var sug = r.suggestions[idx];
+                if (!sug) return;
+                state.search.titre = sug.titre;
+                state.search.artiste = sug.artiste || '';
+                persist();
+                searchSong();
+            });
+        });
+        var back = $('btn-back-search');
+        if (back) back.addEventListener('click', function () {
             state.phase = 'search';
             state.result = null;
             renderAll();
@@ -618,6 +649,14 @@
         // Toolbar
         html += '<div class="toolbar">';
         html +=   '<button type="button" class="btn-secondary" id="btn-modify">← Modifier</button>';
+        // Toggle mode (Original/Simplifié) — re-render à la volée sans appel LLM
+        html +=   '<div class="mode-toggle" id="mode-toggle-results" style="flex:0 0 auto;min-width:160px;">';
+        for (var mi = 0; mi < MODES.length; mi++) {
+            var mm = MODES[mi];
+            var mAct = mm.id === state.mode ? ' active' : '';
+            html +=   '<button type="button" class="mode-btn' + mAct + '" data-mode="' + mm.id + '">' + escapeHtml(mm.label) + '</button>';
+        }
+        html +=   '</div>';
         html +=   '<div class="tool-row tempo-row">';
         html +=     '<span style="font-size:0.78rem;color:var(--text-muted);">Tempo</span>';
         html +=     '<input type="range" id="tempo-slider" min="40" max="200" step="1" value="' + state.tempo + '" />';
@@ -658,6 +697,20 @@
             renderAll();
         });
         $('btn-play').addEventListener('click', startPlayback);
+
+        // Toggle mode dans la toolbar : re-render sans appel LLM
+        var modeToolbar = $('mode-toggle-results');
+        if (modeToolbar) {
+            modeToolbar.addEventListener('click', function (e) {
+                var b = e.target.closest('button[data-mode]');
+                if (!b) return;
+                var newMode = b.getAttribute('data-mode');
+                if (newMode === state.mode) return;
+                state.mode = newMode;
+                persist();
+                renderResults();
+            });
+        }
 
         var tSlider = $('tempo-slider');
         var tValue  = $('tempo-value');

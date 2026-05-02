@@ -104,22 +104,29 @@
             outline: none; transition: border-color 0.2s;
         }
         .field input[type="text"]:focus, .field select:focus { border-color: var(--v); }
-        .niveau-pills {
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
-        }
-        .niveau-pill {
-            padding: 12px 8px;
+        /* Toggle Original / Simplifié — 2 boutons côte à côte */
+        .mode-toggle {
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 4px; padding: 4px;
             background: var(--bg);
-            color: var(--text-muted);
             border: 1px solid rgba(255,255,255,0.08);
             border-radius: 10px;
-            font-family: inherit; font-size: 0.85rem; font-weight: 500;
-            cursor: pointer; min-height: var(--tap-min);
-            transition: background 0.15s, color 0.15s, border-color 0.15s;
         }
-        .niveau-pill:hover { background: var(--bg-card-hover); }
-        .niveau-pill.active {
-            background: var(--v-soft-stronger); color: var(--v); border-color: var(--v);
+        .mode-btn {
+            padding: 10px 8px;
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            border-radius: 8px;
+            font-family: inherit; font-size: 0.85rem; font-weight: 500;
+            cursor: pointer; min-height: 38px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .mode-btn:hover { color: var(--text); }
+        .mode-btn.active {
+            background: var(--v-soft-stronger);
+            color: var(--v);
+            font-weight: 600;
         }
         .btn-primary {
             width: 100%; padding: 16px;
@@ -133,24 +140,44 @@
         .btn-primary:not(:disabled):active { transform: scale(0.98); }
         .btn-primary.loading { opacity: 0.7; cursor: wait; }
 
-        .suggestions {
-            margin-top: 18px;
-            display: flex; flex-direction: column; gap: 8px;
+        /* LLM suggestions — quand le morceau cherché n'est pas connu, on propose
+           3 alternatives proches sous forme de cards cliquables. */
+        .llm-suggestions {
+            display: flex; flex-direction: column; gap: 10px;
+            margin-top: 14px;
         }
-        .suggestion-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-        .suggestion-chip {
-            padding: 8px 12px;
-            background: var(--bg);
-            color: var(--text-muted);
+        .llm-suggestions-msg {
+            font-size: 0.92rem; color: var(--text); line-height: 1.5;
+            padding: 12px 14px;
+            background: var(--v-soft); border: 1px solid var(--v-border);
+            border-radius: 10px;
+        }
+        .llm-suggestion-item {
+            display: flex; flex-direction: column; gap: 4px;
+            padding: 14px 16px;
+            background: var(--bg-card);
             border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 999px;
-            font-family: inherit; font-size: 0.78rem; font-weight: 500;
-            cursor: pointer;
-            transition: background 0.15s, color 0.15s, border-color 0.15s;
+            border-radius: 12px;
+            color: var(--text);
+            font-family: inherit; text-align: left;
+            cursor: pointer; min-height: var(--tap-min);
+            transition: background 0.15s, border-color 0.15s, transform 0.1s;
         }
-        .suggestion-chip:hover {
-            background: var(--v-soft-stronger);
-            color: var(--v); border-color: var(--v-border);
+        .llm-suggestion-item:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--v-border);
+            transform: translateY(-1px);
+        }
+        .llm-suggestion-item:active { transform: scale(0.99); }
+        .llm-suggestion-titre {
+            font-size: 0.98rem; font-weight: 700; color: var(--text);
+        }
+        .llm-suggestion-artiste {
+            font-size: 0.85rem; color: var(--text-muted);
+        }
+        .llm-suggestion-raison {
+            font-size: 0.8rem; color: var(--v-light); margin-top: 4px;
+            font-style: italic;
         }
 
         /* ═══ PHASE 2 — Résultats ═══════════════════════════════ */
@@ -306,7 +333,7 @@
             .search-card, .result-head, .section-block { padding: 14px 12px; }
             .cp-chords { font-size: 0.78rem; }
             .cp-lyrics { font-size: 0.85rem; }
-            .niveau-pill { padding: 10px 4px; font-size: 0.78rem; }
+            .mode-btn { padding: 8px 4px; font-size: 0.78rem; }
         }
     </style>
 </head>

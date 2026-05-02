@@ -1,16 +1,24 @@
 // ─── POST /api/bibli/generate ────────────────────────────────────
 // Génère paroles + accords (format ChordPro) d'un morceau via Groq.
 //
-// Body : { titre, artiste?, genre?, niveau }
-//   titre : string non vide, 2-150 chars
-//   artiste : optionnel, 0-100 chars
+// Body : { titre, artiste?, genre? }
+//   titre : string non vide, 2-100 chars
+//   artiste : optionnel, 0-50 chars
 //   genre : optionnel, ∈ VALID_GENRES
-//   niveau : ∈ VALID_NIVEAUX (palette d'accords contraint le LLM)
 //
-// Response : { ok: true, found: true, titre, artiste, tonalite, tonalite_label_fr,
-//              bpm, genre, sections: [{ type, label, lines: [...] }] }
-//   Ou : { ok: true, found: false, message: '...' } si LLM ne connaît pas le morceau.
+// Response : 2 formats possibles selon que le LLM connaît le morceau ou non.
+//
+//   Cas EXACT (morceau connu) :
+//   { ok: true, type: 'exact', titre, artiste, tonalite, tonalite_label_fr,
+//     bpm, genre, sections: [{ type, label, lines }], chord_count }
+//
+//   Cas SUGGESTIONS (morceau inconnu, LLM propose 3 alternatives) :
+//   { ok: true, type: 'suggestions', message,
+//     suggestions: [{ titre, artiste, raison }] }
+//
 // Pas d'auth (page élève publique avec slug whitelist côté frontend).
+// Pas de palette d'accords contrainte : le LLM utilise la notation jazz complète,
+// le frontend simplifie via le mode toggle (Original/Simplifié).
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -18,19 +26,18 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-const VALID_NIVEAUX = ['debutant', 'intermediaire', 'avance'];
 const VALID_GENRES = ['variete-francaise', 'pop', 'gospel', 'jazz', 'rock', 'autre'];
 
-// Palettes d'accords par niveau (suffixes notation jazz LLM, pas notation MhTheory)
-const NIVEAU_PALETTES = {
-  debutant: ['(rien)', 'm', 'dim', '7'],
-  intermediaire: ['(rien)', 'm', 'dim', 'aug', '7', 'maj7', 'm7', 'sus2', 'sus4', 'dim7'],
-  avance: ['(rien)', 'm', 'dim', 'aug', 'sus2', 'sus4', '7', 'maj7', 'm7', 'm7b5', 'dim7', 'mMaj7', '6', 'm6', 'add9', '9', '13', 'm11', '7sus4', '7b9', '7#5', '7#9'],
-};
+// Palette des suffixes notation jazz autorisés — alignée avec MhTheory.CHORD_TYPES
+// (22 types). Le LLM doit s'y tenir ; le frontend gère la simplification visuelle.
+const PALETTE_LLM = [
+  '(rien)', 'm', 'dim', 'aug', 'sus2', 'sus4',
+  '7', 'maj7', 'm7', 'm7b5', 'dim7', 'mMaj7',
+  '6', 'm6', 'add9', '9', '13', 'm11',
+  '7sus4', '7b9', '7#5', '7#9',
+];
 
 // Strip caractères de contrôle + brackets ChordPro ([], {}) + tags HTML (<, >).
-// Réduit prompt injection vers le LLM et garantit que les paroles ne contiennent
-// pas de marqueurs ChordPro injectés via le titre/artiste.
 function sanitizeFreeText(s, maxLen) {
   if (typeof s !== 'string') return '';
   let out = s.replace(/[\x00-\x1F\x7F\[\]{}<>]/g, '');
@@ -54,8 +61,6 @@ export async function onRequestPost({ request, env }) {
   try { body = await request.json(); }
   catch { return json({ error: 'invalid_json' }, 400); }
 
-  // Sanitize : strip caractères de contrôle + brackets ChordPro/HTML pour fermer
-  // toute fenêtre de prompt injection vers le LLM. Limites de longueur strictes.
   const titre = sanitizeFreeText(body.titre, 100);
   if (titre.length < 2) {
     return json({ error: 'invalid_titre' }, 400);
@@ -65,29 +70,25 @@ export async function onRequestPost({ request, env }) {
   if (genre && !VALID_GENRES.includes(genre)) {
     return json({ error: 'invalid_genre' }, 400);
   }
-  const niveau = String(body.niveau || '').toLowerCase();
-  if (!VALID_NIVEAUX.includes(niveau)) {
-    return json({ error: 'invalid_niveau' }, 400);
-  }
 
   if (!env.GROQ_API_KEY) {
     return json({ error: 'groq_not_configured' }, 500);
   }
 
-  const palette = NIVEAU_PALETTES[niveau];
-  const paletteStr = palette.join(', ');
+  const paletteStr = PALETTE_LLM.join(', ');
 
   const systemPrompt = `Tu es un expert en transcription d'accords pour piano. Tu réponds UNIQUEMENT en JSON pur valide (pas de markdown, pas de backticks, pas de texte autour).`;
 
   const userPrompt = `Génère les accords + paroles du morceau "${titre}"${artiste ? ' de ' + artiste : ''}${genre ? ' (genre: ' + genre + ')' : ''}.
 
-CONTRAINTES :
+Tu DOIS retourner UN SEUL des deux formats JSON suivants — JAMAIS un mélange.
 
-1. Format de sortie : JSON strict avec structure :
+═══ CAS 1 — Tu CONNAIS ce morceau précis avec certitude ═══
+
 {
-  "found": true,
+  "type": "exact",
   "titre": "<titre exact>",
-  "artiste": "<artiste exact, ou '' si inconnu>",
+  "artiste": "<artiste exact, ou \\"\\" si inconnu>",
   "tonalite": "<ex: Dm, C, F>",
   "tonalite_label_fr": "<ex: Ré mineur, Do majeur>",
   "bpm": <nombre entier réaliste, ex 76>,
@@ -101,35 +102,43 @@ CONTRAINTES :
   ]
 }
 
-2. Format ChordPro pour les paroles :
-   - Mettre les accords entre crochets [Dm] juste avant la syllabe où l'accord change
-   - Exemple : "[Dm]Je vous parle d'un [Bm7b5]temps"
-   - Plusieurs accords sans paroles (intro/outro instrumentale) : "[A7] [Dm] [Am7]"
-   - Sections sans paroles : juste les accords sur une ligne
-
+CONTRAINTES CAS 1 :
+1. Format ChordPro : accords entre crochets [Dm] juste avant la syllabe où l'accord change. Ex : "[Dm]Je vous parle d'un [Bm7b5]temps".
+2. Plusieurs accords sans paroles (intro instrumentale) : "[A7] [Dm] [Am7]" sur une ligne.
 3. PALETTE D'ACCORDS AUTORISÉE (suffixes après [A-G] avec # ou b optionnel) :
    ${paletteStr}
+   Si l'accord original n'est pas dans cette palette, simplifie au plus proche dans la palette. Slash chords (C/E) → ignore le bass note, garde "C".
+4. Tonalité ORIGINALE du morceau (pas transposée).
+5. BPM : tempo réel si connu, sinon estime selon le genre (ballade=70, midtempo=100, rapide=130).
+6. COPYRIGHT : pour les paroles, donne UNIQUEMENT les premiers 5-8 mots de chaque ligne.
+7. Au moins 2 sections (couplet + refrain typiquement). 4 à 8 lignes par section maximum.
+8. Tonalité format : root [A-G] avec # ou b optionnel, suivi de 'm' si mineure. Ex: "C", "Dm", "Bb", "F#m".
 
-   Si l'accord original du morceau n'est pas dans cette palette, simplifie au plus proche dans la palette :
-   - Cmaj9 → Cmaj7 (intermédiaire) ou C (débutant)
-   - C13 → C7 (intermédiaire et débutant)
-   - Cm9 → Cm7 (intermédiaire) ou Cm (débutant)
-   - Slash chords (C/E) → ignore le bass note, garde juste C
-   INTERDIT FORMELLEMENT : utiliser un suffixe hors palette. Cette règle est PRIORITAIRE.
+═══ CAS 2 — Tu ne CONNAIS PAS ce morceau précis ═══
 
-4. Si le morceau n'est PAS connu de toi avec certitude, retourne :
-   { "found": false, "message": "Morceau non trouvé. Essaie un autre titre ou ajoute le nom de l'artiste." }
-   IMPORTANT : ne PAS inventer un morceau. Mieux vaut dire qu'il n'est pas connu.
+{
+  "type": "suggestions",
+  "message": "<phrase courte qui explique que tu ne connais pas et que tu proposes des alternatives>",
+  "suggestions": [
+    { "titre": "<titre exact>", "artiste": "<artiste exact>", "raison": "<phrase courte expliquant pourquoi cette alternative>" },
+    { "titre": "...", "artiste": "...", "raison": "..." },
+    { "titre": "...", "artiste": "...", "raison": "..." }
+  ]
+}
 
-5. La tonalité retournée doit être la TONALITÉ ORIGINALE du morceau (pas transposée). L'élève transposera ensuite côté frontend.
+CONTRAINTES CAS 2 :
+1. EXACTEMENT 3 suggestions, pas plus, pas moins.
+2. Les suggestions doivent être des morceaux que tu CONNAIS et qui sont PROCHES du morceau demandé :
+   - Même artiste si possible (ex: demandé "Burna Boy unknown" → propose 3 morceaux de Burna Boy connus de toi)
+   - Même genre, même époque, même style sinon
+3. La "raison" explique le lien (ex: "même artiste", "style afrobeats similaire", "ballade gospel similaire").
+4. Le message peut être court : "Je ne connais pas ce morceau précis. Voici 3 alternatives proches :"
 
-6. BPM : indique le tempo réel du morceau si tu le connais, sinon estime selon le genre (ballade=70, midtempo=100, rapide=130).
+═══ RÈGLE IMPORTANTE ═══
 
-7. COPYRIGHT : pour les paroles, donne UNIQUEMENT les premiers 5-8 mots de chaque ligne (pas les paroles complètes). L'élève reconnaîtra le morceau au placement des accords.
-
-8. Au moins 2 sections (couplet + refrain typiquement). 4 à 8 lignes par section maximum.
-
-9. Tonalité format : root [A-G] avec # ou b optionnel, suivi de 'm' si mineure. Ex: "C", "Dm", "Bb", "F#m".
+Si tu connais le morceau → CAS 1 (jamais le cas 2 par paresse).
+Si tu ne le connais pas → CAS 2 (jamais inventer un morceau pour le cas 1).
+TOUJOURS retourner un JSON valide. JAMAIS de "found: false" ou autre format.
 
 Réponds UNIQUEMENT avec le JSON.`;
 
@@ -179,16 +188,41 @@ Réponds UNIQUEMENT avec le JSON.`;
     return json({ error: 'invalid_structure' }, 502);
   }
 
-  // Cas "non trouvé" : on renvoie tel quel pour que le frontend affiche le message.
-  if (parsed.found === false) {
+  // Détection du format de réponse (LLM peut omettre le `type` explicite)
+  const isSuggestions = parsed.type === 'suggestions' || Array.isArray(parsed.suggestions);
+  const isExact = parsed.type === 'exact' || Array.isArray(parsed.sections);
+
+  if (isSuggestions) {
+    const rawSuggestions = Array.isArray(parsed.suggestions) ? parsed.suggestions : [];
+    const suggestions = rawSuggestions
+      .filter(s => s && typeof s === 'object')
+      .map(s => ({
+        titre: sanitizeFreeText(s.titre || '', 100),
+        artiste: sanitizeFreeText(s.artiste || '', 50),
+        raison: sanitizeFreeText(s.raison || '', 200),
+      }))
+      .filter(s => s.titre.length > 0)
+      .slice(0, 5);
+
+    if (suggestions.length === 0) {
+      return json({ error: 'no_valid_suggestions' }, 502);
+    }
+
     return json({
       ok: true,
-      found: false,
-      message: typeof parsed.message === 'string' ? parsed.message : 'Morceau non trouvé.',
+      type: 'suggestions',
+      message: typeof parsed.message === 'string'
+        ? parsed.message.slice(0, 250)
+        : 'Je ne connais pas ce morceau précis. Voici des alternatives proches :',
+      suggestions,
     });
   }
 
-  // Validation post-LLM (cas trouvé)
+  if (!isExact) {
+    return json({ error: 'invalid_structure' }, 502);
+  }
+
+  // Validation post-LLM (cas exact)
   if (!Array.isArray(parsed.sections) || parsed.sections.length === 0) {
     return json({ error: 'invalid_sections' }, 502);
   }
@@ -206,33 +240,29 @@ Réponds UNIQUEMENT avec le JSON.`;
     return json({ error: 'no_valid_sections' }, 502);
   }
 
-  // Audit : extraire tous les accords trouvés via regex et logger les hors-palette
-  // (pas bloquant — le LLM essaye de simplifier mais peut rater).
+  // Compte total des accords (pour stats / debug)
   const chordRe = /\[([^\]]+)\]/g;
-  const allChords = [];
+  let chordCount = 0;
   for (const section of sections) {
     for (const line of section.lines) {
-      let m;
       chordRe.lastIndex = 0;
-      while ((m = chordRe.exec(line)) !== null) allChords.push(m[1]);
+      while (chordRe.exec(line) !== null) chordCount++;
     }
   }
-  // (palette-check côté frontend si besoin — on log juste ici)
-  if (allChords.length === 0) {
+  if (chordCount === 0) {
     return json({ error: 'no_chords_found' }, 502);
   }
 
   return json({
     ok: true,
-    found: true,
+    type: 'exact',
     titre: typeof parsed.titre === 'string' ? parsed.titre : titre,
     artiste: typeof parsed.artiste === 'string' ? parsed.artiste : artiste,
     tonalite: typeof parsed.tonalite === 'string' ? parsed.tonalite : '',
     tonalite_label_fr: typeof parsed.tonalite_label_fr === 'string' ? parsed.tonalite_label_fr : '',
     bpm: Number.isInteger(parsed.bpm) && parsed.bpm >= 40 && parsed.bpm <= 220 ? parsed.bpm : 100,
     genre: typeof parsed.genre === 'string' ? parsed.genre : (genre || ''),
-    niveau,
     sections,
-    chord_count: allChords.length,
+    chord_count: chordCount,
   });
 }
