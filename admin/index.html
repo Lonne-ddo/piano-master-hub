@@ -9,7 +9,7 @@
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (j) {
       if (!j || !j.ok) { window.location.replace('/admin/login.html'); return; }
-      document.body.style.display = '';
+      document.body.style.display = 'block';
     })
     .catch(function () { window.location.replace('/admin/login.html'); });
   </script>
