@@ -409,7 +409,6 @@
     // ═══ API call ═══
     function searchSong() {
         if (state.phase === 'loading') return;
-        // Sanitize côté client (strip controls + brackets, limit length) — backend revalide
         var titre = sanitizeText(state.search.titre, 100);
         var artiste = sanitizeText(state.search.artiste, 50);
         state.search.titre = titre;
@@ -418,12 +417,29 @@
             showToast('Entre un titre (2 caractères minimum, sans crochets ni < >)');
             return;
         }
-        // Reset audio + transposition + tempo : nouveau morceau = état neutre
         stopPlayback({ immediate: true });
         state.transposition = 0;
-        state.tempo = 100; // sentinel : sera remplacé par r.data.bpm en succès
+        state.tempo = 100;
         state.phase = 'loading';
         renderAll();
+
+        // Loader évolutif : message change à 3s puis 8s.
+        var loaderTimer1 = setTimeout(function () {
+            if (state.phase === 'loading') setLoaderMessage('✍️ Génération des accords…');
+        }, 3000);
+        var loaderTimer2 = setTimeout(function () {
+            if (state.phase === 'loading') setLoaderMessage('⏳ Presque prêt…');
+        }, 8000);
+
+        // AbortController : 30s timeout côté client
+        var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        var timeoutId = controller ? setTimeout(function () { controller.abort(); }, 30000) : null;
+
+        function clearLoaderTimers() {
+            clearTimeout(loaderTimer1);
+            clearTimeout(loaderTimer2);
+            if (timeoutId) clearTimeout(timeoutId);
+        }
 
         fetch('/api/bibli/generate', {
             method: 'POST',
@@ -432,10 +448,12 @@
                 titre: titre,
                 artiste: state.search.artiste || '',
                 genre: state.search.genre || ''
-            })
+            }),
+            signal: controller ? controller.signal : undefined
         }).then(function (res) {
             return res.json().then(function (data) { return { ok: res.ok, data: data }; });
         }).then(function (r) {
+            clearLoaderTimers();
             if (!r.ok || !r.data || !r.data.ok) {
                 var err = (r.data && r.data.error) || 'erreur inconnue';
                 showToast('Génération échouée : ' + err);
@@ -467,8 +485,13 @@
             persist();
             renderAll();
         }).catch(function (e) {
-            console.error('[bibli] search failed:', e);
-            showToast('Erreur réseau : ' + (e.message || ''));
+            clearLoaderTimers();
+            if (e && e.name === 'AbortError') {
+                showToast('Délai dépassé (30 s). Réessaie.');
+            } else {
+                console.error('[bibli] search failed:', e);
+                showToast('Erreur réseau : ' + (e.message || ''));
+            }
             state.phase = 'search';
             renderAll();
         });
@@ -575,9 +598,14 @@
         $('main-area').innerHTML =
             '<div class="state-card">' +
                 '<div class="spinner"></div>' +
-                '<div class="msg">Génération des accords par IA…</div>' +
-                '<div class="sub">Quelques secondes</div>' +
+                '<div class="msg" id="loader-msg">🔍 Recherche du morceau…</div>' +
+                '<div class="sub" id="loader-sub">Quelques secondes</div>' +
             '</div>';
+    }
+
+    function setLoaderMessage(msg) {
+        var el = document.getElementById('loader-msg');
+        if (el) el.textContent = msg;
     }
 
     function renderSuggestions() {

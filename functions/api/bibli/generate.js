@@ -70,7 +70,7 @@ async function callGemini(systemPrompt, userMessage, apiKey, opts = {}) {
         generationConfig: {
           responseMimeType: 'application/json',
           temperature: opts.temperature ?? 0.3,
-          maxOutputTokens: opts.maxTokens || 3500,
+          maxOutputTokens: opts.maxTokens || 6000,
         },
       }),
     }
@@ -97,7 +97,7 @@ async function callGroq(systemPrompt, userMessage, apiKey, opts = {}) {
       model: 'llama-3.3-70b-versatile',
       response_format: { type: 'json_object' },
       temperature: opts.temperature ?? 0.3,
-      max_tokens: opts.maxTokens || 3500,
+      max_tokens: opts.maxTokens || 6000,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user',   content: userMessage },
@@ -139,7 +139,32 @@ export async function onRequestPost({ request, env }) {
 
   const paletteStr = PALETTE_LLM.join(', ');
 
-  const systemPrompt = `Tu es un expert en transcription d'accords pour piano. Tu réponds UNIQUEMENT en JSON pur valide (pas de markdown, pas de backticks, pas de texte autour).`;
+  const systemPrompt = `Tu es un expert en transcription musicale pour piano, spécialisé dans les arrangements pédagogiques. Tu connais des milliers de morceaux : standards de jazz, soul, gospel, pop classique, variété francophone, afrobeats, R&B, rap mainstream, rock, classique, etc.
+
+Ta mission : transcrire des morceaux en format ChordPro avec une fidélité maximale, à destination d'élèves pianistes en cours de coaching privé.
+
+PRIORITÉS (par ordre d'importance) :
+
+1. EXACTITUDE des accords : utilise les VRAIS accords du morceau, pas des simplifications. Si le morceau utilise un Cdim7, écris Cdim7. Tous les types disponibles : maj, min, dim, aug, sus2, sus4, 7, maj7, min7, min7b5, dim7, mMaj7, 6, min6, add9, 9, 11, 13, min9, min11, 7sus4, 7b9, 7#9, 7#5, etc.
+
+2. STRUCTURE COMPLÈTE : génère TOUTES les sections du morceau :
+   - Intro (si présente)
+   - Tous les couplets ("Couplet 1", "Couplet 2", "Couplet 3"...)
+   - Tous les refrains
+   - Pont / bridge (si présent)
+   - Solo (si instrumentale notable, juste les accords)
+   - Outro (si présente)
+   ⚠️ Minimum 4 sections par morceau (sauf si vraiment très court).
+
+3. PAROLES : 10-15 premiers mots par ligne (assez pour reconnaître le morceau et placer les accords correctement).
+
+4. PLACEMENT précis des accords [X] juste avant la syllabe où l'accord change.
+
+5. TONALITÉ originale du morceau.
+
+6. BPM réel du morceau si tu le connais.
+
+Ne réponds qu'en JSON pur (pas de markdown, pas de backticks).`;
 
   const userPrompt = `Génère les accords + paroles du morceau "${titre}"${artiste ? ' de ' + artiste : ''}${genre ? ' (genre: ' + genre + ')' : ''}.
 
@@ -165,16 +190,40 @@ Tu DOIS retourner UN SEUL des deux formats JSON suivants — JAMAIS un mélange.
 }
 
 CONTRAINTES CAS 1 :
-1. Format ChordPro : accords entre crochets [Dm] juste avant la syllabe où l'accord change. Ex : "[Dm]Je vous parle d'un [Bm7b5]temps".
-2. Plusieurs accords sans paroles (intro instrumentale) : "[A7] [Dm] [Am7]" sur une ligne.
-3. PALETTE D'ACCORDS AUTORISÉE (suffixes après [A-G] avec # ou b optionnel) :
+
+1. FORMAT ChordPro : accords entre crochets [Dm] juste avant la syllabe où l'accord change. Ex : "[Dm]Je vous parle d'un [Bm7b5]temps".
+   Plusieurs accords sans paroles (intro instrumentale) : "[A7] [Dm] [Am7]" sur une ligne.
+
+2. EXHAUSTIVITÉ — AU MOINS 4 SECTIONS distinctes. Pour un morceau standard :
+   - intro instrumentale (si elle existe)
+   - couplet 1, couplet 2, couplet 3 — distinguer les variations harmoniques entre eux
+   - refrain (chœur) avec ses variations
+   - pont si présent
+   - solo / outro / coda si présents
+   N'omets PAS les sections instrumentales. Le but est de couvrir l'intégralité de la structure.
+
+3. AU MOINS 12 LIGNES TOTAL réparties sur les sections.
+
+4. EXEMPLE DE QUALITÉ ATTENDUE — pour "Isn't She Lovely" de Stevie Wonder :
+   - 8+ sections : intro long, 3 couplets, 3 refrains, solo harmonica, outro
+   - 20+ lignes
+   - Variété d'accords typique soul/jazz : E, B7, A, A7, F#m7, Cdim7
+
+5. PALETTE D'ACCORDS AUTORISÉE (suffixes après [A-G] avec # ou b optionnel) :
    ${paletteStr}
    Si l'accord original n'est pas dans cette palette, simplifie au plus proche dans la palette. Slash chords (C/E) → ignore le bass note, garde "C".
-4. Tonalité ORIGINALE du morceau (pas transposée).
-5. BPM : tempo réel si connu, sinon estime selon le genre (ballade=70, midtempo=100, rapide=130).
-6. COPYRIGHT : pour les paroles, donne UNIQUEMENT les premiers 5-8 mots de chaque ligne.
-7. Au moins 2 sections (couplet + refrain typiquement). 4 à 8 lignes par section maximum.
-8. Tonalité format : root [A-G] avec # ou b optionnel, suivi de 'm' si mineure. Ex: "C", "Dm", "Bb", "F#m".
+
+6. ZÉRO HALLUCINATION — n'invente PAS d'accords ou de paroles. Si tu ne connais
+   pas une partie précise du morceau, omets-la. Si tu ne peux pas atteindre 4 sections
+   et 12 lignes avec certitude → bascule sur le CAS 2 (suggestions).
+
+7. PAROLES — 10 à 15 mots par ligne maximum. Suffisant pour identifier le morceau
+   sans risque copyright (usage pédagogique privé pour 4 élèves coachés).
+
+8. TONALITÉ ORIGINALE du morceau (pas transposée). Format : root [A-G] avec # ou b
+   optionnel, suivi de 'm' si mineure. Ex: "C", "Dm", "Bb", "F#m".
+
+9. BPM : tempo réel si connu, sinon estime selon le genre (ballade=70, midtempo=100, rapide=130).
 
 ═══ CAS 2 — Tu ne CONNAIS PAS ce morceau précis ═══
 
@@ -209,7 +258,7 @@ Réponds UNIQUEMENT avec le JSON.`;
   // 'suggestions' (morceau pas connu) OU si Groq fail, on tente Gemini Flash
   // (corpus plus large pour les niches afrobeats / gospel non-anglo / etc.).
   // On garde la meilleure réponse (exact > suggestions).
-  const opts = { temperature: 0.3, maxTokens: 3500 };
+  const opts = { temperature: 0.3, maxTokens: 6000 };
   let groqOutcome = null, geminiOutcome = null;
 
   if (env.GROQ_API_KEY) {
