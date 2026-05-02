@@ -8,7 +8,7 @@
 //                                   → { status, output, ... } + log final si terminé
 //
 // Auth : super-admin via session cookie uniquement (magic link → is_admin === true).
-// Pas de x-admin-secret. Pas d'autre porte d'entrée.
+// Aucune autre porte d'entrée (pas de header secret, pas de query token).
 //
 // Logging : un seul log final par run dans MASTERHUB_HISTORY (TTL 90j),
 // déduplication via clé tag `stems:tag:<predictionId>`.

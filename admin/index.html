@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+  <style>body{display:none}</style>
+  <script>
+  // Garde super-admin via cookie session — affiche la page seulement
+  // après confirmation par /api/auth/whoami.
+  fetch('/api/auth/whoami', { credentials: 'same-origin' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      if (!j || !j.ok || !j.is_admin) { window.location.replace('/'); return; }
+      document.body.style.display = '';
+    })
+    .catch(function () { window.location.replace('/'); });
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Élèves — Master Hub Admin</title>
@@ -687,11 +699,8 @@ let STUDENT_LIST = [
 let activeId = null;
 let clientCache = {};
 
-// Secret hardcodé : l'URL /admin/ n'est connue que d'Estelon. Couche de défense
-// minimale côté frontend ; le backend continue à valider env.ADMIN_SECRET.
-function authHeaders() {
-  return { 'x-admin-secret': '4697' };
-}
+// Auth : cookie mh_session envoyé automatiquement (same-origin fetch).
+// Toutes les fetch /api/eleves/* passent par credentials: 'same-origin'.
 
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
@@ -1027,7 +1036,7 @@ async function selectStudent(id, forceSync = false) {
   showLoader(meta.nom);
   try {
     const res = await fetch(`/api/eleves/${id}${forceSync ? '?sync=true' : ''}`, {
-      headers: authHeaders()
+      credentials: 'same-origin'
     });
     const data = await res.json();
     // En mode 'stale', le worker renvoie 200 avec source:'stale' + error — on affiche le profil, pas d'erreur bloquante
@@ -1055,7 +1064,7 @@ async function syncFromGDocs() {
   try {
     const res = await fetch('/api/eleves/sync', {
       method: 'POST',
-      headers: authHeaders()
+      credentials: 'same-origin'
     });
     const data = await res.json();
     if (data.success) {
@@ -1139,7 +1148,8 @@ async function makeDateEditable(el, studentId, field, kind = 'date') {
     try {
       const res = await fetch(`/api/eleves/${studentId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stats_override: { [field]: payloadValue } })
       });
       const payload = await res.json().catch(() => ({}));
@@ -1148,7 +1158,7 @@ async function makeDateEditable(el, studentId, field, kind = 'date') {
       }
       let fresh = payload.data || null;
       if (!fresh) {
-        const getRes = await fetch(`/api/eleves/${studentId}`, { headers: authHeaders() });
+        const getRes = await fetch(`/api/eleves/${studentId}`, { credentials: 'same-origin' });
         const getData = await getRes.json();
         if (getRes.ok && !getData.error) fresh = getData;
       }
@@ -1193,7 +1203,8 @@ async function resetDateOverride(studentId, field) {
   try {
     const res = await fetch(`/api/eleves/${studentId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stats_override: { [field]: null } })
     });
     const payload = await res.json().catch(() => ({}));
@@ -1202,7 +1213,7 @@ async function resetDateOverride(studentId, field) {
     }
     let fresh = payload.data || null;
     if (!fresh) {
-      const getRes = await fetch(`/api/eleves/${studentId}`, { headers: authHeaders() });
+      const getRes = await fetch(`/api/eleves/${studentId}`, { credentials: 'same-origin' });
       const getData = await getRes.json();
       if (getRes.ok && !getData.error) fresh = getData;
     }
@@ -1324,7 +1335,8 @@ function editChannel(studentId, channel) {
     try {
       const res = await fetch(`/api/eleves/${studentId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
       const payload = await res.json().catch(() => ({}));

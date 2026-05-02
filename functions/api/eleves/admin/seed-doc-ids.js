@@ -6,16 +6,19 @@
 // Garantit aussi que `eleves:list` contient bien tous les slugs
 // (utile si la clé est partiellement initialisée).
 //
-// Auth : x-admin-secret. À lancer une fois après deploy de l'infra
-// de centralisation, depuis la console DevTools sur /admin/ :
+// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
+// À lancer une fois après deploy, depuis la console DevTools sur /admin/
+// (le cookie session est envoyé automatiquement) :
 //
 //   fetch('/api/eleves/admin/seed-doc-ids', {
 //     method: 'POST',
-//     headers: { 'x-admin-secret': '4697' }
+//     credentials: 'same-origin'
 //   }).then(r => r.json()).then(console.log)
 //
 // Réponse : { ok: true, results: [{ slug, status, value? }] }
 //   status ∈ 'created' | 'updated' | 'unchanged' | 'error'
+
+import { requireAdmin } from '../../_lib/session.js';
 
 const DOC_IDS = {
   japhet: '19xGdQoE2k2tSFYp_MykzDL-7vxIz5HYr4DR3wRuQ3TM',
@@ -27,7 +30,7 @@ const DOC_IDS = {
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-admin-secret, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type',
 };
 
 function jsonResponse(data, status = 200) {
@@ -42,9 +45,8 @@ export async function onRequestOptions() {
 }
 
 export async function onRequestPost({ request, env }) {
-  const secret = request.headers.get('x-admin-secret');
-  if (!secret || secret !== env.ADMIN_SECRET) {
-    return jsonResponse({ error: 'Unauthorized' }, 401);
+  if (!(await requireAdmin(request, env))) {
+    return jsonResponse({ error: 'unauthorized' }, 401);
   }
 
   const results = [];

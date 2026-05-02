@@ -1,6 +1,6 @@
 // ─── GET /api/quiz/admin/list[?slug=…] ───────────────────────────
 // Admin endpoint : liste les sessions de quiz par élève + stats agrégées.
-// Auth : x-admin-secret === env.ADMIN_SECRET (sinon 401).
+// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
 // Stockage source : KV MASTERHUB_QUIZ_HISTORY, clés `quiz:<slug>:<ts>`.
 //
 // Query :
@@ -22,12 +22,14 @@
 //   }
 // }
 
+import { requireAdmin } from '../../_lib/session.js';
+
 const ELEVES = ['japhet', 'tara', 'dexter', 'messon'];
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-admin-secret, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type',
 };
 
 function jsonResponse(data, status = 200) {
@@ -37,21 +39,14 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-function requireAuth(request, env) {
-  const secret = request.headers.get('x-admin-secret');
-  if (!secret || secret !== env.ADMIN_SECRET) {
-    return jsonResponse({ ok: false, error: 'Unauthorized' }, 401);
-  }
-  return null;
-}
-
 export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS });
 }
 
 export async function onRequestGet({ request, env }) {
-  const authErr = requireAuth(request, env);
-  if (authErr) return authErr;
+  if (!(await requireAdmin(request, env))) {
+    return jsonResponse({ ok: false, error: 'unauthorized' }, 401);
+  }
 
   if (!env.MASTERHUB_QUIZ_HISTORY) {
     return jsonResponse({

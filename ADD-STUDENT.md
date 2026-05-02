@@ -28,7 +28,8 @@ Depuis la console DevTools sur `/admin/` (auth déjà active) :
 ```js
 fetch('/api/eleves/nouveau', {
   method: 'PATCH',
-  headers: { 'Content-Type': 'application/json', 'x-admin-secret': '4697' },
+  credentials: 'same-origin',
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({})
 }).then(r => r.json()).then(console.log)
 ```

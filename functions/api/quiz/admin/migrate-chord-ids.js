@@ -3,16 +3,17 @@
 // m6, m9, m11) vers la convention canonique MhTheory (min7, min, etc.) dans
 // les sessions historiques de MASTERHUB_QUIZ_HISTORY.
 //
-// À lancer manuellement après le commit qui aligne quiz-engine sur MhTheory :
-//   curl -X POST https://piano-master-hub.pages.dev/api/quiz/admin/migrate-chord-ids \
-//        -H "x-admin-secret: <secret>"
+// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
 //
-// Ou DevTools console :
-//   fetch('/api/quiz/admin/migrate-chord-ids', { method: 'POST', headers: { 'x-admin-secret': '4697' } })
+// À lancer manuellement après le commit qui aligne quiz-engine sur MhTheory,
+// depuis la console DevTools sur /admin/ (cookie envoyé automatiquement) :
+//   fetch('/api/quiz/admin/migrate-chord-ids', { method: 'POST', credentials: 'same-origin' })
 //     .then(r => r.json()).then(console.log)
 //
 // Idempotent : peut être relancé sans risque (les ids déjà migrés ne sont pas
 // re-touchés). Marque chaque entrée mise à jour avec _migrated.
+
+import { requireAdmin } from '../../_lib/session.js';
 
 const MIGRATION_MAP = {
   'm':      'min',
@@ -26,7 +27,7 @@ const MIGRATION_MAP = {
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-admin-secret, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type',
 };
 
 function json(data, status = 200) {
@@ -41,8 +42,7 @@ export async function onRequestOptions() {
 }
 
 export async function onRequestPost({ request, env }) {
-  const secret = request.headers.get('x-admin-secret');
-  if (!secret || secret !== env.ADMIN_SECRET) {
+  if (!(await requireAdmin(request, env))) {
     return json({ ok: false, error: 'unauthorized' }, 401);
   }
   if (!env.MASTERHUB_QUIZ_HISTORY) {

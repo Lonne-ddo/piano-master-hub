@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+  <style>body{display:none}</style>
   <script>
-  (function(){
-    if (localStorage.getItem('mh_admin') !== '4697') {
-      window.location.replace('/admin/');
-    }
-  })();
+  // Garde super-admin via cookie session — affiche la page seulement
+  // après confirmation par /api/auth/whoami.
+  fetch('/api/auth/whoami', { credentials: 'same-origin' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      if (!j || !j.ok || !j.is_admin) { window.location.replace('/'); return; }
+      document.body.style.display = '';
+    })
+    .catch(function () { window.location.replace('/'); });
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -539,7 +544,7 @@
 <header class="mh-header">
   <a href="/admin/outils.html" class="mh-back">&larr; Outils</a>
   <h1 class="mh-title">Mes boucles</h1>
-  <button class="mh-logout" type="button" onclick="localStorage.removeItem('mh_admin'); window.location.replace('/admin/');">Se d&eacute;connecter</button>
+  <button class="mh-logout" type="button" onclick="fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'}).finally(function(){window.location.replace('/');});">Se d&eacute;connecter</button>
 </header>
 
 <!-- ═══ APP ═══════════════════════════════════════════════════ -->
@@ -615,9 +620,8 @@
 
 <script>
 // ─── Helpers ───────────────────────────────────────────────────
-function authHeaders() {
-  return { 'x-admin-secret': localStorage.getItem('mh_admin') || '' };
-}
+// Auth : cookie mh_session envoyé automatiquement par le navigateur
+// (same-origin fetch). Aucun header d'auth côté client.
 function esc(s) {
   if (s === null || s === undefined) return '';
   const d = document.createElement('div');
@@ -659,7 +663,7 @@ let pendingUploadFiles = [];
 
 // ─── API calls ─────────────────────────────────────────────────
 async function apiList() {
-  const res = await fetch('/api/loops', { headers: authHeaders() });
+  const res = await fetch('/api/loops', { credentials: 'same-origin' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
   return await res.json();
 }
@@ -676,7 +680,7 @@ async function apiUpload(file, { bpm, tags, durationSec }) {
 
   const res = await fetch('/api/loops', {
     method: 'POST',
-    headers: authHeaders(),
+    credentials: 'same-origin',
     body: fd,
   });
   const data = await res.json().catch(() => ({}));
@@ -689,7 +693,8 @@ async function apiUpload(file, { bpm, tags, durationSec }) {
 async function apiPatch(id, payload) {
   const res = await fetch(`/api/loops/${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => ({}));
@@ -700,7 +705,7 @@ async function apiPatch(id, payload) {
 async function apiDelete(id) {
   const res = await fetch(`/api/loops/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    headers: authHeaders(),
+    credentials: 'same-origin',
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.ok) throw new Error(data.error || 'HTTP ' + res.status);
@@ -710,7 +715,8 @@ async function apiDelete(id) {
 async function apiAddCategory(name) {
   const res = await fetch('/api/loops/categories', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   });
   const data = await res.json().catch(() => ({}));
@@ -740,7 +746,7 @@ async function fetchAndDecode(loopId) {
   audioBufferPromises[loopId] = (async () => {
     try {
       const res = await fetch(`/api/loops/${encodeURIComponent(loopId)}/audio`, {
-        headers: authHeaders(),
+        credentials: 'same-origin',
       });
       if (!res.ok) throw new Error('Audio HTTP ' + res.status);
       const arr = await res.arrayBuffer();

@@ -46,6 +46,20 @@ export function generateToken(bytes = 32) {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+// ─── Helper auth admin-only ───────────────────────────────────────
+// Vérifie que la requête a une session super-admin valide :
+// cookie mh_session avec is_admin === true ET email toujours dans ADMIN_EMAILS.
+//
+// Retourne la session si OK, null sinon. Defense-in-depth contre l'offboarding
+// pendant la fenêtre de 90j : si l'email est retiré de ADMIN_EMAILS, la
+// session perd ses droits immédiatement.
+export async function requireAdmin(request, env) {
+  const session = await getSessionFromRequest(request, env);
+  if (!session || !session.is_admin) return null;
+  if (!isAdminEmail(session.email, env)) return null;
+  return session;
+}
+
 // ─── Helper auth pour endpoints élève ─────────────────────────────
 // Vérifie que la session courante a le droit d'accéder aux ressources d'un slug
 // donné. Admin = passe-droit (peut consulter n'importe quel slug). Élève = doit

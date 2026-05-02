@@ -6,11 +6,15 @@
 //
 // AssemblyAI accepte des fichiers volumineux, gère le français nativement,
 // et n'a pas de restriction de langue mixte.
+//
+// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
+
+import { requireAdmin } from './_lib/session.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-admin-secret',
+  'Access-Control-Allow-Headers': 'Content-Type',
 };
 
 export async function onRequestOptions() {
@@ -21,8 +25,8 @@ export async function onRequestPost(context) {
   try {
     const { request, env } = context;
 
-    if (request.headers.get('x-admin-secret') !== env.ADMIN_SECRET) {
-      return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+    if (!(await requireAdmin(request, env))) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), {
         status: 401, headers: { ...CORS, 'Content-Type': 'application/json' }
       });
     }

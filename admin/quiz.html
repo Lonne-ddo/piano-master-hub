@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+  <style>body{display:none}</style>
   <script>
-  (function(){
-    if (localStorage.getItem('mh_admin') !== '4697') {
-      window.location.replace('/admin/');
-    }
-  })();
+  // Garde super-admin via cookie session — affiche la page seulement
+  // après confirmation par /api/auth/whoami.
+  fetch('/api/auth/whoami', { credentials: 'same-origin' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      if (!j || !j.ok || !j.is_admin) { window.location.replace('/'); return; }
+      document.body.style.display = '';
+    })
+    .catch(function () { window.location.replace('/'); });
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -382,9 +387,7 @@ let dataCache = null;
 let activeTab = 'all'; // 'all' | <slug>
 
 // ─── Helpers ─────────────────────────────────────────────────
-function authHeaders() {
-  return { 'x-admin-secret': localStorage.getItem('mh_admin') || '' };
-}
+// Auth : cookie mh_session envoyé automatiquement (same-origin fetch).
 
 function escapeHtml(s) {
   if (s === null || s === undefined) return '';
@@ -557,7 +560,7 @@ async function loadData() {
   document.getElementById('mainContent').innerHTML =
     '<div class="status-box"><div class="spinner"></div>Chargement des sessions…</div>';
   try {
-    const res = await fetch('/api/quiz/admin/list', { headers: authHeaders() });
+    const res = await fetch('/api/quiz/admin/list', { credentials: 'same-origin' });
     const json = await res.json();
     if (!json.ok) throw new Error(json.error || ('HTTP ' + res.status));
     dataCache = json.data || {};
@@ -580,8 +583,8 @@ loadData();
 
 document.getElementById('refreshBtn').addEventListener('click', loadData);
 document.getElementById('logoutBtn').addEventListener('click', function () {
-  localStorage.removeItem('mh_admin');
-  window.location.replace('/admin/');
+  fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+    .finally(function () { window.location.replace('/'); });
 });
 </script>
 

@@ -15,7 +15,7 @@ export function corsAdmin(request, opts) {
   return {
     'Access-Control-Allow-Origin': allowed,
     'Access-Control-Allow-Methods': opts.methods || 'GET, POST, PATCH, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': opts.headers || 'Content-Type, x-admin-secret, Authorization',
+    'Access-Control-Allow-Headers': opts.headers || 'Content-Type',
     'Vary': 'Origin',
   };
 }

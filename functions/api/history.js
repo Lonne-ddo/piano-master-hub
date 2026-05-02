@@ -1,27 +1,17 @@
 // Endpoint /api/history — historique transcripteur (KV MASTERHUB_HISTORY).
-// Auth : x-admin-secret (uniformisé avec les autres endpoints admin).
-// Backwards-compat : Authorization: Bearer <secret> est aussi accepté tant que
-// admin/transcripteur.html n'est pas migré.
+// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
+
+import { requireAdmin } from './_lib/session.js'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-admin-secret, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type',
 }
 
 // Limites de validation (anti-DOS / anti-pollution KV)
 const KEY_RE = /^[a-zA-Z0-9:_\-.]{1,100}$/
 const MAX_VALUE_BYTES = 50 * 1024 // 50 KB par entrée (largement assez pour métadonnées + transcript court)
-
-// ── Vérification auth (x-admin-secret prioritaire ; Bearer en fallback legacy)
-function checkAuth(request, env) {
-  const adminSecret = request.headers.get('x-admin-secret')
-  if (adminSecret && adminSecret === env.ADMIN_SECRET) return true
-  const auth = request.headers.get('Authorization') || ''
-  if (!auth.startsWith('Bearer ')) return false
-  const token = auth.slice('Bearer '.length).trim()
-  return token === env.ADMIN_SECRET
-}
 
 // ── GET /api/history ─ Lister les 20 dernières entrées ───────
 async function handleGet(env) {
@@ -106,8 +96,8 @@ export async function onRequest(context) {
     return new Response(null, { status: 204, headers: CORS_HEADERS })
   }
 
-  if (!checkAuth(request, env)) {
-    return Response.json({ error: 'Non autorisé' }, { status: 401, headers: CORS_HEADERS })
+  if (!(await requireAdmin(request, env))) {
+    return Response.json({ error: 'unauthorized' }, { status: 401, headers: CORS_HEADERS })
   }
 
   const method = request.method.toUpperCase()

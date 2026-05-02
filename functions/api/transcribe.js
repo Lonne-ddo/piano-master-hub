@@ -6,6 +6,8 @@
  * Clé API lue depuis env.GROQ_API_KEY (variable Cloudflare).
  */
 
+import { requireAdmin } from "./_lib/session.js";
+
 export const config = {
   runtime: 'edge',
 };
@@ -15,7 +17,7 @@ const MODEL = "whisper-large-v3";
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin":  "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, x-admin-secret",
+  "Access-Control-Allow-Headers": "Content-Type",
 };
 
 export async function onRequest(context) {
@@ -33,9 +35,8 @@ export async function onRequest(context) {
     });
   }
 
-  // Auth admin (évite que /api/transcribe consomme le quota Groq publiquement)
-  const secret = request.headers.get("x-admin-secret");
-  if (!secret || secret !== env.ADMIN_SECRET) {
+  // Auth super-admin (cookie session) — évite que /api/transcribe consomme le quota Groq publiquement
+  if (!(await requireAdmin(request, env))) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },

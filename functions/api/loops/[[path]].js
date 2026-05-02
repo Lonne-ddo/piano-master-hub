@@ -12,12 +12,14 @@
 //   "loops:index"        → JSON { loops: [...metadata], categories: [...] }
 //   "loops:audio:{id}"   → ArrayBuffer (binaire MP3, max 25 MiB par valeur)
 //
-// Auth : header x-admin-secret obligatoire sur tous les endpoints.
+// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
+
+import { requireAdmin } from '../_lib/session.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-admin-secret, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type',
 };
 
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024; // 20 MiB (sous la limite KV de 25 MiB)
@@ -30,10 +32,9 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-function requireAuth(request, env) {
-  const secret = request.headers.get('x-admin-secret');
-  if (!secret || secret !== env.ADMIN_SECRET) {
-    return jsonResponse({ ok: false, error: 'Unauthorized' }, 401);
+async function requireAuth(request, env) {
+  if (!(await requireAdmin(request, env))) {
+    return jsonResponse({ ok: false, error: 'unauthorized' }, 401);
   }
   return null;
 }
@@ -83,7 +84,7 @@ export async function onRequest(context) {
   }
 
   // Auth obligatoire
-  const authErr = requireAuth(request, env);
+  const authErr = await requireAuth(request, env);
   if (authErr) return authErr;
 
   const segments = (params.path && Array.isArray(params.path) ? params.path : []).filter(Boolean);

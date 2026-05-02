@@ -63,7 +63,7 @@ const PROTECTED_FIELDS = [
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, PATCH, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-admin-secret, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type',
 };
 
 export async function onRequestOptions() {
@@ -71,6 +71,8 @@ export async function onRequestOptions() {
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────
+import { requireAdmin } from '../_lib/session.js';
+
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -78,10 +80,9 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-function requireAuth(request, env) {
-  const secret = request.headers.get('x-admin-secret');
-  if (!secret || secret !== env.ADMIN_SECRET) {
-    return jsonResponse({ error: 'Unauthorized' }, 401);
+async function requireAuth(request, env) {
+  if (!(await requireAdmin(request, env))) {
+    return jsonResponse({ error: 'unauthorized' }, 401);
   }
   return null;
 }
@@ -311,7 +312,7 @@ ${docText.slice(0, 6000)}
 //     c. Tous fail + cache existe                 → { ...cached, source: 'stale', error: 'LLM unavailable' }
 //     d. Tous fail + pas de cache                 → 503
 export async function onRequestGet({ params, request, env }) {
-  const authErr = requireAuth(request, env);
+  const authErr = await requireAuth(request, env);
   if (authErr) return authErr;
 
   const id = params.id;
@@ -391,7 +392,7 @@ export async function onRequestGet({ params, request, env }) {
 const ALLOWED_OVERRIDE_FIELDS = ['date_debut', 'date_fin', 'total_cours'];
 
 export async function onRequestPatch({ params, request, env }) {
-  const authErr = requireAuth(request, env);
+  const authErr = await requireAuth(request, env);
   if (authErr) return authErr;
 
   const id = params.id;

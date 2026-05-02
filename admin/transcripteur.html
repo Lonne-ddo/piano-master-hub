@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+  <style>body{display:none}</style>
   <script>
-  (function(){
-    if (localStorage.getItem('mh_admin') !== '4697') {
-      window.location.replace('/admin/');
-    }
-  })();
+  // Garde super-admin via cookie session — affiche la page seulement
+  // après confirmation par /api/auth/whoami.
+  fetch('/api/auth/whoami', { credentials: 'same-origin' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      if (!j || !j.ok || !j.is_admin) { window.location.replace('/'); return; }
+      document.body.style.display = '';
+    })
+    .catch(function () { window.location.replace('/'); });
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -446,7 +451,7 @@
 <header class="mh-header">
   <a href="/admin/outils.html" class="mh-back">&larr; Outils</a>
   <h1 class="mh-title">Transcripteur</h1>
-  <button class="mh-logout" type="button" onclick="localStorage.removeItem('mh_admin'); window.location.replace('/admin/');">Se d&eacute;connecter</button>
+  <button class="mh-logout" type="button" onclick="fetch('/api/auth/logout',{method:'POST',credentials:'same-origin'}).finally(function(){window.location.replace('/');});">Se d&eacute;connecter</button>
 </header>
 
 <!-- ══ LAYOUT ══════════════════════════════════════════════ -->
@@ -658,10 +663,8 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 async function streamClaude(payload, signal) {
   const resp = await fetch('/api/claude', {
     method:  'POST',
-    headers: {
-      'Content-Type':   'application/json',
-      'x-admin-secret': ADMIN_SECRET,
-    },
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(payload),
     signal,
   })
@@ -709,14 +712,10 @@ async function streamClaude(payload, signal) {
   return fullText
 }
 
-// ── Admin token pour l'historique ────────────────────────────
-// TODO: clé exposée — ADMIN_SECRET ne doit pas figurer en dur ici.
-// À remplacer par un token Clerk (Clerk.session.getToken()) puis vérifier
-// côté Worker via JWT Clerk plutôt que via le secret statique env.ADMIN_SECRET.
-// En attendant cette migration, la valeur est retirée du source ;
-// les endpoints /api/history, /api/access/grant, /api/access/revoke
-// nécessiteront une mise à jour de l'auth côté Worker.
-const ADMIN_SECRET = '4697'
+// ── Auth ─────────────────────────────────────────────────────
+// Cookie mh_session envoyé automatiquement par le navigateur (same-origin
+// fetch). Tous les endpoints admin (/api/claude, /api/transcribe, /api/history)
+// vérifient la session super-admin côté serveur via getSessionFromRequest.
 
 // ── État ─────────────────────────────────────────────────────
 let selectedFiles   = []     // Fichiers sélectionnés (triés par nom)
@@ -962,7 +961,7 @@ async function transcribeFileWithRetry(file, onProgress) {
 // Groq Whisper traite l'audio (évite le timeout 30s de Cloudflare → 502).
 // Renvoie { text } en succès, { error, status } en erreur.
 async function streamTranscribe(formData) {
-  const resp = await fetch('/api/transcribe', { method: 'POST', headers: { 'x-admin-secret': ADMIN_SECRET }, body: formData })
+  const resp = await fetch('/api/transcribe', { method: 'POST', credentials: 'same-origin', body: formData })
 
   // Le serveur ouvre toujours un 200 (puisqu'il commence à streamer avant
   // d'avoir la réponse Groq). Une 4xx/5xx ici signale un échec amont
@@ -1039,7 +1038,7 @@ async function transcribeWithAssemblyAI(file, fileName) {
 
   const resp = await fetch('/api/transcribe-assembly', {
     method: 'POST',
-    headers: { 'x-admin-secret': ADMIN_SECRET },
+    credentials: 'same-origin',
     body: formData
   })
 
@@ -1723,7 +1722,8 @@ async function saveToHistory(filename, summary, raw, meta) {
     }
     await fetch('/api/history', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, data: payload })
     })
     loadHistory()
@@ -1733,7 +1733,7 @@ async function saveToHistory(filename, summary, raw, meta) {
 async function loadHistory() {
   try {
     const res = await fetch('/api/history', {
-      headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+      credentials: 'same-origin'
     })
     if (!res.ok) throw new Error('HTTP ' + res.status)
     const items = await res.json()
@@ -1817,7 +1817,7 @@ async function deleteHistory(key) {
   try {
     await fetch('/api/history?key=' + encodeURIComponent(key), {
       method: 'DELETE',
-      headers: { 'Authorization': 'Bearer ' + ADMIN_SECRET }
+      credentials: 'same-origin'
     })
     loadHistory()
   } catch(e) {
@@ -1859,7 +1859,8 @@ async function persistCurrent() {
   try {
     await fetch('/api/history', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ADMIN_SECRET },
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: currentHistoryKey, data: payload })
     })
     loadHistory()
