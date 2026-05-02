@@ -499,13 +499,22 @@ export async function onRequestPatch({ params, request, env }) {
 
   // ── Handle email patch (admin saisit l'email pour le magic link) ─
   // body.email = string | null | '' (pour supprimer)
+  // Maintient l'index inverse `email:<email_lowercase>` → { slug } pour
+  // permettre au request-link de faire un lookup O(1) (cf api/auth/request-link.js).
+  let emailIndexOld = null;
+  let emailIndexNew = null;
   if (body.email !== undefined) {
+    const oldEmail = typeof existing.email === 'string' ? existing.email.toLowerCase() : null;
     if (body.email === null || body.email === '') {
       delete updated.email;
+      if (oldEmail) emailIndexOld = oldEmail;
     } else if (typeof body.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.email).trim())) {
       return jsonResponse({ error: 'email invalide' }, 400);
     } else {
-      updated.email = String(body.email).trim().toLowerCase();
+      const newEmail = String(body.email).trim().toLowerCase();
+      updated.email = newEmail;
+      if (oldEmail && oldEmail !== newEmail) emailIndexOld = oldEmail;
+      emailIndexNew = newEmail;
     }
   }
 
@@ -518,6 +527,18 @@ export async function onRequestPatch({ params, request, env }) {
   updated._patchedAt = new Date().toISOString();
   // Pas de TTL : un override saisi manuellement doit persister jusqu'au prochain reset explicite.
   await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated));
+
+  // Maintient l'index inverse email:<email> APRÈS l'écriture du profil. Erreurs
+  // non-bloquantes : le profil est sauvegardé même si l'index échoue (le
+  // fallback scan dans request-link couvre ce cas).
+  if (emailIndexOld) {
+    try { await env.MASTERHUB_STUDENTS.delete(`email:${emailIndexOld}`); }
+    catch (e) { console.warn('[eleves/PATCH] email index delete failed:', e?.message || e); }
+  }
+  if (emailIndexNew) {
+    try { await env.MASTERHUB_STUDENTS.put(`email:${emailIndexNew}`, JSON.stringify({ slug: id })); }
+    catch (e) { console.warn('[eleves/PATCH] email index put failed:', e?.message || e); }
+  }
 
   return jsonResponse({ ok: true, success: true, data: updated, stats: updated.stats || null });
 }

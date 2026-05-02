@@ -49,25 +49,40 @@ export async function onRequestPost({ request, env }) {
   // Si pas admin, recherche l'élève par email dans le KV
   let foundSlug = null;
   if (!adminMatch) {
-    let slugs;
+    // Lookup primaire O(1) via l'index inverse `email:<email>` → { slug }.
+    // Cet index est maintenu par le PATCH email dans eleves/[id].js et par
+    // l'endpoint admin migrate-email-index.
     try {
-      const listRaw = await env.MASTERHUB_STUDENTS.get('eleves:list');
-      slugs = listRaw ? JSON.parse(listRaw) : ['japhet', 'messon', 'dexter', 'tara'];
+      const idx = await env.MASTERHUB_STUDENTS.get(`email:${email}`, { type: 'json' });
+      if (idx && typeof idx.slug === 'string') foundSlug = idx.slug;
     } catch {
-      slugs = ['japhet', 'messon', 'dexter', 'tara'];
+      /* ignore — fallback scan ci-dessous */
     }
-    for (const slug of slugs) {
-      let raw;
-      try { raw = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`); }
-      catch { continue; }
-      if (!raw) continue;
+
+    // Fallback scan O(n) : couvre la transition (eleve:<slug>.email peuplé
+    // sans index inverse correspondant). À retirer une fois la migration KV
+    // terminée et stable (cf /api/eleves/admin/migrate-email-index).
+    if (!foundSlug) {
+      let slugs;
       try {
-        const data = JSON.parse(raw);
-        if (data.email && String(data.email).toLowerCase() === email) {
-          foundSlug = slug;
-          break;
-        }
-      } catch { /* skip */ }
+        const listRaw = await env.MASTERHUB_STUDENTS.get('eleves:list');
+        slugs = listRaw ? JSON.parse(listRaw) : ['japhet', 'messon', 'dexter', 'tara'];
+      } catch {
+        slugs = ['japhet', 'messon', 'dexter', 'tara'];
+      }
+      for (const slug of slugs) {
+        let raw;
+        try { raw = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`); }
+        catch { continue; }
+        if (!raw) continue;
+        try {
+          const data = JSON.parse(raw);
+          if (data.email && String(data.email).toLowerCase() === email) {
+            foundSlug = slug;
+            break;
+          }
+        } catch { /* skip */ }
+      }
     }
 
     // Anti-énumération : si email inconnu, on retourne ok=true sans envoyer.

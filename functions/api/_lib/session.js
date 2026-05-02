@@ -45,3 +45,33 @@ export function generateToken(bytes = 32) {
   for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+
+// ─── Helper auth pour endpoints élève ─────────────────────────────
+// Vérifie que la session courante a le droit d'accéder aux ressources d'un slug
+// donné. Admin = passe-droit (peut consulter n'importe quel slug). Élève = doit
+// matcher exactement son propre slug.
+//
+// Retourne :
+//   { ok: true, role: 'admin'|'eleve', session }  — accès autorisé
+//   { ok: false, status: 401|403, error: string } — accès refusé
+//
+// Defense-in-depth : revalide isAdminEmail() pour les sessions admin afin de
+// gérer l'offboarding pendant la fenêtre de 90j d'une session admin (un email
+// retiré de ADMIN_EMAILS perd ses droits immédiatement).
+export async function requireEleveOrAdmin(slug, request, env) {
+  const session = await getSessionFromRequest(request, env);
+  if (!session) return { ok: false, status: 401, error: 'unauthorized' };
+
+  if (session.is_admin) {
+    if (!isAdminEmail(session.email, env)) {
+      return { ok: false, status: 401, error: 'unauthorized' };
+    }
+    return { ok: true, role: 'admin', session };
+  }
+
+  const wanted = String(slug || '').toLowerCase();
+  if (session.slug && wanted && session.slug === wanted) {
+    return { ok: true, role: 'eleve', session };
+  }
+  return { ok: false, status: 403, error: 'forbidden' };
+}
