@@ -37,7 +37,7 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    .app { max-width: 900px; margin: 0 auto; padding: 24px 20px 60px; }
+    .app { max-width: 920px; margin: 0 auto; padding: 24px 20px 60px; }
 
     .admin-banner {
       background: var(--v-dim);
@@ -55,7 +55,6 @@
     .admin-banner .sep { opacity: .4; }
     .admin-banner a { color: var(--text2); text-decoration: none; transition: color .15s; }
     .admin-banner a:hover { color: var(--v); }
-    .admin-banner .email { color: var(--text2); text-transform: none; letter-spacing: 0; }
 
     .ph { margin-bottom: 18px; }
     .ph-title {
@@ -70,38 +69,76 @@
       padding: 3px 9px; border-radius: 20px;
       background: var(--v-dim); color: var(--v);
     }
-    .ph-desc {
-      font-size: 13.5px; color: var(--text2);
-      margin-top: 6px; line-height: 1.5;
-    }
+    .ph-desc { font-size: 13.5px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
     .ph-meta {
-      margin-top: 10px; font-size: 11.5px;
-      color: var(--text3); font-family: 'DM Mono', monospace;
+      margin-top: 10px; font-size: 11.5px; color: var(--text3);
+      font-family: 'DM Mono', monospace;
       display: flex; flex-wrap: wrap; gap: 12px;
     }
-    .ph-meta span::before {
-      content: '·'; margin-right: 8px; color: var(--text3); opacity: .5;
-    }
+    .ph-meta span::before { content: '·'; margin-right: 8px; opacity: .5; }
     .ph-meta span:first-child::before { content: ''; margin: 0; }
 
-    /* ── Drop zone ─────────────────────────────────────────── */
+    /* ── Sections ──────────────────────────────────────────── */
+    .section { margin-top: 28px; }
+    .section-title {
+      font-size: 14px; font-weight: 700;
+      letter-spacing: .07em; text-transform: uppercase;
+      color: var(--text2);
+      font-family: 'DM Mono', monospace;
+      margin-bottom: 14px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .cap-pill {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .04em;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: var(--bg2);
+      color: var(--text2);
+      border: 1px solid var(--border);
+      font-family: 'DM Mono', monospace;
+    }
+    .cap-pill.warning { background: rgba(240,180,41,0.15); color: var(--amber); border-color: rgba(240,180,41,0.35); }
+    .cap-pill.danger  { background: rgba(224,92,107,0.15); color: var(--red);   border-color: rgba(224,92,107,0.35); }
+
+    /* ── Form upload ───────────────────────────────────────── */
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .field label {
+      font-size: 11px; font-weight: 600;
+      letter-spacing: .06em; text-transform: uppercase;
+      color: var(--text3); font-family: 'DM Mono', monospace;
+    }
+    .field input[type="text"] {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--bg1);
+      color: var(--text1);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 14px; font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .field input[type="text"]:focus { border-color: var(--v); }
+
     .st-drop-zone {
       display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 8px;
+      align-items: center; justify-content: center; gap: 8px;
       border: 2px dashed var(--border);
       border-radius: 14px;
-      padding: 48px 24px;
+      padding: 40px 24px;
       cursor: pointer;
       transition: all .15s;
       text-align: center;
       background: var(--bg1);
     }
     .st-drop-zone.disabled { opacity: .5; cursor: not-allowed; }
-    .st-drop-zone:not(.disabled):hover,
-    .st-drop-zone.drag-over { border-color: var(--v); background: var(--v-dim); }
-    .st-drop-icon { font-size: 36px; }
-    .st-drop-text { font-size: 15px; font-weight: 600; color: var(--text1); }
+    .st-drop-zone:not(.disabled):hover, .st-drop-zone.drag-over {
+      border-color: var(--v); background: var(--v-dim);
+    }
+    .st-drop-icon { font-size: 32px; }
+    .st-drop-text { font-size: 14px; font-weight: 600; color: var(--text1); }
     .st-drop-sub  { font-size: 12px; color: var(--text3); }
 
     .st-file-info {
@@ -117,8 +154,7 @@
     .st-file-info button {
       margin-left: auto;
       background: transparent; border: none;
-      color: var(--text3);
-      cursor: pointer; font-size: 16px;
+      color: var(--text3); cursor: pointer; font-size: 16px;
       padding: 4px 8px;
     }
     .st-file-info button:hover { color: var(--red); }
@@ -128,8 +164,7 @@
       padding: 12px 18px;
       border-radius: 10px;
       border: none;
-      background: var(--v);
-      color: #fff;
+      background: var(--v); color: #fff;
       font-size: 14px; font-weight: 600;
       cursor: pointer; font-family: inherit;
       transition: opacity .15s, background .15s;
@@ -138,33 +173,32 @@
     .gen-btn:hover:not(:disabled) { background: var(--v-soft); }
     .gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    /* ── Progression ───────────────────────────────────────── */
-    .st-progress-wrap {
+    /* ── Progress overlay ──────────────────────────────────── */
+    .progress-card {
       background: var(--bg1);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 22px;
+      margin-top: 14px;
     }
-    .st-progress-label { font-size: 13.5px; color: var(--text1); margin-bottom: 14px; }
-    .st-progress-bar-wrap {
+    .progress-label { font-size: 13.5px; color: var(--text1); margin-bottom: 14px; }
+    .progress-bar-wrap {
       background: var(--bg2);
       border-radius: 20px;
       height: 6px;
       overflow: hidden;
       margin-bottom: 14px;
     }
-    .st-progress-bar {
-      height: 100%;
-      background: var(--v);
-      border-radius: 20px;
+    .progress-bar {
+      height: 100%; background: var(--v); border-radius: 20px;
       transition: width .3s ease;
     }
-    .st-progress-hint {
+    .progress-hint {
       font-size: 11.5px; color: var(--text3);
       font-family: 'DM Mono', monospace;
       margin-bottom: 12px;
     }
-    #st-cancel-btn {
+    .cancel-btn {
       font-size: 12px;
       background: transparent;
       border: 1px solid var(--border);
@@ -173,106 +207,176 @@
       border-radius: 6px;
       cursor: pointer; font-family: inherit;
     }
-    #st-cancel-btn:hover { color: var(--text1); border-color: var(--v); }
+    .cancel-btn:hover { color: var(--text1); border-color: var(--v); }
 
-    /* ── Résultat ──────────────────────────────────────────── */
-    .st-result-header {
-      display: flex; align-items: center; gap: 12px;
-      margin-bottom: 18px; flex-wrap: wrap;
+    /* ── Liste séparations ─────────────────────────────────── */
+    #list-content {
+      display: flex; flex-direction: column; gap: 10px;
     }
-    .st-back-btn {
-      background: transparent;
-      border: 1px solid var(--border);
-      color: var(--text2);
-      padding: 7px 14px;
-      border-radius: 8px;
-      cursor: pointer; font-size: 12px; font-family: inherit;
+    .list-empty {
+      padding: 28px 14px;
+      text-align: center;
+      color: var(--text3);
+      font-size: 13px;
+      border: 1px dashed var(--border);
+      border-radius: 12px;
     }
-    .st-back-btn:hover { color: var(--text1); border-color: var(--v); }
-    .st-song-title { font-size: 14.5px; font-weight: 700; color: var(--text1); }
-
-    .st-tracks { display: flex; flex-direction: column; gap: 10px; }
-    .st-track {
+    .sep-card {
       background: var(--bg1);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 14px 16px;
-      display: flex; align-items: center; gap: 14px;
-      flex-wrap: wrap;
     }
-    .st-track-label {
-      font-size: 14px; font-weight: 600;
-      min-width: 90px; flex-shrink: 0;
+    .sep-card-head {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
     }
-    .st-track audio { flex: 1; min-width: 220px; height: 36px; }
-    .st-track-download {
+    .sep-title { font-size: 14.5px; font-weight: 700; color: var(--text1); flex: 1 1 auto; min-width: 0; }
+    .sep-meta {
+      font-size: 11px; color: var(--text3);
+      font-family: 'DM Mono', monospace; letter-spacing: .03em;
+    }
+    .sep-assigned {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: var(--bg2);
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+    .sep-assigned.assigned { background: var(--v-dim); color: var(--v); border-color: rgba(139,111,232,0.35); }
+
+    .sep-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .sep-btn {
       font-size: 12px;
       background: var(--bg2);
       border: 1px solid var(--border);
       color: var(--text2);
-      padding: 7px 12px;
+      padding: 6px 12px;
       border-radius: 8px;
       cursor: pointer;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center; gap: 5px;
-      transition: all .15s;
       font-family: inherit;
+      transition: all .15s;
     }
-    .st-track-download:hover {
-      background: var(--v-dim);
-      color: var(--v);
-      border-color: var(--v);
+    .sep-btn:hover { background: var(--v-dim); color: var(--v); border-color: var(--v); }
+    .sep-btn.danger:hover { background: rgba(224,92,107,0.15); color: var(--red); border-color: var(--red); }
+
+    .sep-players {
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      flex-direction: column; gap: 8px;
     }
-    .st-track[data-stem="vocals"] .st-track-label { color: var(--green); }
-    .st-track[data-stem="drums"]  .st-track-label { color: var(--v); }
-    .st-track[data-stem="bass"]   .st-track-label { color: #60a5fa; }
-    .st-track[data-stem="other"]  .st-track-label { color: var(--amber); }
+    .sep-card.expanded .sep-players { display: flex; }
+
+    .stem-row {
+      display: flex; align-items: center; gap: 12px;
+      flex-wrap: wrap;
+    }
+    .stem-label {
+      font-size: 13px; font-weight: 600;
+      min-width: 80px;
+      flex-shrink: 0;
+    }
+    .stem-row audio { flex: 1; min-width: 200px; height: 36px; }
+    .stem-row[data-stem="vocals"] .stem-label { color: var(--green); }
+    .stem-row[data-stem="drums"]  .stem-label { color: var(--v); }
+    .stem-row[data-stem="bass"]   .stem-label { color: #60a5fa; }
+    .stem-row[data-stem="piano"]  .stem-label { color: #ec4899; }
+    .stem-row[data-stem="guitar"] .stem-label { color: #f97316; }
+    .stem-row[data-stem="other"]  .stem-label { color: var(--amber); }
+
+    /* ── Modal assign ──────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      max-width: 360px;
+      width: 100%;
+    }
+    .modal h3 {
+      font-size: 16px; font-weight: 700;
+      color: var(--text1);
+      margin-bottom: 16px;
+    }
+    .checkbox-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+    .checkbox-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .checkbox-row:hover { border-color: var(--v); }
+    .checkbox-row input { accent-color: var(--v); width: 16px; height: 16px; }
+    .checkbox-row label { font-size: 14px; color: var(--text1); cursor: pointer; flex: 1; }
+
+    .modal-actions {
+      display: flex; gap: 8px; justify-content: flex-end;
+    }
+    .modal-actions button {
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text2);
+    }
+    .modal-actions button.primary {
+      background: var(--v); color: #fff; border-color: var(--v);
+    }
+    .modal-actions button.primary:hover { background: var(--v-soft); }
+    .modal-actions button:disabled { opacity: 0.5; cursor: wait; }
 
     /* ── Erreur ────────────────────────────────────────────── */
-    .st-error {
+    .err-box {
       background: rgba(224,92,107,0.08);
       border: 1px solid rgba(224,92,107,0.3);
       border-radius: 10px;
-      padding: 14px 18px;
+      padding: 12px 16px;
       display: flex; align-items: center; gap: 12px;
       font-size: 13px; color: var(--red);
+      margin-top: 14px;
     }
-    #st-retry-btn {
+    .err-box button {
       margin-left: auto;
       background: transparent;
-      border: 1px solid var(--red);
-      color: var(--red);
-      padding: 6px 14px;
-      border-radius: 6px;
+      border: 1px solid var(--red); color: var(--red);
+      padding: 6px 14px; border-radius: 6px;
       cursor: pointer; font-size: 12px; font-family: inherit;
     }
 
     /* ── Toast ─────────────────────────────────────────────── */
     .st-toast {
       position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-      background: var(--bg2);
-      color: var(--text1);
-      border: 1px solid rgba(224,92,107,0.4);
-      padding: 10px 18px;
-      border-radius: 10px;
+      background: var(--bg2); color: var(--text1);
+      border: 1px solid var(--border);
+      padding: 10px 18px; border-radius: 10px;
       font-size: 13px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.4);
       z-index: 9999;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
     }
     .st-toast.show { opacity: 1; }
 
-    /* ── Boot loader (pendant whoami) ──────────────────────── */
-    .st-boot {
-      display: flex; flex-direction: column;
-      align-items: center; gap: 12px;
-      padding: 80px 20px;
-      color: var(--text3);
+    .boot {
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+      padding: 80px 20px; color: var(--text3);
     }
-    .st-boot .spinner {
+    .spinner {
       width: 28px; height: 28px;
       border: 2px solid var(--border);
       border-top-color: var(--v);
@@ -283,30 +387,27 @@
 
     @media (max-width: 600px) {
       .app { padding: 18px 14px 40px; }
-      .st-drop-zone { padding: 36px 16px; }
-      .st-track { padding: 12px; }
-      .st-track-label { min-width: auto; }
-      .st-track audio { min-width: 0; }
+      .st-drop-zone { padding: 28px 14px; }
+      .stem-label { min-width: auto; }
+      .stem-row audio { min-width: 0; }
     }
   </style>
 </head>
 <body>
 
-<!-- Phase boot : visible le temps de vérifier l'auth admin via /api/admin/check -->
+<!-- Phase boot -->
 <div class="app" id="boot-section">
-  <div class="st-boot">
+  <div class="boot">
     <div class="spinner"></div>
     <p>Vérification de l'accès…</p>
   </div>
 </div>
 
-<!-- Phase app : injectée après auth OK -->
+<!-- App -->
 <div class="app" id="main-section" style="display:none">
 
   <div class="admin-banner">
     <span>🔒 Super-admin</span>
-    <span class="sep">·</span>
-    <span class="email" id="admin-email"></span>
     <span class="sep">·</span>
     <a href="/admin/outils.html">← Outils</a>
   </div>
@@ -314,112 +415,140 @@
   <div class="ph">
     <div class="ph-title">
       Séparateur de pistes
-      <span class="badge">Demucs · Replicate</span>
+      <span class="badge">Demucs htdemucs_6s · Replicate</span>
     </div>
     <p class="ph-desc">
-      Upload un fichier audio pour isoler automatiquement les 4 pistes :
-      Chant · Batterie · Basse · Autres (instruments + ambiance).
+      Upload un morceau pour isoler 6 pistes : Chant · Batterie · Basse · Piano · Guitare · Autres.
+      Stems stockés sur R2, assignables aux élèves pour écoute pédagogique.
     </p>
     <div class="ph-meta">
       <span>≈ 1–3 min selon durée</span>
-      <span>💰 Coût estimé : ~0,02 € / séparation</span>
-      <span>Max 50 Mo · 15 min</span>
+      <span>💰 ~0,02 € / morceau</span>
+      <span>Max 50 Mo · 15 min · 20/mois</span>
     </div>
   </div>
 
-  <!-- Upload -->
-  <div id="st-upload-section">
-    <label class="st-drop-zone" id="st-drop-zone">
-      <input type="file" id="st-file-input" accept=".mp3,.wav,.m4a,.ogg" hidden />
-      <div class="st-drop-icon">🎵</div>
-      <div class="st-drop-text">Dépose ton fichier audio ici</div>
-      <div class="st-drop-sub">.mp3 · .wav · .m4a — max 50 Mo · 15 min</div>
-    </label>
-    <div id="st-file-info" style="display:none" class="st-file-info">
-      <span id="st-file-name"></span>
-      <span class="meta" id="st-file-meta"></span>
-      <button type="button" id="st-clear-btn" title="Retirer">✕</button>
+  <!-- Section A : nouvelle séparation -->
+  <section class="section" id="section-new">
+    <div class="section-title">
+      Nouvelle séparation
+      <span id="cap-pill" class="cap-pill">— / 20</span>
     </div>
-    <button type="button" id="st-analyze-btn" disabled class="gen-btn">
+
+    <div class="field">
+      <label for="title-input">Titre du morceau</label>
+      <input id="title-input" type="text" maxlength="80" placeholder="Ex : Isn't She Lovely" />
+    </div>
+
+    <label class="st-drop-zone" id="drop-zone">
+      <input type="file" id="file-input" accept=".mp3,.wav,.m4a,.flac,.ogg" hidden />
+      <div class="st-drop-icon">🎵</div>
+      <div class="st-drop-text">Dépose un fichier audio ici</div>
+      <div class="st-drop-sub">.mp3 · .wav · .m4a · .flac — max 50 Mo · 15 min</div>
+    </label>
+    <div id="file-info" style="display:none" class="st-file-info">
+      <span id="file-name"></span>
+      <span class="meta" id="file-meta"></span>
+      <button type="button" id="clear-btn" title="Retirer">✕</button>
+    </div>
+
+    <button type="button" id="analyze-btn" disabled class="gen-btn">
       Séparer les pistes →
     </button>
-  </div>
 
-  <!-- Progression -->
-  <div id="st-progress-section" style="display:none" class="st-progress-wrap">
-    <div class="st-progress-label" id="st-progress-label">Upload du fichier…</div>
-    <div class="st-progress-bar-wrap">
-      <div class="st-progress-bar" id="st-progress-bar" style="width:0%"></div>
+    <!-- Progress -->
+    <div id="progress-section" style="display:none" class="progress-card">
+      <div class="progress-label" id="progress-label">Lecture du fichier…</div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+      </div>
+      <div class="progress-hint">⏱ ≈ 1 à 3 min · upload R2 inclus</div>
+      <button type="button" id="cancel-btn" class="cancel-btn">Annuler</button>
     </div>
-    <div class="st-progress-hint">⏱ ≈ 1 à 3 min selon la durée du morceau</div>
-    <button type="button" id="st-cancel-btn">Annuler</button>
-  </div>
 
-  <!-- Résultat -->
-  <div id="st-result-section" style="display:none">
-    <div class="st-result-header">
-      <button class="st-back-btn" id="st-reset-btn">← Nouvelle séparation</button>
-      <span class="st-song-title" id="st-song-title"></span>
+    <!-- Erreur -->
+    <div id="error-section" style="display:none" class="err-box">
+      <span id="error-msg"></span>
+      <button type="button" id="retry-btn">OK</button>
     </div>
-    <div class="st-tracks" id="st-tracks-list"></div>
-  </div>
+  </section>
 
-  <!-- Erreur -->
-  <div id="st-error-section" style="display:none" class="st-error">
-    <span id="st-error-msg"></span>
-    <button type="button" id="st-retry-btn">Réessayer</button>
+  <!-- Section B : liste séparations -->
+  <section class="section" id="section-list">
+    <div class="section-title">Mes séparations</div>
+    <div id="list-content">
+      <div class="list-empty">Chargement…</div>
+    </div>
+  </section>
+
+</div>
+
+<!-- Modal assign -->
+<div class="modal-overlay" id="assign-modal">
+  <div class="modal">
+    <h3 id="assign-title">Assigner à des élèves</h3>
+    <div class="checkbox-list" id="assign-list"></div>
+    <div class="modal-actions">
+      <button type="button" id="assign-cancel">Annuler</button>
+      <button type="button" id="assign-save" class="primary">Enregistrer</button>
+    </div>
   </div>
 </div>
 
 <script>
-// ─── Séparateur de pistes — Master Hub Admin ─────────────────────
-// 1) Vérifie l'auth admin via /api/admin/check → redirect /admin/login.html sinon
-// 2) Drop zone → validation client (50 Mo / 15 min) → POST predict
-// 3) Polling status (3s) jusqu'à statut terminal → 4 lecteurs + downloads
-// 4) Lock UI pendant traitement (un seul run à la fois)
+// ─── Séparateur stems — Master Hub Admin ─────────────────────────
+// Auth admin (cookie mh_admin_pw) requis. Toutes les fetch utilisent
+// credentials: 'same-origin' (cookie envoyé automatiquement).
 
-// Constantes — synchro avec backend (functions/api/stems.js)
-const MAX_SIZE_MB     = 50;
-const MAX_DURATION_S  = 900;
+const MAX_SIZE_MB = 50;
+const MAX_DURATION_S = 900;
 const POLL_INTERVAL_MS = 3000;
-
-// Labels FR + ordre d'affichage (htdemucs : 4 stems)
+const ELEVES = [
+  { slug: 'japhet', display: 'Japhet' },
+  { slug: 'tara',   display: 'Tara'   },
+  { slug: 'dexter', display: 'Dexter' },
+  { slug: 'messon', display: 'Messon' },
+];
 const STEM_LABELS = {
-  vocals: 'Chant',
-  drums:  'Batterie',
-  bass:   'Basse',
-  other:  'Autres',
+  vocals: 'Chant', drums: 'Batterie', bass: 'Basse',
+  piano: 'Piano', guitar: 'Guitare', other: 'Autres',
 };
-const STEM_ORDER = ['vocals', 'drums', 'bass', 'other'];
+const STEM_ORDER = ['vocals', 'drums', 'bass', 'piano', 'guitar', 'other'];
 
-// État
-let selectedFile  = null;
+// État form
+let selectedFile = null;
 let audioDuration = null;
-let predictionId  = null;
-let pollHandle    = null;
-let isProcessing  = false;  // lock UI
+let predictionId = null;
+let pollHandle = null;
+let isProcessing = false;
+let monthlyCount = 0;
+let monthlyCap = 20;
 
-// ─── Boot — vérifier l'auth admin (mdp) ────────────────────
+// État liste
+let separationsCache = [];
+let assignTargetId = null;
+
+// ─── Boot ────────────────────────────────────────────────────
 (async function boot() {
   try {
     const r = await fetch('/api/admin/check', { credentials: 'same-origin' });
-    if (!r.ok) throw new Error('not_admin');
+    if (!r.ok) throw 0;
     const j = await r.json();
-    if (!j.ok) throw new Error('not_admin');
-    document.getElementById('admin-email').textContent = 'super-admin';
-    document.getElementById('boot-section').style.display = 'none';
-    document.getElementById('main-section').style.display = '';
-    bindUi();
+    if (!j.ok) throw 0;
   } catch {
     window.location.replace('/admin/login.html');
+    return;
   }
+  document.getElementById('boot-section').style.display = 'none';
+  document.getElementById('main-section').style.display = 'block';
+  bindUi();
+  await Promise.all([refreshCap(), refreshList()]);
 })();
 
 // ─── UI bindings ─────────────────────────────────────────────
 function bindUi() {
-  const dropZone   = document.getElementById('st-drop-zone');
-  const fileInput  = document.getElementById('st-file-input');
-  const analyzeBtn = document.getElementById('st-analyze-btn');
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
 
   dropZone.addEventListener('dragover', (e) => {
     if (isProcessing) return;
@@ -439,33 +568,55 @@ function bindUi() {
     if (f) setFile(f);
   });
 
-  document.getElementById('st-clear-btn').onclick = clearFile;
-  analyzeBtn.addEventListener('click', startAnalysis);
-  document.getElementById('st-cancel-btn').onclick = () => {
+  document.getElementById('clear-btn').onclick = clearFile;
+  document.getElementById('analyze-btn').addEventListener('click', startAnalysis);
+  document.getElementById('cancel-btn').onclick = () => {
     cancelPolling();
     isProcessing = false;
-    showSection('upload');
+    document.getElementById('progress-section').style.display = 'none';
+    document.getElementById('drop-zone').classList.remove('disabled');
+    document.getElementById('analyze-btn').disabled = !selectedFile;
   };
-  document.getElementById('st-reset-btn').addEventListener('click', () => {
-    clearFile();
-    document.getElementById('st-tracks-list').innerHTML = '';
-    showSection('upload');
+  document.getElementById('retry-btn').onclick = () => {
+    document.getElementById('error-section').style.display = 'none';
+  };
+
+  // Modal assign
+  document.getElementById('assign-cancel').onclick = closeAssignModal;
+  document.getElementById('assign-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'assign-modal') closeAssignModal();
   });
-  document.getElementById('st-retry-btn').onclick = () => {
-    isProcessing = false;
-    showSection('upload');
-  };
+  document.getElementById('assign-save').onclick = saveAssignment;
 }
 
-// ─── File handling + validation ──────────────────────────────
+// ─── Cap counter ────────────────────────────────────────────
+async function refreshCap() {
+  try {
+    const r = await fetch('/api/stems/stats', { credentials: 'same-origin' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j.ok) return;
+    monthlyCount = j.count || 0;
+    monthlyCap = j.cap || 20;
+    renderCap();
+  } catch { /* fail silently */ }
+}
+
+function renderCap() {
+  const pill = document.getElementById('cap-pill');
+  pill.textContent = monthlyCount + ' / ' + monthlyCap;
+  pill.classList.remove('warning', 'danger');
+  if (monthlyCount >= monthlyCap) pill.classList.add('danger');
+  else if (monthlyCount >= monthlyCap - 3) pill.classList.add('warning');
+}
+
+// ─── File ───────────────────────────────────────────────────
 function setFile(file) {
-  // Taille
   const sizeMB = file.size / 1024 / 1024;
   if (sizeMB > MAX_SIZE_MB) {
-    toast(`Fichier trop volumineux (${sizeMB.toFixed(1)} Mo, max ${MAX_SIZE_MB} Mo)`);
+    toast('Fichier trop volumineux (' + sizeMB.toFixed(1) + ' Mo, max ' + MAX_SIZE_MB + ' Mo)');
     return;
   }
-  // Durée — async via Audio metadata
   const url = URL.createObjectURL(file);
   const probe = document.createElement('audio');
   probe.preload = 'metadata';
@@ -474,20 +625,20 @@ function setFile(file) {
     URL.revokeObjectURL(url);
     const d = probe.duration || 0;
     if (d > MAX_DURATION_S) {
-      toast(`Morceau trop long (${Math.round(d / 60)} min, max ${MAX_DURATION_S / 60} min)`);
+      toast('Morceau trop long (' + Math.round(d / 60) + ' min, max ' + (MAX_DURATION_S / 60) + ' min)');
       return;
     }
     if (!d || !isFinite(d)) {
-      toast('Impossible de lire la durée du fichier — fichier audio valide ?');
+      toast('Impossible de lire la durée — fichier audio valide ?');
       return;
     }
     selectedFile = file;
     audioDuration = d;
-    document.getElementById('st-file-name').textContent = file.name;
-    document.getElementById('st-file-meta').textContent =
-      `${sizeMB.toFixed(1)} Mo · ${formatDuration(d)}`;
-    document.getElementById('st-file-info').style.display = 'flex';
-    document.getElementById('st-analyze-btn').disabled = false;
+    document.getElementById('file-name').textContent = file.name;
+    document.getElementById('file-meta').textContent =
+      sizeMB.toFixed(1) + ' Mo · ' + formatDuration(d);
+    document.getElementById('file-info').style.display = 'flex';
+    document.getElementById('analyze-btn').disabled = false;
   });
   probe.addEventListener('error', () => {
     URL.revokeObjectURL(url);
@@ -499,117 +650,120 @@ function clearFile() {
   if (isProcessing) return;
   selectedFile = null;
   audioDuration = null;
-  document.getElementById('st-file-input').value = '';
-  document.getElementById('st-file-info').style.display = 'none';
-  document.getElementById('st-analyze-btn').disabled = true;
+  document.getElementById('file-input').value = '';
+  document.getElementById('file-info').style.display = 'none';
+  document.getElementById('analyze-btn').disabled = true;
 }
 
 function formatDuration(s) {
   const m = Math.floor(s / 60);
   const sec = Math.floor(s % 60);
-  return `${m}:${String(sec).padStart(2, '0')}`;
+  return m + ':' + String(sec).padStart(2, '0');
 }
 
-// ─── Pipeline analyse ────────────────────────────────────────
+// ─── Pipeline analyse ───────────────────────────────────────
 async function startAnalysis() {
   if (!selectedFile || isProcessing) return;
-  isProcessing = true;
-  document.getElementById('st-analyze-btn').disabled = true;
-  document.getElementById('st-drop-zone').classList.add('disabled');
+  const title = document.getElementById('title-input').value.trim();
+  if (!title) {
+    toast('Saisis un titre avant de séparer.');
+    document.getElementById('title-input').focus();
+    return;
+  }
+  if (monthlyCount >= monthlyCap) {
+    toast('Cap mensuel atteint (' + monthlyCap + '/' + monthlyCap + ').');
+    return;
+  }
 
-  showSection('progress');
+  isProcessing = true;
+  document.getElementById('analyze-btn').disabled = true;
+  document.getElementById('drop-zone').classList.add('disabled');
+  document.getElementById('error-section').style.display = 'none';
+  document.getElementById('progress-section').style.display = 'block';
   setProgress(5, 'Lecture du fichier…');
 
   try {
     const base64 = await readAsDataURL(selectedFile);
-
     setProgress(20, 'Upload vers Replicate…');
 
+    const sizeMB = (selectedFile.size / 1024 / 1024);
     const resp = await fetch('/api/stems?action=predict', {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         audio: base64,
+        title,
         filename: selectedFile.name,
         duration: audioDuration,
+        sizeMB,
       }),
     });
     const data = await resp.json();
-
     if (!resp.ok || data.error) {
-      const msg = data.error === 'file_too_large' ? `Fichier trop volumineux (max ${MAX_SIZE_MB} Mo)`
-                : data.error === 'duration_too_long' ? `Morceau trop long (max ${MAX_DURATION_S / 60} min)`
-                : data.error === 'unauthorized' ? 'Session admin expirée — reconnecte-toi via le magic link'
-                : data.error === 'replicate_token_missing' ? 'Replicate non configuré côté serveur'
-                : data.detail || data.error || `Erreur ${resp.status}`;
+      const msg = data.error === 'monthly_cap_reached' ? 'Cap mensuel atteint (' + (data.cap || 20) + '/' + (data.cap || 20) + ').'
+        : data.error === 'file_too_large' ? 'Fichier trop volumineux'
+        : data.error === 'duration_too_long' ? 'Morceau trop long'
+        : data.error === 'unauthorized' ? 'Session admin expirée — reconnecte-toi'
+        : data.error === 'replicate_token_missing' ? 'Replicate non configuré côté serveur'
+        : data.error === 'r2_not_bound' ? 'Bucket R2 STEMS_R2 non bindé sur Cloudflare Pages'
+        : data.detail || data.error || ('Erreur ' + resp.status);
       throw new Error(msg);
-    }
-
-    if (data.status === 'succeeded') {
-      handleSuccess(data.output);
-      return;
     }
 
     predictionId = data.id;
     setProgress(35, 'Séparation en cours (~30–90 s)…');
-    startPolling();
+    startPolling(title, sizeMB);
   } catch (err) {
-    isProcessing = false;
-    document.getElementById('st-drop-zone').classList.remove('disabled');
-    showError(err.message || 'Erreur inconnue');
+    failAnalysis(err.message || 'Erreur inconnue');
   }
 }
 
 function readAsDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload  = () => resolve(reader.result);
+    reader.onload = () => resolve(reader.result);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 }
 
-function startPolling() {
+function startPolling(title, sizeMB) {
   let dotCount = 0;
   pollHandle = setInterval(async () => {
     dotCount = (dotCount + 1) % 4;
-
     try {
       const params = new URLSearchParams({
         action: 'status',
         id: predictionId,
+        title,
         filename: selectedFile?.name || '',
         duration: String(Math.round(audioDuration || 0)),
-        size: String((selectedFile?.size || 0) / 1024 / 1024),
+        size: String(sizeMB.toFixed(2)),
       });
-      const resp = await fetch(`/api/stems?${params}`, {
-        credentials: 'same-origin',
-      });
-      const data = await resp.json();
-
-      if (data.status === 'succeeded') {
+      const r = await fetch('/api/stems?' + params, { credentials: 'same-origin' });
+      const j = await r.json();
+      if (j.status === 'succeeded') {
         cancelPolling();
-        setProgress(95, 'Finalisation…');
-        handleSuccess(data.output);
-      } else if (data.status === 'failed' || data.status === 'canceled') {
+        setProgress(95, 'Upload R2 + finalisation…');
+        // Le serveur a déjà fait l'upload R2 + KV write avant de retourner
+        // succeeded (cf stems.js). On rafraîchit la liste.
+        await refreshList();
+        await refreshCap();
+        finishAnalysis();
+      } else if (j.status === 'failed' || j.status === 'canceled') {
         cancelPolling();
-        isProcessing = false;
-        document.getElementById('st-drop-zone').classList.remove('disabled');
-        showError(data.error || `Échec de la séparation (${data.status})`);
+        failAnalysis(j.error || 'Échec de la séparation (' + j.status + ')');
       } else {
-        const elapsed = data.metrics?.predict_time || 0;
-        const dots = '.'.repeat(dotCount + 1);
+        const elapsed = j.metrics?.predict_time || 0;
         setProgress(
           Math.min(92, 35 + elapsed * 0.6),
-          `Séparation en cours${dots}`
+          'Séparation en cours' + '.'.repeat(dotCount + 1),
         );
       }
     } catch (err) {
       cancelPolling();
-      isProcessing = false;
-      document.getElementById('st-drop-zone').classList.remove('disabled');
-      showError(err.message || 'Erreur réseau');
+      failAnalysis(err.message || 'Erreur réseau');
     }
   }, POLL_INTERVAL_MS);
 }
@@ -621,69 +775,192 @@ function cancelPolling() {
   }
 }
 
-// ─── Résultat ────────────────────────────────────────────────
-function handleSuccess(output) {
-  // Replicate retourne un objet { vocals, drums, bass, other } ou un array.
-  const stemUrls = {};
-  if (Array.isArray(output)) {
-    const fallback = ['vocals', 'drums', 'bass', 'other'];
-    output.forEach((url, i) => { if (fallback[i]) stemUrls[fallback[i]] = url; });
-  } else if (output && typeof output === 'object') {
-    Object.assign(stemUrls, output);
-  }
-
-  const presentKeys = STEM_ORDER.filter((k) => stemUrls[k]);
-  if (!presentKeys.length) {
-    isProcessing = false;
-    document.getElementById('st-drop-zone').classList.remove('disabled');
-    showError('Aucune piste reçue de Replicate');
-    return;
-  }
-
-  setProgress(100, 'Pistes prêtes ✓');
-
-  const songTitle = selectedFile?.name?.replace(/\.[^.]+$/, '') || 'Analyse';
-  document.getElementById('st-song-title').textContent = songTitle;
-
-  const list = document.getElementById('st-tracks-list');
-  list.innerHTML = presentKeys.map((key) => {
-    const url = stemUrls[key];
-    const label = STEM_LABELS[key] || key;
-    const fname = `${songTitle} — ${label}.mp3`.replace(/"/g, '');
-    return `
-      <div class="st-track" data-stem="${key}">
-        <span class="st-track-label">${escapeHtml(label)}</span>
-        <audio controls preload="metadata" src="${escapeAttr(url)}"></audio>
-        <a class="st-track-download" href="${escapeAttr(url)}" download="${escapeAttr(fname)}">
-          ↓ Télécharger
-        </a>
-      </div>
-    `;
-  }).join('');
-
-  setTimeout(() => {
-    isProcessing = false;
-    document.getElementById('st-drop-zone').classList.remove('disabled');
-    showSection('result');
-  }, 250);
+function finishAnalysis() {
+  isProcessing = false;
+  document.getElementById('drop-zone').classList.remove('disabled');
+  document.getElementById('progress-section').style.display = 'none';
+  toast('Séparation terminée ✓');
+  clearFile();
+  document.getElementById('title-input').value = '';
 }
 
-// ─── Helpers UI ──────────────────────────────────────────────
-function showSection(name) {
-  ['upload', 'progress', 'result', 'error'].forEach((n) => {
-    const el = document.getElementById(`st-${n}-section`);
-    if (el) el.style.display = n === name ? '' : 'none';
-  });
+function failAnalysis(msg) {
+  isProcessing = false;
+  document.getElementById('drop-zone').classList.remove('disabled');
+  document.getElementById('progress-section').style.display = 'none';
+  document.getElementById('analyze-btn').disabled = !selectedFile;
+  document.getElementById('error-msg').textContent = '✗ ' + msg;
+  document.getElementById('error-section').style.display = 'flex';
 }
 
 function setProgress(pct, label) {
-  document.getElementById('st-progress-bar').style.width = pct + '%';
-  document.getElementById('st-progress-label').textContent = label;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = label;
 }
 
-function showError(msg) {
-  document.getElementById('st-error-msg').textContent = '✗ ' + msg;
-  showSection('error');
+// ─── Liste séparations ──────────────────────────────────────
+async function refreshList() {
+  const list = document.getElementById('list-content');
+  try {
+    const r = await fetch('/api/stems/list', { credentials: 'same-origin' });
+    if (!r.ok) {
+      list.innerHTML = '<div class="list-empty">Impossible de charger la liste.</div>';
+      return;
+    }
+    const j = await r.json();
+    separationsCache = Array.isArray(j.items) ? j.items : [];
+    renderList();
+  } catch {
+    list.innerHTML = '<div class="list-empty">Erreur réseau.</div>';
+  }
+}
+
+function renderList() {
+  const el = document.getElementById('list-content');
+  if (!separationsCache.length) {
+    el.innerHTML = '<div class="list-empty">Aucune séparation pour le mois courant.</div>';
+    return;
+  }
+  el.innerHTML = separationsCache.map((s) => {
+    const date = formatDate(s.ts);
+    const assigned = Array.isArray(s.assignedTo) ? s.assignedTo : [];
+    const assignedLabel = assigned.length
+      ? assigned.map((slug) => {
+          const e = ELEVES.find((x) => x.slug === slug);
+          return e ? e.display : slug;
+        }).join(', ')
+      : 'Non assigné';
+    const assignedClass = assigned.length ? 'sep-assigned assigned' : 'sep-assigned';
+    return (
+      '<div class="sep-card" data-id="' + escapeAttr(s.id) + '">' +
+        '<div class="sep-card-head">' +
+          '<span class="sep-title">' + escapeHtml(s.title) + '</span>' +
+          '<span class="sep-meta">' + escapeHtml(date) + '</span>' +
+          '<span class="' + assignedClass + '">' + escapeHtml(assignedLabel) + '</span>' +
+          '<div class="sep-actions">' +
+            '<button class="sep-btn" data-act="toggle">▶ Écouter</button>' +
+            '<button class="sep-btn" data-act="assign">👥 Assigner</button>' +
+            '<button class="sep-btn danger" data-act="delete">🗑</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="sep-players"></div>' +
+      '</div>'
+    );
+  }).join('');
+
+  el.querySelectorAll('.sep-card').forEach((card) => {
+    const id = card.getAttribute('data-id');
+    card.querySelectorAll('button[data-act]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const act = btn.getAttribute('data-act');
+        if (act === 'toggle') toggleCard(card, id);
+        else if (act === 'assign') openAssignModal(id);
+        else if (act === 'delete') deleteSep(id);
+      });
+    });
+  });
+}
+
+function toggleCard(card, id) {
+  if (card.classList.contains('expanded')) {
+    card.classList.remove('expanded');
+    card.querySelector('.sep-players').innerHTML = '';
+    return;
+  }
+  // Charge les players
+  const sep = separationsCache.find((s) => s.id === id);
+  if (!sep) return;
+  const players = STEM_ORDER
+    .filter((stem) => sep.stems.includes(stem))
+    .map((stem) => {
+      const label = STEM_LABELS[stem] || stem;
+      const audioUrl = '/api/stems/' + encodeURIComponent(id) + '/audio/' + stem;
+      return (
+        '<div class="stem-row" data-stem="' + stem + '">' +
+          '<span class="stem-label">' + label + '</span>' +
+          '<audio controls preload="none" src="' + audioUrl + '"></audio>' +
+        '</div>'
+      );
+    }).join('');
+  card.querySelector('.sep-players').innerHTML = players;
+  card.classList.add('expanded');
+}
+
+async function deleteSep(id) {
+  if (!confirm('Supprimer cette séparation (irréversible) ?')) return;
+  try {
+    const r = await fetch('/api/stems/' + encodeURIComponent(id), {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Erreur ' + r.status));
+    toast('Séparation supprimée ✓');
+    await refreshList();
+    await refreshCap();
+  } catch (e) {
+    toast('Erreur : ' + (e.message || ''));
+  }
+}
+
+// ─── Modal assign ───────────────────────────────────────────
+function openAssignModal(id) {
+  assignTargetId = id;
+  const sep = separationsCache.find((s) => s.id === id);
+  const current = sep?.assignedTo || [];
+  document.getElementById('assign-title').textContent = 'Assigner « ' + (sep?.title || '') + ' »';
+  const html = ELEVES.map((e) => (
+    '<label class="checkbox-row">' +
+      '<input type="checkbox" value="' + e.slug + '"' + (current.includes(e.slug) ? ' checked' : '') + ' />' +
+      '<span>' + e.display + '</span>' +
+    '</label>'
+  )).join('');
+  document.getElementById('assign-list').innerHTML = html;
+  document.getElementById('assign-modal').classList.add('show');
+}
+
+function closeAssignModal() {
+  document.getElementById('assign-modal').classList.remove('show');
+  assignTargetId = null;
+}
+
+async function saveAssignment() {
+  if (!assignTargetId) return;
+  const slugs = Array.from(
+    document.querySelectorAll('#assign-list input[type="checkbox"]:checked'),
+  ).map((c) => c.value);
+  const btn = document.getElementById('assign-save');
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/stems/' + encodeURIComponent(assignTargetId) + '?action=assign', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ eleveSlugs: slugs }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || ('Erreur ' + r.status));
+    toast('Assignation mise à jour ✓');
+    closeAssignModal();
+    await refreshList();
+  } catch (e) {
+    toast('Erreur : ' + (e.message || ''));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ─── Helpers UI ─────────────────────────────────────────────
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mois = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+  const mm = mois[d.getMonth()];
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return dd + ' ' + mm + ' · ' + hh + ':' + min;
 }
 
 function toast(msg) {

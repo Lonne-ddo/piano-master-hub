@@ -300,18 +300,20 @@
     (function () {
         var sub = document.getElementById('stems-sub');
         if (!sub) return;
-        var defaultLabel = sub.textContent;
         fetch('/api/stems/stats', { credentials: 'same-origin' })
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (j) {
                 if (!j || !j.ok) return;
                 var n = j.count || 0;
+                var cap = j.cap || 20;
                 var cost = (j.costEUR || 0).toLocaleString('fr-FR', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                 });
                 var word = n === 1 ? 'séparation' : 'séparations';
-                sub.textContent = 'Ce mois : ' + n + ' ' + word + ' · ~' + cost + ' €';
+                sub.textContent = 'Ce mois : ' + n + ' / ' + cap + ' ' + word + ' · ~' + cost + ' €';
+                if (n >= cap) sub.style.color = '#e05c6b';
+                else if (n >= cap - 3) sub.style.color = '#f0b429';
             })
             .catch(function () { /* fail silently — sub reste sur defaultLabel */ });
     })();

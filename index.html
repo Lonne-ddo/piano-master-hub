@@ -531,6 +531,68 @@
             margin-bottom: 18px;
         }
 
+        /* Section Mes séparations (audio Demucs assignés par l'admin) */
+        .separations-block {
+            width: 100%;
+            margin-top: 16px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+        .separations-block h2 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+        .separations-empty {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+        .sep-item {
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+        .sep-item:last-child { margin-bottom: 0; }
+        .sep-item-head {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 14px;
+            cursor: pointer;
+            background: rgba(255,255,255,0.02);
+            transition: background 0.15s;
+        }
+        .sep-item-head:hover { background: rgba(255,255,255,0.05); }
+        .sep-item-title { font-size: 0.95rem; font-weight: 600; color: var(--text); flex: 1; }
+        .sep-item-date { font-size: 0.75rem; color: var(--text-muted); font-family: monospace; }
+        .sep-item-chevron { color: var(--text-muted); font-size: 0.9rem; transition: transform 0.2s; }
+        .sep-item.expanded .sep-item-chevron { transform: rotate(180deg); }
+        .sep-item-body {
+            display: none;
+            padding: 12px 14px 14px;
+            background: rgba(0,0,0,0.15);
+            flex-direction: column; gap: 8px;
+        }
+        .sep-item.expanded .sep-item-body { display: flex; }
+        .sep-stem-row {
+            display: flex; align-items: center; gap: 10px;
+            flex-wrap: wrap;
+        }
+        .sep-stem-row .label {
+            font-size: 0.82rem; font-weight: 600;
+            min-width: 70px; flex-shrink: 0;
+        }
+        .sep-stem-row[data-stem="vocals"] .label { color: #5ecb8b; }
+        .sep-stem-row[data-stem="drums"]  .label { color: #8B6FE8; }
+        .sep-stem-row[data-stem="bass"]   .label { color: #60a5fa; }
+        .sep-stem-row[data-stem="piano"]  .label { color: #ec4899; }
+        .sep-stem-row[data-stem="guitar"] .label { color: #f97316; }
+        .sep-stem-row[data-stem="other"]  .label { color: #f0b429; }
+        .sep-stem-row audio { flex: 1; min-width: 200px; height: 32px; }
+
         .doc-btn {
             display: inline-flex;
             align-items: center;
@@ -822,6 +884,7 @@
             '<div id="programme-zone"></div>' +
             '<div id="devoirs-zone"></div>' +
             '<div id="resume-zone"></div>' +
+            '<div id="separations-zone"></div>' +
             '<div class="cards-section-title">Ressources</div>' +
             '<div class="cards dashboard-cards" id="cards"></div>';
 
@@ -829,6 +892,84 @@
         renderFooter();
         renderDynamicSkeleton();
         fetchDashboardData(eleve);
+        loadSeparationsForEleve(eleve.slug);
+    }
+
+    // Charge la liste des séparations Demucs assignées à cet élève (lecture seule).
+    // Affiche un accordion ; chaque entrée déploie 6 lecteurs <audio> via le proxy R2.
+    function loadSeparationsForEleve(slug) {
+        var zone = document.getElementById("separations-zone");
+        if (!zone) return;
+        zone.innerHTML = '';
+        fetch('/api/eleves/' + encodeURIComponent(slug) + '/stems', { credentials: 'include' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) {
+                if (!j || !j.ok) return; // 401/403 ou erreur réseau → silent
+                var items = Array.isArray(j.items) ? j.items : [];
+                renderSeparations(zone, items, slug);
+            })
+            .catch(function () { /* silent */ });
+    }
+
+    function renderSeparations(zone, items, slug) {
+        if (!items.length) {
+            // Si vide : on n'affiche rien (pas de bruit visuel)
+            zone.innerHTML = '';
+            return;
+        }
+        var STEM_LABELS = { vocals: 'Chant', drums: 'Batterie', bass: 'Basse', piano: 'Piano', guitar: 'Guitare', other: 'Autres' };
+        var STEM_ORDER = ['vocals', 'drums', 'bass', 'piano', 'guitar', 'other'];
+        var monthsShort = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+
+        function fmtDate(iso) {
+            if (!iso) return '';
+            var d = new Date(iso);
+            if (isNaN(d.getTime())) return '';
+            return d.getDate() + ' ' + monthsShort[d.getMonth()];
+        }
+
+        var html = '<div class="separations-block">' +
+            '<h2>🎹 Mes séparations</h2>';
+        items.forEach(function (s, idx) {
+            var stems = Array.isArray(s.stems) ? s.stems : [];
+            html += '<div class="sep-item" data-idx="' + idx + '">' +
+                '<div class="sep-item-head">' +
+                    '<span class="sep-item-title">' + escapeHtml(s.title || 'Sans titre') + '</span>' +
+                    '<span class="sep-item-date">' + escapeHtml(fmtDate(s.ts)) + '</span>' +
+                    '<span class="sep-item-chevron">▾</span>' +
+                '</div>' +
+                '<div class="sep-item-body" data-id="' + escapeHtml(s.id) + '"></div>' +
+            '</div>';
+        });
+        html += '</div>';
+        zone.innerHTML = html;
+
+        zone.querySelectorAll('.sep-item').forEach(function (el) {
+            var head = el.querySelector('.sep-item-head');
+            var body = el.querySelector('.sep-item-body');
+            head.addEventListener('click', function () {
+                if (el.classList.contains('expanded')) {
+                    el.classList.remove('expanded');
+                    body.innerHTML = '';
+                    return;
+                }
+                var idx = parseInt(el.getAttribute('data-idx'), 10);
+                var sep = items[idx];
+                if (!sep) return;
+                var sepStems = Array.isArray(sep.stems) ? sep.stems : [];
+                var rows = STEM_ORDER
+                    .filter(function (k) { return sepStems.indexOf(k) !== -1; })
+                    .map(function (k) {
+                        var url = '/api/stems/' + encodeURIComponent(sep.id) + '/audio/' + k;
+                        return '<div class="sep-stem-row" data-stem="' + k + '">' +
+                            '<span class="label">' + (STEM_LABELS[k] || k) + '</span>' +
+                            '<audio controls preload="none" src="' + url + '"></audio>' +
+                        '</div>';
+                    }).join('');
+                body.innerHTML = rows || '<div class="separations-empty">Aucune piste disponible.</div>';
+                el.classList.add('expanded');
+            });
+        });
     }
 
     function renderDynamicSkeleton() {

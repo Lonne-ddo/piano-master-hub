@@ -8,6 +8,7 @@
 import { requireAdminPassword } from '../_lib/session.js';
 
 const COST_EUR_PER_RUN = 0.02;
+const MONTHLY_CAP = 20;
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -63,6 +64,7 @@ export async function onRequestGet({ request, env }) {
     ok: true,
     ym,
     count,
+    cap: MONTHLY_CAP,
     costEUR: Math.round(count * COST_EUR_PER_RUN * 100) / 100,
   });
 }
