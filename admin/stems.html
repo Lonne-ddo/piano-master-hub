@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <script>
+    // Garde admin frontale (l'auth backend reste l'autorité finale)
+    (function () {
+      if (localStorage.getItem('mh_admin') !== '4697') {
+        window.location.replace('/admin/');
+      }
+    })();
+  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Master Hub Admin — Séparateur de pistes</title>
+  <meta name="theme-color" content="#0f0f14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MH Admin" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --v:       #8B6FE8;
+      --v-dim:   rgba(139,111,232,0.14);
+      --v-soft:  #6b54c4;
+      --bg0:     #09090f;
+      --bg1:     #0f0e18;
+      --bg2:     #161524;
+      --bg3:     #1e1c30;
+      --text1:   #eeeaf8;
+      --text2:   #9d9ab5;
+      --text3:   #5a5870;
+      --border:  #25233a;
+      --green:   #5ecb8b;
+      --amber:   #f0b429;
+      --red:     #e05c6b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg0);
+      color: var(--text1);
+      min-height: 100vh;
+      min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Shell ─────────────────────────────────────────────── */
+    .app { max-width: 900px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    .admin-banner {
+      background: var(--v-dim);
+      border: 1px solid rgba(139,111,232,0.35);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 12px;
+      color: var(--v);
+      letter-spacing: .04em;
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px;
+      flex-wrap: wrap;
+    }
+    .admin-banner .sep { opacity: .4; }
+    .admin-banner a {
+      color: var(--text2);
+      text-decoration: none;
+      transition: color .15s;
+    }
+    .admin-banner a:hover { color: var(--v); }
+
+    .ph { margin-bottom: 18px; }
+    .ph-title {
+      font-size: 22px; font-weight: 700; color: var(--text1);
+      letter-spacing: -.01em;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10.5px; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: var(--v-dim);
+      color: var(--v);
+    }
+    .ph-desc {
+      font-size: 13.5px; color: var(--text2);
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+    .ph-meta {
+      margin-top: 10px;
+      font-size: 11.5px; color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      display: flex; flex-wrap: wrap; gap: 12px;
+    }
+    .ph-meta span::before {
+      content: '·'; margin-right: 8px; color: var(--text3); opacity: .5;
+    }
+    .ph-meta span:first-child::before { content: ''; margin: 0; }
+
+    /* ── Drop zone ─────────────────────────────────────────── */
+    .st-drop-zone {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 8px;
+      border: 2px dashed var(--border);
+      border-radius: 14px;
+      padding: 48px 24px;
+      cursor: pointer;
+      transition: all .15s;
+      text-align: center;
+      background: var(--bg1);
+    }
+    .st-drop-zone:hover, .st-drop-zone.drag-over {
+      border-color: var(--v);
+      background: var(--v-dim);
+    }
+    .st-drop-icon { font-size: 36px; }
+    .st-drop-text { font-size: 15px; font-weight: 600; color: var(--text1); }
+    .st-drop-sub  { font-size: 12px; color: var(--text3); }
+
+    .st-file-info {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--text1);
+    }
+    .st-file-info .size { color: var(--text3); font-size: 12px; }
+    .st-file-info button {
+      margin-left: auto;
+      background: transparent; border: none;
+      color: var(--text3);
+      cursor: pointer; font-size: 16px;
+      padding: 4px 8px;
+    }
+    .st-file-info button:hover { color: var(--red); }
+
+    .gen-btn {
+      width: 100%;
+      padding: 12px 18px;
+      border-radius: 10px;
+      border: none;
+      background: var(--v);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: opacity .15s, background .15s;
+      margin-top: 14px;
+    }
+    .gen-btn:hover:not(:disabled) { background: var(--v-soft); }
+    .gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* ── Progression ───────────────────────────────────────── */
+    .st-progress-wrap {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px;
+    }
+    .st-progress-label {
+      font-size: 13.5px;
+      color: var(--text1);
+      margin-bottom: 14px;
+    }
+    .st-progress-bar-wrap {
+      background: var(--bg2);
+      border-radius: 20px;
+      height: 6px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .st-progress-bar {
+      height: 100%;
+      background: var(--v);
+      border-radius: 20px;
+      transition: width .3s ease;
+    }
+    .st-progress-hint {
+      font-size: 11.5px;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      margin-bottom: 12px;
+    }
+    #st-cancel-btn {
+      font-size: 12px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    #st-cancel-btn:hover { color: var(--text1); border-color: var(--v); }
+
+    /* ── Résultat ──────────────────────────────────────────── */
+    .st-result-header {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 18px; flex-wrap: wrap;
+    }
+    .st-back-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 7px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+    }
+    .st-back-btn:hover { color: var(--text1); border-color: var(--v); }
+    .st-song-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--text1);
+    }
+
+    .st-tracks { display: flex; flex-direction: column; gap: 10px; }
+    .st-track {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      display: flex; align-items: center; gap: 14px;
+      flex-wrap: wrap;
+    }
+    .st-track-label {
+      font-size: 14px; font-weight: 600;
+      min-width: 90px;
+      flex-shrink: 0;
+    }
+    .st-track audio {
+      flex: 1;
+      min-width: 220px;
+      height: 36px;
+    }
+    .st-track-download {
+      font-size: 12px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 7px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center; gap: 5px;
+      transition: all .15s;
+      font-family: inherit;
+    }
+    .st-track-download:hover {
+      background: var(--v-dim);
+      color: var(--v);
+      border-color: var(--v);
+    }
+
+    /* Couleurs par stem */
+    .st-track[data-stem="vocals"]  .st-track-label { color: var(--green); }
+    .st-track[data-stem="drums"]   .st-track-label { color: var(--v); }
+    .st-track[data-stem="bass"]    .st-track-label { color: #60a5fa; }
+    .st-track[data-stem="piano"]   .st-track-label { color: #ec4899; }
+    .st-track[data-stem="guitar"]  .st-track-label { color: #f97316; }
+    .st-track[data-stem="other"]   .st-track-label { color: var(--amber); }
+
+    /* ── Erreur ────────────────────────────────────────────── */
+    .st-error {
+      background: rgba(224,92,107,0.08);
+      border: 1px solid rgba(224,92,107,0.3);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center; gap: 12px;
+      font-size: 13px;
+      color: var(--red);
+    }
+    #st-retry-btn {
+      margin-left: auto;
+      background: transparent;
+      border: 1px solid var(--red);
+      color: var(--red);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+    }
+
+    /* ── Responsive ────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      .app { padding: 18px 14px 40px; }
+      .st-drop-zone { padding: 36px 16px; }
+      .st-track { padding: 12px; }
+      .st-track-label { min-width: auto; }
+      .st-track audio { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Bandeau super-admin -->
+  <div class="admin-banner">
+    <span>🔒 Super-admin</span>
+    <span class="sep">·</span>
+    <a href="/admin/">← Élèves</a>
+    <span class="sep">·</span>
+    <a href="/admin/outils.html">Outils</a>
+  </div>
+
+  <!-- En-tête -->
+  <div class="ph">
+    <div class="ph-title">
+      Séparateur de pistes
+      <span class="badge">Demucs · Replicate</span>
+    </div>
+    <p class="ph-desc">
+      Upload un fichier audio pour isoler automatiquement les 6 pistes :
+      Chant · Batterie · Basse · Piano · Guitare · Autres.
+    </p>
+    <div class="ph-meta">
+      <span>≈ 1–3 min selon durée</span>
+      <span>💰 ~0.02 € / morceau</span>
+      <span>Max 50 Mo · 15 min</span>
+    </div>
+  </div>
+
+  <!-- Section upload -->
+  <div id="st-upload-section">
+    <label class="st-drop-zone" id="st-drop-zone">
+      <input type="file" id="st-file-input" accept=".mp3,.wav,.m4a,.flac,.ogg" hidden />
+      <div class="st-drop-icon">🎵</div>
+      <div class="st-drop-text">Dépose ton fichier audio ici</div>
+      <div class="st-drop-sub">.mp3 · .wav · .m4a · .flac — max 50 Mo</div>
+    </label>
+    <div id="st-file-info" style="display:none" class="st-file-info">
+      <span id="st-file-name"></span>
+      <span class="size" id="st-file-size"></span>
+      <button type="button" id="st-clear-btn" title="Retirer">✕</button>
+    </div>
+    <div id="st-long-warning" style="display:none;margin-top:10px;font-size:12px;color:var(--amber);">
+      ⚠️ Morceau long détecté — traitement plus long (3–5 min).
+    </div>
+    <button type="button" id="st-analyze-btn" disabled class="gen-btn">
+      Séparer les pistes →
+    </button>
+  </div>
+
+  <!-- Section progression -->
+  <div id="st-progress-section" style="display:none" class="st-progress-wrap">
+    <div class="st-progress-label" id="st-progress-label">Envoi du fichier…</div>
+    <div class="st-progress-bar-wrap">
+      <div class="st-progress-bar" id="st-progress-bar" style="width:0%"></div>
+    </div>
+    <div class="st-progress-hint">⏱ ≈ 1 à 3 min selon la durée du morceau</div>
+    <button type="button" id="st-cancel-btn">Annuler</button>
+  </div>
+
+  <!-- Section résultat -->
+  <div id="st-result-section" style="display:none">
+    <div class="st-result-header">
+      <button class="st-back-btn" id="st-reset-btn">← Nouvelle séparation</button>
+      <span class="st-song-title" id="st-song-title"></span>
+    </div>
+    <div class="st-tracks" id="st-tracks-list"></div>
+  </div>
+
+  <!-- Section erreur -->
+  <div id="st-error-section" style="display:none" class="st-error">
+    <span id="st-error-msg"></span>
+    <button type="button" id="st-retry-btn">Réessayer</button>
+  </div>
+
+</div>
+
+<script>
+// ─── Séparateur de pistes — Master Hub Admin ─────────────────────
+// Frontend : drag/drop → /api/stems/separate → poll /api/stems/status → 6 lecteurs
+//
+// Auth : x-admin-secret (legacy) ; le cookie de session admin est envoyé
+// automatiquement par le navigateur si l'admin est loggé via magic link.
+
+const ADMIN_SECRET = '4697';
+
+// Labels FR + ordre d'affichage canonique (htdemucs_6s)
+const STEM_LABELS = {
+  vocals: 'Chant',
+  drums:  'Batterie',
+  bass:   'Basse',
+  piano:  'Piano',
+  guitar: 'Guitare',
+  other:  'Autres',
+};
+const STEM_ORDER = ['vocals', 'drums', 'bass', 'piano', 'guitar', 'other'];
+
+// État
+let selectedFile  = null;
+let predictionId  = null;
+let pollInterval  = null;
+let cancelled     = false;
+let audioDuration = null;
+
+// ── Refs DOM ─────────────────────────────────────────────────
+const dropZone   = document.getElementById('st-drop-zone');
+const fileInput  = document.getElementById('st-file-input');
+const analyzeBtn = document.getElementById('st-analyze-btn');
+const longWarn   = document.getElementById('st-long-warning');
+
+// ── Upload ───────────────────────────────────────────────────
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer?.files?.[0];
+  if (f) setFile(f);
+});
+fileInput.addEventListener('change', (e) => {
+  const f = e.target.files?.[0];
+  if (f) setFile(f);
+});
+
+function setFile(file) {
+  if (file.size > 50 * 1024 * 1024) {
+    showError('Fichier trop volumineux (max 50 Mo).');
+    return;
+  }
+  selectedFile = file;
+  audioDuration = null;
+  longWarn.style.display = 'none';
+
+  document.getElementById('st-file-name').textContent = file.name;
+  document.getElementById('st-file-size').textContent =
+    (file.size / 1024 / 1024).toFixed(1) + ' Mo';
+  document.getElementById('st-file-info').style.display = 'flex';
+  analyzeBtn.disabled = false;
+
+  // Lit la durée pour avertir si > 10 min + envoyer au backend
+  try {
+    const url = URL.createObjectURL(file);
+    const probe = document.createElement('audio');
+    probe.preload = 'metadata';
+    probe.src = url;
+    probe.addEventListener('loadedmetadata', () => {
+      audioDuration = probe.duration || null;
+      URL.revokeObjectURL(url);
+      if (audioDuration && audioDuration > 10 * 60) {
+        longWarn.style.display = '';
+      }
+      if (audioDuration && audioDuration > 15 * 60) {
+        showError('Morceau trop long (max 15 min).');
+        analyzeBtn.disabled = true;
+      }
+    });
+    probe.addEventListener('error', () => URL.revokeObjectURL(url));
+  } catch (e) {
+    /* metadata read non-bloquant */
+  }
+}
+
+document.getElementById('st-clear-btn').onclick = () => {
+  selectedFile = null;
+  audioDuration = null;
+  fileInput.value = '';
+  document.getElementById('st-file-info').style.display = 'none';
+  longWarn.style.display = 'none';
+  analyzeBtn.disabled = true;
+};
+
+// ── Analyse ──────────────────────────────────────────────────
+analyzeBtn.addEventListener('click', startAnalysis);
+
+async function startAnalysis() {
+  if (!selectedFile) return;
+  cancelled = false;
+  showSection('progress');
+  setProgress(8, 'Lecture du fichier…');
+
+  try {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(selectedFile);
+    });
+
+    setProgress(22, 'Envoi vers Replicate…');
+
+    const resp = await fetch('/api/stems/separate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-secret': ADMIN_SECRET,
+      },
+      body: JSON.stringify({
+        audio: base64,
+        filename: selectedFile.name,
+        duration: audioDuration,
+      }),
+    });
+
+    const data = await resp.json();
+    if (!resp.ok || data.error) {
+      throw new Error(data.detail || data.error || `Erreur Replicate ${resp.status}`);
+    }
+
+    if (data.status === 'succeeded') {
+      handleSuccess(data.output);
+      return;
+    }
+
+    predictionId = data.id;
+    setProgress(35, 'Séparation en cours…');
+    pollStatus();
+  } catch (err) {
+    showError(err.message || 'Erreur inconnue');
+  }
+}
+
+function pollStatus() {
+  let dotCount = 0;
+  pollInterval = setInterval(async () => {
+    if (cancelled) { clearInterval(pollInterval); return; }
+    dotCount = (dotCount + 1) % 4;
+
+    try {
+      const resp = await fetch(`/api/stems/status?id=${predictionId}`, {
+        headers: { 'x-admin-secret': ADMIN_SECRET },
+      });
+      const data = await resp.json();
+
+      if (data.status === 'succeeded') {
+        clearInterval(pollInterval);
+        handleSuccess(data.output);
+      } else if (data.status === 'failed' || data.status === 'canceled') {
+        clearInterval(pollInterval);
+        showError(data.error || 'Échec de la séparation');
+      } else {
+        const elapsed = data.metrics?.predict_time || 0;
+        const dots = '.'.repeat(dotCount + 1);
+        setProgress(
+          Math.min(92, 30 + elapsed * 0.6),
+          `Séparation en cours${dots}`
+        );
+      }
+    } catch (err) {
+      clearInterval(pollInterval);
+      showError(err.message || 'Erreur réseau');
+    }
+  }, 3000);
+}
+
+document.getElementById('st-cancel-btn').onclick = () => {
+  cancelled = true;
+  clearInterval(pollInterval);
+  showSection('upload');
+};
+
+// ── Résultat ─────────────────────────────────────────────────
+function handleSuccess(output) {
+  // Replicate retourne soit un array, soit un objet { vocals, drums, ... }
+  const stemUrls = {};
+  if (Array.isArray(output)) {
+    // Ordre legacy htdemucs (4 stems) : vocals, drums, bass, other
+    const fallback = ['vocals', 'drums', 'bass', 'other'];
+    output.forEach((url, i) => { if (fallback[i]) stemUrls[fallback[i]] = url; });
+  } else if (output && typeof output === 'object') {
+    Object.assign(stemUrls, output);
+  }
+
+  const presentKeys = STEM_ORDER.filter(k => stemUrls[k]);
+  if (!presentKeys.length) {
+    showError('Aucune piste reçue de Replicate');
+    return;
+  }
+
+  setProgress(100, 'Pistes prêtes');
+
+  const songTitle = selectedFile?.name?.replace(/\.[^.]+$/, '') || 'Analyse';
+  document.getElementById('st-song-title').textContent = songTitle;
+
+  const list = document.getElementById('st-tracks-list');
+  list.innerHTML = presentKeys.map((key) => {
+    const url = stemUrls[key];
+    const label = STEM_LABELS[key] || key;
+    const fname = `${songTitle} — ${label}.mp3`;
+    return `
+      <div class="st-track" data-stem="${key}">
+        <span class="st-track-label">${label}</span>
+        <audio controls preload="metadata" src="${url}"></audio>
+        <a class="st-track-download" href="${url}" download="${fname.replace(/"/g, '')}">
+          ↓ Télécharger
+        </a>
+      </div>
+    `;
+  }).join('');
+
+  setTimeout(() => showSection('result'), 200);
+}
+
+document.getElementById('st-reset-btn').addEventListener('click', () => {
+  selectedFile = null;
+  audioDuration = null;
+  predictionId = null;
+  fileInput.value = '';
+  document.getElementById('st-file-info').style.display = 'none';
+  longWarn.style.display = 'none';
+  analyzeBtn.disabled = true;
+  document.getElementById('st-tracks-list').innerHTML = '';
+  showSection('upload');
+});
+
+// ── Utilitaires ──────────────────────────────────────────────
+function showSection(name) {
+  document.getElementById('st-upload-section').style.display   = name === 'upload'   ? '' : 'none';
+  document.getElementById('st-progress-section').style.display = name === 'progress' ? '' : 'none';
+  document.getElementById('st-result-section').style.display   = name === 'result'   ? '' : 'none';
+  document.getElementById('st-error-section').style.display    = name === 'error'    ? '' : 'none';
+}
+
+function setProgress(pct, label) {
+  document.getElementById('st-progress-bar').style.width = pct + '%';
+  document.getElementById('st-progress-label').textContent = label;
+}
+
+function showError(msg) {
+  document.getElementById('st-error-msg').textContent = '✗ ' + msg;
+  showSection('error');
+}
+
+document.getElementById('st-retry-btn').onclick = () => showSection('upload');
+</script>
+
+</body>
+</html>
