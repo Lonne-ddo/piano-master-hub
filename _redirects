@@ -10,3 +10,8 @@
 /tara             /index.html    200
 /dexter           /index.html    200
 /messon           /index.html    200
+# Catch-all SPA fallback : tout path inconnu sert /index.html avec URL préservée.
+# Les fonctions /api/* et fichiers statiques (/admin/*, /bibli, /quiz, etc.) ont
+# priorité sur _redirects côté CF Pages, donc pas de collision.
+# Permet aussi un futur 5e élève sans toucher au fichier (ex: /youri).
+/*                /index.html    200
