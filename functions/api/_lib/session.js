@@ -1,6 +1,11 @@
 // ─── Helper session côté élève ───────────────────────────────────
 // Lit le cookie `mh_session` et résout la session KV correspondante.
 // Retourne null si pas de cookie, cookie invalide, ou session expirée/absente.
+//
+// Note : depuis la séparation admin/élève, le cookie mh_session ne contient
+// QUE des sessions élève (slug). Les anciennes sessions admin (is_admin: true)
+// existent encore pendant la fenêtre 90j de leur TTL ; elles sont ignorées
+// pour l'auth admin (qui passe par mh_admin_pw / requireAdminPassword).
 
 export async function getSessionFromRequest(request, env) {
   const cookie = request.headers.get('cookie') || '';
@@ -24,19 +29,6 @@ export async function getSessionFromRequest(request, env) {
   }
 }
 
-// Vérifie si un email appartient à la whitelist super-admin (env var
-// ADMIN_EMAILS, CSV insensible à la casse). Retourne false si var absente.
-export function isAdminEmail(email, env) {
-  if (!email || !env || !env.ADMIN_EMAILS) return false;
-  const norm = String(email).trim().toLowerCase();
-  if (!norm) return false;
-  return String(env.ADMIN_EMAILS)
-    .split(',')
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean)
-    .includes(norm);
-}
-
 // Génère un token random base64url (32 ou 48 bytes selon usage).
 export function generateToken(bytes = 32) {
   const buf = new Uint8Array(bytes);
@@ -46,42 +38,123 @@ export function generateToken(bytes = 32) {
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// ─── Helper auth admin-only ───────────────────────────────────────
-// Vérifie que la requête a une session super-admin valide :
-// cookie mh_session avec is_admin === true ET email toujours dans ADMIN_EMAILS.
+// ─── Auth admin par mot de passe (cookie mh_admin_pw HMAC stateless) ────
 //
-// Retourne la session si OK, null sinon. Defense-in-depth contre l'offboarding
-// pendant la fenêtre de 90j : si l'email est retiré de ADMIN_EMAILS, la
-// session perd ses droits immédiatement.
-export async function requireAdmin(request, env) {
-  const session = await getSessionFromRequest(request, env);
-  if (!session || !session.is_admin) return null;
-  if (!isAdminEmail(session.email, env)) return null;
-  return session;
+// Le cookie a la forme `<expiresAtMs>.<base64url(HMAC-SHA256(secret, expiresAtMs))>`
+// avec `secret = adminPasswordOrFallback(env)`.
+//
+// Avantages de cette approche :
+//   - Stateless : pas de KV write/read sur chaque requête
+//   - Pas de var SESSION_SECRET supplémentaire — la clé HMAC dérive du mdp
+//     admin lui-même (changer le mdp invalide tous les cookies en cours)
+//   - Forge impossible sans connaître le mdp
+//   - Expiration auto-vérifiable côté serveur
+
+const ADMIN_COOKIE_NAME = 'mh_admin_pw';
+const ADMIN_COOKIE_TTL_S = 90 * 24 * 3600; // 90 jours
+
+// TODO(cleanup): retirer ce fallback une fois ADMIN_PASSWORD set sur CF Pages
+// (Production + Preview). Voir notice de déploiement du commit refactor auth.
+function adminPasswordOrFallback(env) {
+  return (env && env.ADMIN_PASSWORD) ? env.ADMIN_PASSWORD : '4697';
+}
+
+function base64urlEncode(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function hmacSha256(secret, message) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
+  return base64urlEncode(new Uint8Array(sig));
+}
+
+// Comparaison à temps constant pour éviter les leaks par timing.
+function constantTimeStrEq(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let acc = 0;
+  for (let i = 0; i < a.length; i++) acc |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return acc === 0;
+}
+
+// Construit la valeur du cookie admin signée pour un TTL en secondes.
+export async function buildAdminPasswordCookieValue(env, ttlSeconds = ADMIN_COOKIE_TTL_S) {
+  const expiresAt = String(Date.now() + ttlSeconds * 1000);
+  const secret = adminPasswordOrFallback(env);
+  const sig = await hmacSha256(secret, expiresAt);
+  return `${expiresAt}.${sig}`;
+}
+
+// Construit l'en-tête Set-Cookie complet (Path=/, HttpOnly, Secure, SameSite=Lax).
+export async function buildAdminPasswordSetCookie(env, ttlSeconds = ADMIN_COOKIE_TTL_S) {
+  const value = await buildAdminPasswordCookieValue(env, ttlSeconds);
+  return `${ADMIN_COOKIE_NAME}=${value}; Path=/; Max-Age=${ttlSeconds}; HttpOnly; Secure; SameSite=Lax`;
+}
+
+// En-tête Set-Cookie qui efface le cookie admin (logout).
+export function buildAdminPasswordClearCookie() {
+  return `${ADMIN_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`;
+}
+
+// Lit le cookie admin et vérifie expiration + signature HMAC.
+// Retourne true si cookie valide non expiré, false sinon.
+export async function requireAdminPassword(request, env) {
+  const cookie = request.headers.get('cookie') || '';
+  const match = cookie.match(/(?:^|;\s*)mh_admin_pw=([^;]+)/);
+  if (!match) return false;
+
+  const value = match[1];
+  const dotIdx = value.lastIndexOf('.');
+  if (dotIdx <= 0) return false;
+
+  const expiresAtStr = value.slice(0, dotIdx);
+  const sig = value.slice(dotIdx + 1);
+
+  const expiresAt = parseInt(expiresAtStr, 10);
+  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) return false;
+
+  const secret = adminPasswordOrFallback(env);
+  let expectedSig;
+  try {
+    expectedSig = await hmacSha256(secret, expiresAtStr);
+  } catch {
+    return false;
+  }
+  return constantTimeStrEq(sig, expectedSig);
+}
+
+// Vérifie qu'un mot de passe candidate match le mdp admin (avec fallback).
+// Comparaison à temps constant.
+export function checkAdminPassword(candidate, env) {
+  if (typeof candidate !== 'string') return false;
+  return constantTimeStrEq(candidate, adminPasswordOrFallback(env));
 }
 
 // ─── Helper auth pour endpoints élève ─────────────────────────────
-// Vérifie que la session courante a le droit d'accéder aux ressources d'un slug
-// donné. Admin = passe-droit (peut consulter n'importe quel slug). Élève = doit
-// matcher exactement son propre slug.
+// Vérifie que la requête a le droit d'accéder aux ressources d'un slug donné :
+//   - admin (cookie mh_admin_pw signé) → passe-droit (peut consulter tout slug)
+//   - élève (session.slug === slug)    → accès à sa propre fiche uniquement
 //
 // Retourne :
-//   { ok: true, role: 'admin'|'eleve', session }  — accès autorisé
+//   { ok: true, role: 'admin'|'eleve', session? }  — accès autorisé
 //   { ok: false, status: 401|403, error: string } — accès refusé
-//
-// Defense-in-depth : revalide isAdminEmail() pour les sessions admin afin de
-// gérer l'offboarding pendant la fenêtre de 90j d'une session admin (un email
-// retiré de ADMIN_EMAILS perd ses droits immédiatement).
 export async function requireEleveOrAdmin(slug, request, env) {
+  if (await requireAdminPassword(request, env)) {
+    return { ok: true, role: 'admin' };
+  }
+
   const session = await getSessionFromRequest(request, env);
   if (!session) return { ok: false, status: 401, error: 'unauthorized' };
-
-  if (session.is_admin) {
-    if (!isAdminEmail(session.email, env)) {
-      return { ok: false, status: 401, error: 'unauthorized' };
-    }
-    return { ok: true, role: 'admin', session };
-  }
 
   const wanted = String(slug || '').toLowerCase();
   if (session.slug && wanted && session.slug === wanted) {

@@ -292,7 +292,7 @@
 </head>
 <body>
 
-<!-- Phase boot : visible le temps de vérifier l'auth admin via /api/auth/whoami -->
+<!-- Phase boot : visible le temps de vérifier l'auth admin via /api/admin/check -->
 <div class="app" id="boot-section">
   <div class="st-boot">
     <div class="spinner"></div>
@@ -373,7 +373,7 @@
 
 <script>
 // ─── Séparateur de pistes — Master Hub Admin ─────────────────────
-// 1) Vérifie l'auth admin via /api/auth/whoami → redirect / si pas admin
+// 1) Vérifie l'auth admin via /api/admin/check → redirect /admin/login.html sinon
 // 2) Drop zone → validation client (50 Mo / 15 min) → POST predict
 // 3) Polling status (3s) jusqu'à statut terminal → 4 lecteurs + downloads
 // 4) Lock UI pendant traitement (un seul run à la fois)
@@ -399,20 +399,19 @@ let predictionId  = null;
 let pollHandle    = null;
 let isProcessing  = false;  // lock UI
 
-// ─── Boot — vérifier l'auth ────────────────────────────────
+// ─── Boot — vérifier l'auth admin (mdp) ────────────────────
 (async function boot() {
   try {
-    const r = await fetch('/api/auth/whoami', { credentials: 'same-origin' });
+    const r = await fetch('/api/admin/check', { credentials: 'same-origin' });
     if (!r.ok) throw new Error('not_admin');
     const j = await r.json();
-    if (!j.ok || !j.is_admin) throw new Error('not_admin');
-    document.getElementById('admin-email').textContent = j.email || '';
+    if (!j.ok) throw new Error('not_admin');
+    document.getElementById('admin-email').textContent = 'super-admin';
     document.getElementById('boot-section').style.display = 'none';
     document.getElementById('main-section').style.display = '';
     bindUi();
   } catch {
-    // Redirige vers le chooser : il proposera le login admin si l'email n'a pas de session.
-    window.location.replace('/?stems_login=1');
+    window.location.replace('/admin/login.html');
   }
 })();
 

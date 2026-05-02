@@ -1,9 +1,9 @@
 // Pipeline LLM : Claude Sonnet 4.6 → Gemini 2.5 Flash → Groq Llama 3.3
 // Les 3 providers reçoivent le MÊME system prompt (cohérence des résultats).
 //
-// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
+// Auth : admin via cookie mh_admin_pw (HMAC).
 
-import { requireAdmin } from './_lib/session.js';
+import { requireAdminPassword } from './_lib/session.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -184,7 +184,7 @@ export async function onRequest(context) {
       return new Response(null, { status: 204, headers: CORS });
     }
 
-    if (!(await requireAdmin(request, env))) {
+    if (!(await requireAdminPassword(request, env))) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), {
         status: 401,
         headers: { ...CORS, 'Content-Type': 'application/json' },

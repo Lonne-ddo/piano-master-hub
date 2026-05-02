@@ -7,15 +7,14 @@
 //   GET  /api/stems?action=status&id=<>&filename=<>&duration=<>&size=<>
 //                                   → { status, output, ... } + log final si terminé
 //
-// Auth : super-admin via session cookie uniquement (magic link → is_admin === true).
-// Aucune autre porte d'entrée (pas de header secret, pas de query token).
+// Auth : admin via cookie mh_admin_pw (HMAC stateless).
 //
 // Logging : un seul log final par run dans MASTERHUB_HISTORY (TTL 90j),
 // déduplication via clé tag `stems:tag:<predictionId>`.
 //   - status === 'success'  : run réussi (compte pour les coûts)
 //   - status === 'failed'   : Replicate refuse (4xx/5xx) ou prediction failed/canceled
 
-import { getSessionFromRequest, isAdminEmail } from './_lib/session.js';
+import { requireAdminPassword } from './_lib/session.js';
 
 // ─── Constantes ────────────────────────────────────────────────
 const REPLICATE_VERSION = '25a173108cff36ef9f80f854c162d01df9e6528be175794b81158fa03836d953';
@@ -37,16 +36,6 @@ function jsonResponse(data, status = 200) {
     status,
     headers: { ...CORS, 'Content-Type': 'application/json' },
   });
-}
-
-// ─── Auth super-admin (session cookie + isAdminEmail) ──────────
-async function requireAdmin(request, env) {
-  const session = await getSessionFromRequest(request, env);
-  if (!session || !session.is_admin) return null;
-  // Defense in depth : si l'email a été retiré de ADMIN_EMAILS depuis la
-  // création de la session, on refuse même avec un cookie valide.
-  if (!isAdminEmail(session.email, env)) return null;
-  return session;
 }
 
 // ─── Logging KV ────────────────────────────────────────────────
@@ -100,8 +89,9 @@ export async function onRequestOptions() {
 export async function onRequest(context) {
   const { request, env } = context;
 
-  const session = await requireAdmin(request, env);
-  if (!session) return jsonResponse({ error: 'unauthorized' }, 401);
+  if (!(await requireAdminPassword(request, env))) {
+    return jsonResponse({ error: 'unauthorized' }, 401);
+  }
 
   if (!env.REPLICATE_API_TOKEN) {
     return jsonResponse({ error: 'replicate_token_missing' }, 502);
@@ -111,16 +101,20 @@ export async function onRequest(context) {
   const action = url.searchParams.get('action');
 
   if (action === 'predict' && request.method === 'POST') {
-    return handlePredict(request, env, session);
+    return handlePredict(request, env);
   }
   if (action === 'status' && request.method === 'GET') {
-    return handleStatus(request, env, session);
+    return handleStatus(request, env);
   }
   return jsonResponse({ error: 'invalid_action' }, 400);
 }
 
 // ─── Predict ───────────────────────────────────────────────────
-async function handlePredict(request, env, session) {
+// L'auth admin est par mot de passe (pas d'email associé) — on log 'admin'
+// dans les entrées MASTERHUB_HISTORY pour le suivi des coûts.
+const ADMIN_LOG_LABEL = 'admin';
+
+async function handlePredict(request, env) {
   let body;
   try { body = await request.json(); }
   catch { return jsonResponse({ error: 'invalid_json' }, 400); }
@@ -138,7 +132,7 @@ async function handlePredict(request, env, session) {
   if (sizeMB > MAX_SIZE_MB) {
     await writeLog(env, {
       ts: new Date().toISOString(),
-      email: session.email,
+      email: ADMIN_LOG_LABEL,
       filename,
       durationS,
       sizeMB: Math.round(sizeMB * 10) / 10,
@@ -153,7 +147,7 @@ async function handlePredict(request, env, session) {
   if (durationS > MAX_DURATION_S) {
     await writeLog(env, {
       ts: new Date().toISOString(),
-      email: session.email,
+      email: ADMIN_LOG_LABEL,
       filename,
       durationS,
       sizeMB: Math.round(sizeMB * 10) / 10,
@@ -187,7 +181,7 @@ async function handlePredict(request, env, session) {
   } catch (e) {
     await writeLog(env, {
       ts: new Date().toISOString(),
-      email: session.email,
+      email: ADMIN_LOG_LABEL,
       filename,
       durationS,
       sizeMB: Math.round(sizeMB * 10) / 10,
@@ -202,7 +196,7 @@ async function handlePredict(request, env, session) {
   if (!replicateResp.ok) {
     await writeLog(env, {
       ts: new Date().toISOString(),
-      email: session.email,
+      email: ADMIN_LOG_LABEL,
       filename,
       durationS,
       sizeMB: Math.round(sizeMB * 10) / 10,
@@ -220,7 +214,7 @@ async function handlePredict(request, env, session) {
 }
 
 // ─── Status ────────────────────────────────────────────────────
-async function handleStatus(request, env, session) {
+async function handleStatus(request, env) {
   const url = new URL(request.url);
   const id = (url.searchParams.get('id') || '').trim();
   if (!/^[a-zA-Z0-9]+$/.test(id) || id.length > 64) {
@@ -248,7 +242,7 @@ async function handleStatus(request, env, session) {
       const isSuccess = data.status === 'succeeded';
       await writeLog(env, {
         ts: new Date().toISOString(),
-        email: session.email,
+        email: ADMIN_LOG_LABEL,
         filename,
         durationS,
         sizeMB: Math.round(sizeMB * 10) / 10,

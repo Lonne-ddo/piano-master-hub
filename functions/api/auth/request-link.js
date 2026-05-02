@@ -7,7 +7,7 @@
 // valide, qu'il existe ou non en KV. Aucun moyen pour un attaquant de savoir
 // quels emails sont enregistrés.
 
-import { generateToken, isAdminEmail } from '../_lib/session.js';
+import { generateToken } from '../_lib/session.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -43,63 +43,59 @@ export async function onRequestPost({ request, env }) {
     return jsonResponse({ error: 'invalid_email' }, 400);
   }
 
-  // ── Branche super-admin (ADMIN_EMAILS env var) ─────────────────
-  const adminMatch = isAdminEmail(email, env);
-
-  // Si pas admin, recherche l'élève par email dans le KV
+  // Magic link = ÉLÈVES UNIQUEMENT depuis la séparation admin/élève.
+  // Aucune branche admin ici : l'admin se logue via mot de passe sur
+  // /admin/login.html (cf /api/admin/login).
   let foundSlug = null;
-  if (!adminMatch) {
-    // Lookup primaire O(1) via l'index inverse `email:<email>` → { slug }.
-    // Cet index est maintenu par le PATCH email dans eleves/[id].js et par
-    // l'endpoint admin migrate-email-index.
+
+  // Lookup primaire O(1) via l'index inverse `email:<email>` → { slug }.
+  // Cet index est maintenu par le PATCH email dans eleves/[id].js et par
+  // l'endpoint admin migrate-email-index.
+  try {
+    const idx = await env.MASTERHUB_STUDENTS.get(`email:${email}`, { type: 'json' });
+    if (idx && typeof idx.slug === 'string') foundSlug = idx.slug;
+  } catch {
+    /* ignore — fallback scan ci-dessous */
+  }
+
+  // Fallback scan O(n) : couvre la transition (eleve:<slug>.email peuplé
+  // sans index inverse correspondant). À retirer une fois la migration KV
+  // terminée et stable (cf /api/eleves/admin/migrate-email-index).
+  if (!foundSlug) {
+    let slugs;
     try {
-      const idx = await env.MASTERHUB_STUDENTS.get(`email:${email}`, { type: 'json' });
-      if (idx && typeof idx.slug === 'string') foundSlug = idx.slug;
+      const listRaw = await env.MASTERHUB_STUDENTS.get('eleves:list');
+      slugs = listRaw ? JSON.parse(listRaw) : ['japhet', 'messon', 'dexter', 'tara'];
     } catch {
-      /* ignore — fallback scan ci-dessous */
+      slugs = ['japhet', 'messon', 'dexter', 'tara'];
     }
-
-    // Fallback scan O(n) : couvre la transition (eleve:<slug>.email peuplé
-    // sans index inverse correspondant). À retirer une fois la migration KV
-    // terminée et stable (cf /api/eleves/admin/migrate-email-index).
-    if (!foundSlug) {
-      let slugs;
+    for (const slug of slugs) {
+      let raw;
+      try { raw = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`); }
+      catch { continue; }
+      if (!raw) continue;
       try {
-        const listRaw = await env.MASTERHUB_STUDENTS.get('eleves:list');
-        slugs = listRaw ? JSON.parse(listRaw) : ['japhet', 'messon', 'dexter', 'tara'];
-      } catch {
-        slugs = ['japhet', 'messon', 'dexter', 'tara'];
-      }
-      for (const slug of slugs) {
-        let raw;
-        try { raw = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`); }
-        catch { continue; }
-        if (!raw) continue;
-        try {
-          const data = JSON.parse(raw);
-          if (data.email && String(data.email).toLowerCase() === email) {
-            foundSlug = slug;
-            break;
-          }
-        } catch { /* skip */ }
-      }
+        const data = JSON.parse(raw);
+        if (data.email && String(data.email).toLowerCase() === email) {
+          foundSlug = slug;
+          break;
+        }
+      } catch { /* skip */ }
     }
+  }
 
-    // Anti-énumération : si email inconnu, on retourne ok=true sans envoyer.
-    // Délai aléatoire 400-1500ms pour égaliser les latences (sans ce délai,
-    // la branche silent ~5ms vs valide ~300-1500ms permet du timing-attack).
-    if (!foundSlug) {
-      console.log('[auth/request-link] unknown_email_silent_ok');
-      await randomDelayMs(400, 1500);
-      return jsonResponse({ ok: true, message: 'email_sent_if_valid' });
-    }
+  // Anti-énumération : si email inconnu, on retourne ok=true sans envoyer.
+  // Délai aléatoire 400-1500ms pour égaliser les latences (sans ce délai,
+  // la branche silent ~5ms vs valide ~300-1500ms permet du timing-attack).
+  if (!foundSlug) {
+    console.log('[auth/request-link] unknown_email_silent_ok');
+    await randomDelayMs(400, 1500);
+    return jsonResponse({ ok: true, message: 'email_sent_if_valid' });
   }
 
   // Génère + stocke le magic link (TTL 15 min, single-use via delete au verify)
   const token = generateToken(32);
-  const magicLink = adminMatch
-    ? { is_admin: true, email, createdAt: Date.now() }
-    : { slug: foundSlug, email, createdAt: Date.now() };
+  const magicLink = { slug: foundSlug, email, createdAt: Date.now() };
   try {
     await env.MASTERHUB_STUDENTS.put(
       `magic_link:${token}`,
@@ -126,8 +122,8 @@ export async function onRequestPost({ request, env }) {
       body: JSON.stringify({
         from: 'Master Hub <noreply@piano-key.com>',
         to: [email],
-        subject: adminMatch ? 'Connexion super-admin Master Hub' : 'Connexion à Master Hub',
-        html: buildEmailHtml(verifyUrl, foundSlug, adminMatch),
+        subject: 'Connexion à Master Hub',
+        html: buildEmailHtml(verifyUrl, foundSlug),
       }),
     });
 
@@ -152,19 +148,15 @@ function randomDelayMs(minMs, maxMs) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function buildEmailHtml(verifyUrl, slug, isAdmin) {
-  const display = isAdmin
-    ? 'super-admin'
-    : (slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : '');
+function buildEmailHtml(verifyUrl, slug) {
+  const display = slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : '';
   const safeUrl = String(verifyUrl).replace(/"/g, '%22');
-  const intro = isAdmin
-    ? 'Voici ton lien de connexion super-admin à Master Hub. Il expire dans 15 minutes.'
-    : `Bonjour ${display},<br><br>Voici ton lien de connexion à Master Hub. Il expire dans 15 minutes.`;
+  const intro = `Bonjour ${display},<br><br>Voici ton lien de connexion à Master Hub. Il expire dans 15 minutes.`;
   return `<!DOCTYPE html>
 <html>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f7; padding: 40px 20px; margin: 0;">
   <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; padding: 40px 32px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
-    <h1 style="color: #1a1a24; font-size: 22px; margin: 0 0 8px; font-weight: 700;">Master Hub${isAdmin ? ' — Super-admin' : ''}</h1>
+    <h1 style="color: #1a1a24; font-size: 22px; margin: 0 0 8px; font-weight: 700;">Master Hub</h1>
     <p style="color: #555; font-size: 15px; line-height: 1.55; margin: 16px 0;">
       ${intro}
     </p>

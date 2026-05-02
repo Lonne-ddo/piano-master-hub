@@ -1,6 +1,6 @@
 // ─── GET /api/quiz/admin/list[?slug=…] ───────────────────────────
 // Admin endpoint : liste les sessions de quiz par élève + stats agrégées.
-// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
+// Auth : admin via cookie mh_admin_pw (HMAC).
 // Stockage source : KV MASTERHUB_QUIZ_HISTORY, clés `quiz:<slug>:<ts>`.
 //
 // Query :
@@ -22,7 +22,7 @@
 //   }
 // }
 
-import { requireAdmin } from '../../_lib/session.js';
+import { requireAdminPassword } from '../../_lib/session.js';
 
 const ELEVES = ['japhet', 'tara', 'dexter', 'messon'];
 
@@ -44,7 +44,7 @@ export async function onRequestOptions() {
 }
 
 export async function onRequestGet({ request, env }) {
-  if (!(await requireAdmin(request, env))) {
+  if (!(await requireAdminPassword(request, env))) {
     return jsonResponse({ ok: false, error: 'unauthorized' }, 401);
   }
 

@@ -6,9 +6,9 @@
 // Garantit aussi que `eleves:list` contient bien tous les slugs
 // (utile si la clé est partiellement initialisée).
 //
-// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
+// Auth : admin via cookie mh_admin_pw (HMAC).
 // À lancer une fois après deploy, depuis la console DevTools sur /admin/
-// (le cookie session est envoyé automatiquement) :
+// (le cookie admin est envoyé automatiquement) :
 //
 //   fetch('/api/eleves/admin/seed-doc-ids', {
 //     method: 'POST',
@@ -18,7 +18,7 @@
 // Réponse : { ok: true, results: [{ slug, status, value? }] }
 //   status ∈ 'created' | 'updated' | 'unchanged' | 'error'
 
-import { requireAdmin } from '../../_lib/session.js';
+import { requireAdminPassword } from '../../_lib/session.js';
 
 const DOC_IDS = {
   japhet: '19xGdQoE2k2tSFYp_MykzDL-7vxIz5HYr4DR3wRuQ3TM',
@@ -45,7 +45,7 @@ export async function onRequestOptions() {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!(await requireAdmin(request, env))) {
+  if (!(await requireAdminPassword(request, env))) {
     return jsonResponse({ error: 'unauthorized' }, 401);
   }
 

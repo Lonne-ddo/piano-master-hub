@@ -1,7 +1,7 @@
 // Endpoint /api/history — historique transcripteur (KV MASTERHUB_HISTORY).
-// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
+// Auth : admin via cookie mh_admin_pw (HMAC).
 
-import { requireAdmin } from './_lib/session.js'
+import { requireAdminPassword } from './_lib/session.js'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -96,7 +96,7 @@ export async function onRequest(context) {
     return new Response(null, { status: 204, headers: CORS_HEADERS })
   }
 
-  if (!(await requireAdmin(request, env))) {
+  if (!(await requireAdminPassword(request, env))) {
     return Response.json({ error: 'unauthorized' }, { status: 401, headers: CORS_HEADERS })
   }
 

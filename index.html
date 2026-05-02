@@ -367,68 +367,6 @@
         }
         .login-help a:hover { text-decoration: underline; }
 
-        /* Super-admin : grille de sélection d'élève */
-        .admin-chooser-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-top: 14px;
-        }
-        @media (min-width: 480px) {
-            .admin-chooser-grid { grid-template-columns: repeat(4, 1fr); }
-        }
-        .admin-chooser-item {
-            display: flex; flex-direction: column; align-items: center;
-            gap: 8px; padding: 16px 8px;
-            background: var(--bg);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 12px;
-            text-decoration: none;
-            color: var(--text);
-            font-family: inherit;
-            font-size: inherit;
-            cursor: pointer;
-            -webkit-tap-highlight-color: transparent;
-            transition: border-color 0.2s, transform 0.15s, background 0.2s;
-            min-height: 96px;
-        }
-        .admin-chooser-item:hover {
-            border-color: var(--accent);
-            background: rgba(201, 168, 76, 0.06);
-        }
-        .admin-chooser-item:active { transform: scale(0.97); }
-        .admin-chooser-avatar {
-            width: 44px; height: 44px;
-            border-radius: 50%;
-            background: rgba(201, 168, 76, 0.15);
-            color: var(--accent);
-            display: flex; align-items: center; justify-content: center;
-            font-size: 1.1rem; font-weight: 700;
-        }
-        .admin-chooser-name {
-            font-size: 0.92rem; font-weight: 600;
-        }
-
-        /* Bandeau super-admin sur page élève */
-        #admin-bar { width: 100%; margin-bottom: 12px; }
-        .admin-bar-link {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 10px; padding: 10px 14px;
-            background: rgba(201, 168, 76, 0.08);
-            border: 1px solid rgba(201, 168, 76, 0.3);
-            border-radius: 10px;
-            color: var(--accent);
-            text-decoration: none;
-            font-size: 0.85rem; font-weight: 500;
-            transition: background 0.2s;
-        }
-        .admin-bar-link:hover { background: rgba(201, 168, 76, 0.14); }
-        .admin-bar-tag {
-            font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em;
-            padding: 2px 8px; border-radius: 999px;
-            background: rgba(201, 168, 76, 0.18); font-weight: 700;
-        }
-
         /* Footer "Changer de profil" */
         .footer-actions {
             margin-top: 32px;
@@ -756,22 +694,9 @@
                     return;
                 }
 
-                if (j.is_admin) {
-                    if (slugParam) {
-                        var eleve = findEleveBySlug(slugParam)
-                            || { slug: slugParam, display: slugParam.charAt(0).toUpperCase() + slugParam.slice(1) };
-                        localStorage.setItem("eleve_slug", eleve.slug);
-                        renderEspaceEleve(eleve);
-                    } else {
-                        renderAdminChooser(j.email);
-                    }
-                    return;
-                }
-
-                // ÉLÈVE NORMAL : ne JAMAIS afficher le chooser. Redirect immédiat
-                // vers sa propre fiche (pas de flash visuel).
+                // Session élève uniquement (l'admin se logue séparément sur
+                // /admin/login.html). Une session sans slug est anormale → login.
                 if (!j.slug) {
-                    // Cas anormal (session sans slug et sans is_admin) → login
                     renderLoginEmail(initialError);
                     return;
                 }
@@ -801,55 +726,6 @@
             ELEVES_WHITELIST = fresh;
         }
     }).catch(function() { /* fallback hardcodé */ }).then(runInit, runInit);
-
-    // ──────────────────────────────────────────────
-    //  Mode super-admin — écran "Choisir un élève"
-    //  Liens HTML standards <a href="/japhet">. Pas de JS, pas d'event listener.
-    //  Le browser navigate natively. Aucune chance d'interception possible.
-    // ──────────────────────────────────────────────
-    function renderAdminChooser(adminEmail) {
-        // Guard absolu : ne JAMAIS afficher le chooser sans is_admin confirmé
-        // côté serveur. Protège contre tout appel direct accidentel.
-        if (!_lastWhoami || _lastWhoami.is_admin !== true) {
-            console.error('[security] renderAdminChooser appelé sans is_admin');
-            window.location.replace('/');
-            return;
-        }
-        var greeting = document.getElementById("greeting");
-        if (greeting) greeting.innerHTML = '<p class="greeting">Connecté super-admin · ' + escapeHtml(adminEmail || '') + '</p>';
-        var content = document.getElementById("content");
-        var slugs = Object.keys(ELEVES_WHITELIST);
-        var html = '<div class="login-section">' +
-            '<h2>Choisir un élève</h2>' +
-            '<p class="lead">Sélectionne la fiche à consulter.</p>' +
-            '<div class="admin-chooser-grid">';
-        for (var i = 0; i < slugs.length; i++) {
-            var key = slugs[i];
-            var disp = (ELEVES_WHITELIST[key] && ELEVES_WHITELIST[key].display) || (key.charAt(0).toUpperCase() + key.slice(1));
-            // Slug whitelist côté frontend (lowercase + caractères alphanum + tiret)
-            var safeKey = key.replace(/[^a-z0-9_-]/gi, '');
-            if (!safeKey) continue;
-            html += '<a href="/?eleve=' + encodeURIComponent(safeKey) + '" class="admin-chooser-item">' +
-                        '<span class="admin-chooser-avatar">' + escapeHtml(disp.charAt(0)) + '</span>' +
-                        '<span class="admin-chooser-name">' + escapeHtml(disp) + '</span>' +
-                    '</a>';
-        }
-        html += '</div></div>';
-        content.innerHTML = html;
-
-        var footer = document.getElementById("footer");
-        if (footer) {
-            footer.innerHTML = '<div class="footer-actions"><button type="button" id="logout-btn">Se déconnecter</button></div>';
-            document.getElementById("logout-btn").addEventListener("click", function() {
-                fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
-                    .catch(function() {})
-                    .then(function() {
-                        localStorage.removeItem("eleve_slug");
-                        window.location.href = "/";
-                    });
-            });
-        }
-    }
 
     // ──────────────────────────────────────────────
     //  Mode 1 — élève non identifié : login email (magic link)
@@ -943,7 +819,6 @@
 
         var content = document.getElementById("content");
         content.innerHTML =
-            '<div id="admin-bar"></div>' +
             '<div id="programme-zone"></div>' +
             '<div id="devoirs-zone"></div>' +
             '<div id="resume-zone"></div>' +
@@ -954,21 +829,6 @@
         renderFooter();
         renderDynamicSkeleton();
         fetchDashboardData(eleve);
-
-        // Bandeau "Choisir un autre élève" si super-admin (best-effort, non bloquant)
-        fetch('/api/auth/whoami', { credentials: 'include' })
-            .then(function(r) { return r.ok ? r.json() : null; })
-            .then(function(j) {
-                if (!j || !j.ok || !j.is_admin) return;
-                var bar = document.getElementById('admin-bar');
-                if (!bar) return;
-                bar.innerHTML =
-                    '<a class="admin-bar-link" href="/">' +
-                        '<span>← Choisir un autre élève</span>' +
-                        '<span class="admin-bar-tag">super-admin</span>' +
-                    '</a>';
-            })
-            .catch(function() {});
     }
 
     function renderDynamicSkeleton() {

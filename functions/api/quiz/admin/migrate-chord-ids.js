@@ -3,7 +3,7 @@
 // m6, m9, m11) vers la convention canonique MhTheory (min7, min, etc.) dans
 // les sessions historiques de MASTERHUB_QUIZ_HISTORY.
 //
-// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
+// Auth : admin via cookie mh_admin_pw (HMAC).
 //
 // À lancer manuellement après le commit qui aligne quiz-engine sur MhTheory,
 // depuis la console DevTools sur /admin/ (cookie envoyé automatiquement) :
@@ -13,7 +13,7 @@
 // Idempotent : peut être relancé sans risque (les ids déjà migrés ne sont pas
 // re-touchés). Marque chaque entrée mise à jour avec _migrated.
 
-import { requireAdmin } from '../../_lib/session.js';
+import { requireAdminPassword } from '../../_lib/session.js';
 
 const MIGRATION_MAP = {
   'm':      'min',
@@ -42,7 +42,7 @@ export async function onRequestOptions() {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!(await requireAdmin(request, env))) {
+  if (!(await requireAdminPassword(request, env))) {
     return json({ ok: false, error: 'unauthorized' }, 401);
   }
   if (!env.MASTERHUB_QUIZ_HISTORY) {

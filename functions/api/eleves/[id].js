@@ -71,7 +71,7 @@ export async function onRequestOptions() {
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────
-import { requireAdmin } from '../_lib/session.js';
+import { requireAdminPassword } from '../_lib/session.js';
 
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -81,7 +81,7 @@ function jsonResponse(data, status = 200) {
 }
 
 async function requireAuth(request, env) {
-  if (!(await requireAdmin(request, env))) {
+  if (!(await requireAdminPassword(request, env))) {
     return jsonResponse({ error: 'unauthorized' }, 401);
   }
   return null;

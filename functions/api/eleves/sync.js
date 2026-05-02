@@ -10,9 +10,9 @@
 //     → cache KV stale (si présent) ou 503 avec détails
 //  4. Merge avec KV existant. Dates (premier_cours/fin_prevue) override par le
 //     calcul regex SAUF si existing.manualDates === true (édition manuelle).
-// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
+// Auth : admin via cookie mh_admin_pw (HMAC).
 
-import { requireAdmin } from '../_lib/session.js';
+import { requireAdminPassword } from '../_lib/session.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -357,7 +357,7 @@ async function extractLatestSession(docText, eleveId, studentName, env) {
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  if (!(await requireAdmin(request, env))) {
+  if (!(await requireAdminPassword(request, env))) {
     return jsonResponse({ error: 'unauthorized' }, 401);
   }
 

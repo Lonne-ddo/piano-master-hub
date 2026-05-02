@@ -2,7 +2,7 @@
 // One-shot admin endpoint pour synchroniser l'index inverse `email:<email>`
 // avec les `eleve:<slug>.email` déjà peuplés.
 //
-// Auth : super-admin via session cookie (is_admin === true) + isAdminEmail.
+// Auth : admin via cookie mh_admin_pw (HMAC).
 //
 // GET  → audit : pour chaque slug, retourne l'état actuel
 //   {
@@ -18,7 +18,7 @@
 // d'index "orphelin" automatique (un index pointant vers un slug sans email
 // est laissé tel quel — il faut le supprimer manuellement via wrangler).
 
-import { getSessionFromRequest, isAdminEmail } from '../../_lib/session.js';
+import { requireAdminPassword } from '../../_lib/session.js';
 
 const FALLBACK_SLUGS = ['japhet', 'messon', 'dexter', 'tara'];
 
@@ -33,13 +33,6 @@ function jsonResponse(data, status = 200) {
     status,
     headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
-}
-
-async function requireAdmin(request, env) {
-  const session = await getSessionFromRequest(request, env);
-  if (!session?.is_admin) return null;
-  if (!isAdminEmail(session.email, env)) return null;
-  return session;
 }
 
 async function listSlugs(env) {
@@ -90,7 +83,7 @@ export async function onRequestOptions() {
 }
 
 export async function onRequestGet({ request, env }) {
-  if (!(await requireAdmin(request, env))) return jsonResponse({ error: 'unauthorized' }, 401);
+  if (!(await requireAdminPassword(request, env))) return jsonResponse({ error: 'unauthorized' }, 401);
   if (!env.MASTERHUB_STUDENTS) return jsonResponse({ error: 'kv_not_bound' }, 500);
 
   const slugs = await listSlugs(env);
@@ -100,7 +93,7 @@ export async function onRequestGet({ request, env }) {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!(await requireAdmin(request, env))) return jsonResponse({ error: 'unauthorized' }, 401);
+  if (!(await requireAdminPassword(request, env))) return jsonResponse({ error: 'unauthorized' }, 401);
   if (!env.MASTERHUB_STUDENTS) return jsonResponse({ error: 'kv_not_bound' }, 500);
 
   const slugs = await listSlugs(env);

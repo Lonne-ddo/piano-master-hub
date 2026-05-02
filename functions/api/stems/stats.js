@@ -1,11 +1,11 @@
 // ─── GET /api/stems/stats ───────────────────────────────────────
 // Stats du mois courant pour le compteur "Ce mois : N · ~Y €" sur le hub admin.
-// Auth : super-admin via session cookie + isAdminEmail.
+// Auth : admin via cookie mh_admin_pw (HMAC).
 //
 // Réponse : { ok: true, ym: "YYYY-MM", count: int, costEUR: number }
 // (count = nombre de runs status === 'success' uniquement)
 
-import { getSessionFromRequest, isAdminEmail } from '../_lib/session.js';
+import { requireAdminPassword } from '../_lib/session.js';
 
 const COST_EUR_PER_RUN = 0.02;
 
@@ -22,20 +22,14 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-async function requireAdmin(request, env) {
-  const session = await getSessionFromRequest(request, env);
-  if (!session || !session.is_admin) return null;
-  if (!isAdminEmail(session.email, env)) return null;
-  return session;
-}
-
 export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS });
 }
 
 export async function onRequestGet({ request, env }) {
-  const session = await requireAdmin(request, env);
-  if (!session) return jsonResponse({ error: 'unauthorized' }, 401);
+  if (!(await requireAdminPassword(request, env))) {
+    return jsonResponse({ error: 'unauthorized' }, 401);
+  }
   if (!env.MASTERHUB_HISTORY) return jsonResponse({ error: 'kv_not_bound' }, 500);
 
   const now = new Date();

@@ -12,9 +12,9 @@
 //   "loops:index"        → JSON { loops: [...metadata], categories: [...] }
 //   "loops:audio:{id}"   → ArrayBuffer (binaire MP3, max 25 MiB par valeur)
 //
-// Auth : super-admin via cookie session (mh_session) + isAdminEmail.
+// Auth : admin via cookie mh_admin_pw (HMAC).
 
-import { requireAdmin } from '../_lib/session.js';
+import { requireAdminPassword } from '../_lib/session.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +33,7 @@ function jsonResponse(data, status = 200) {
 }
 
 async function requireAuth(request, env) {
-  if (!(await requireAdmin(request, env))) {
+  if (!(await requireAdminPassword(request, env))) {
     return jsonResponse({ ok: false, error: 'unauthorized' }, 401);
   }
   return null;

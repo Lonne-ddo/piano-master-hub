@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Master Hub Admin — Connexion</title>
+  <meta name="theme-color" content="#0f0f14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MH Admin" />
+  <link rel="icon" id="app-icon" />
+  <link rel="apple-touch-icon" id="app-touch-icon" sizes="180x180" />
+  <style>
+    :root {
+      --bg: #0f0f14;
+      --bg-card: #1a1a24;
+      --bg-card-hover: #22222f;
+      --text: #eee;
+      --text-muted: #888;
+      --accent: #8B6FE8;
+      --accent-soft: rgba(139, 111, 232, 0.14);
+      --red: #f87171;
+      --radius: 16px;
+      --tap-min: 48px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh; min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
+      overflow-x: hidden;
+    }
+    #bg-canvas {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 32px 16px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh; min-height: 100dvh;
+    }
+    .header {
+      text-align: center;
+      padding: 24px 0 16px;
+      width: 100%;
+      display: flex; flex-direction: column; align-items: center;
+    }
+    .header .logo {
+      width: 64px; height: 64px;
+      margin: 0 auto 16px;
+      display: block;
+    }
+    .header h1 {
+      font-size: 1.65rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+    .header .subtitle {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    form {
+      width: 100%;
+      margin-top: 28px;
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: var(--radius);
+      padding: 22px 20px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    label {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    input[type="password"] {
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      font-size: 16px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input[type="password"]:focus { border-color: var(--accent); }
+    button {
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      min-height: var(--tap-min);
+      transition: opacity 0.15s, background 0.15s;
+    }
+    button:hover:not(:disabled) { background: #6b54c4; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error-msg {
+      background: rgba(248, 113, 113, 0.08);
+      border: 1px solid rgba(248, 113, 113, 0.25);
+      color: var(--red);
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+    .back-link {
+      margin-top: 22px;
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .back-link:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="container">
+  <header class="header">
+    <svg class="logo" width="64" height="64" viewBox="0 0 72 72">
+      <circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+      <rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+      <rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+      <rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+      <rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+      <rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+    </svg>
+    <h1>Master Hub</h1>
+    <p class="subtitle">Admin</p>
+  </header>
+
+  <form id="login-form" autocomplete="off">
+    <div id="error-box" class="error-msg"></div>
+    <label for="pw">Mot de passe</label>
+    <input id="pw" name="password" type="password" autocomplete="current-password" required autofocus />
+    <button id="submit-btn" type="submit">Entrer</button>
+  </form>
+
+  <a href="/" class="back-link">← Retour à l'espace élève</a>
+</div>
+
+<script>
+// Si déjà loggé admin → redirect outils. Évite un re-login inutile.
+fetch('/api/admin/check', { credentials: 'same-origin' })
+  .then(function (r) { return r.ok ? r.json() : null; })
+  .then(function (j) {
+    if (j && j.ok) window.location.replace('/admin/outils.html');
+  })
+  .catch(function () { /* silently — affiche la page */ });
+
+document.getElementById('login-form').addEventListener('submit', function (ev) {
+  ev.preventDefault();
+  var pw = document.getElementById('pw').value;
+  var btn = document.getElementById('submit-btn');
+  var errBox = document.getElementById('error-box');
+  errBox.classList.remove('show');
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  fetch('/api/admin/login', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: pw }),
+  })
+    .then(function (r) {
+      if (r.ok) {
+        window.location.replace('/admin/outils.html');
+        return null;
+      }
+      return r.json().catch(function () { return {}; });
+    })
+    .then(function (j) {
+      if (j === null) return; // déjà redirigé
+      btn.disabled = false;
+      btn.textContent = 'Entrer';
+      errBox.textContent = 'Mot de passe incorrect.';
+      errBox.classList.add('show');
+      document.getElementById('pw').select();
+    })
+    .catch(function () {
+      btn.disabled = false;
+      btn.textContent = 'Entrer';
+      errBox.textContent = 'Erreur réseau, réessaie.';
+      errBox.classList.add('show');
+    });
+});
+</script>
+
+<script>
+// ── Manifest PWA inline (cohérent avec admin/outils.html) ────────
+(function () {
+  var iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="192" height="192">'
+    + '<rect width="72" height="72" rx="16" fill="#8B6FE8"/>'
+    + '<circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="1.5"/>'
+    + '<rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
+    + '<rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
+    + '<rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
+    + '<rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>'
+    + '<rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>'
+    + '</svg>';
+  var iconUrl = 'data:image/svg+xml;base64,' + btoa(iconSvg);
+  var iconLink = document.getElementById('app-icon');
+  var touchLink = document.getElementById('app-touch-icon');
+  if (iconLink) iconLink.href = iconUrl;
+  if (touchLink) touchLink.href = iconUrl;
+})();
+</script>
+
+<script>
+// ── Fond animé — touches piano flottantes (cohérent /admin/outils) ──
+(function () {
+  var canvas = document.getElementById('bg-canvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var particles = [];
+  var COUNT = 18;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  function createParticle() {
+    var w = 6 + Math.random() * 4;
+    var h = 18 + Math.random() * 10;
+    return {
+      x: Math.random() * canvas.width,
+      y: canvas.height + h,
+      w: w, h: h, r: 2,
+      speed: 0.15 + Math.random() * 0.35,
+      opacity: 0.04 + Math.random() * 0.04,
+      drift: (Math.random() - 0.5) * 0.3,
+    };
+  }
+
+  for (var i = 0; i < COUNT; i++) {
+    var p = createParticle();
+    p.y = Math.random() * canvas.height;
+    particles.push(p);
+  }
+
+  function drawRoundRect(x, y, w, h, r, alpha) {
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  var rafId = null;
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      p.y -= p.speed;
+      p.x += p.drift;
+      drawRoundRect(p.x, p.y, p.w, p.h, p.r, p.opacity);
+      if (p.y + p.h < 0) particles[i] = createParticle();
+    }
+    rafId = requestAnimationFrame(animate);
+  }
+  animate();
+
+  function stopAnim() {
+    if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+    window.removeEventListener('resize', resize);
+  }
+  window.addEventListener('beforeunload', stopAnim);
+  window.addEventListener('pagehide', stopAnim);
+})();
+</script>
+
+</body>
+</html>

@@ -3,15 +3,15 @@
 <head>
   <style>body{display:none}</style>
   <script>
-  // Garde super-admin via cookie session — affiche la page seulement
-  // après confirmation par /api/auth/whoami.
-  fetch('/api/auth/whoami', { credentials: 'same-origin' })
+  // Garde admin via cookie mh_admin_pw — affiche la page seulement
+  // après confirmation par /api/admin/check.
+  fetch('/api/admin/check', { credentials: 'same-origin' })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (j) {
-      if (!j || !j.ok || !j.is_admin) { window.location.replace('/'); return; }
+      if (!j || !j.ok) { window.location.replace('/admin/login.html'); return; }
       document.body.style.display = '';
     })
-    .catch(function () { window.location.replace('/'); });
+    .catch(function () { window.location.replace('/admin/login.html'); });
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -583,8 +583,8 @@ loadData();
 
 document.getElementById('refreshBtn').addEventListener('click', loadData);
 document.getElementById('logoutBtn').addEventListener('click', function () {
-  fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
-    .finally(function () { window.location.replace('/'); });
+  fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' })
+    .finally(function () { window.location.replace('/admin/login.html'); });
 });
 </script>
 

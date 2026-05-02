@@ -6,7 +6,7 @@
  * Clé API lue depuis env.GROQ_API_KEY (variable Cloudflare).
  */
 
-import { requireAdmin } from "./_lib/session.js";
+import { requireAdminPassword } from "./_lib/session.js";
 
 export const config = {
   runtime: 'edge',
@@ -35,8 +35,8 @@ export async function onRequest(context) {
     });
   }
 
-  // Auth super-admin (cookie session) — évite que /api/transcribe consomme le quota Groq publiquement
-  if (!(await requireAdmin(request, env))) {
+  // Auth admin (cookie mh_admin_pw) — évite que /api/transcribe consomme le quota Groq publiquement
+  if (!(await requireAdminPassword(request, env))) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {
       status: 401,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
