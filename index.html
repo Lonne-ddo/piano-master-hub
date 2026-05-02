@@ -730,50 +730,57 @@
     //  Si URL = / → check whoami → si auth, redirect /{slug} ; sinon écran login
     // ──────────────────────────────────────────────
     function runInit() {
-        // Lecture des params (?error=expired|missing_token|...) puis nettoyage URL.
+        console.log('[runInit] START pathname=', window.location.pathname, 'search=', window.location.search);
+
         var params = new URLSearchParams(window.location.search);
         var initialError = params.get("error");
         if (initialError) {
+            console.log('[runInit] initialError=', initialError, '→ replaceState');
             history.replaceState(null, "", window.location.pathname);
         }
 
         var pathMatch = window.location.pathname.match(/^\/([^\/]+)\/?$/);
         var pathSlug = pathMatch ? normalize(pathMatch[1]) : null;
+        console.log('[runInit] pathMatch=', pathMatch, 'pathSlug=', pathSlug);
 
-        // Routing déterministe basé sur whoami AVANT tout rendu :
-        //   - admin + pathSlug    → renderEspaceEleve (fiche du slug demandé)
-        //   - admin + sans slug   → renderAdminChooser
-        //   - élève + slug match  → renderEspaceEleve (sa fiche)
-        //   - élève + slug autre  → redirect vers /{son slug} (sécurité)
-        //   - élève + sans slug   → redirect vers /{son slug}
-        //   - pas auth + slug     → renderLoginEmail (URL préservée)
-        //   - pas auth + sans slug → renderLoginEmail
         fetch("/api/auth/whoami", { credentials: "include" })
-            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(r) {
+                console.log('[runInit] whoami response status=', r.status, 'ok=', r.ok);
+                return r.ok ? r.json() : null;
+            })
             .then(function(j) {
+                console.log('[runInit] whoami body=', JSON.stringify(j));
                 var authed = j && j.ok;
+                console.log('[runInit] authed=', authed, 'is_admin=', j && j.is_admin, 'slug=', j && j.slug);
+
                 if (authed && j.is_admin) {
+                    console.log('[runInit] BRANCH=admin');
                     if (pathSlug) {
                         var eleve = findEleveBySlug(pathSlug)
                             || { slug: pathSlug, display: pathSlug.charAt(0).toUpperCase() + pathSlug.slice(1) };
+                        console.log('[runInit] admin+pathSlug → renderEspaceEleve eleve=', eleve);
                         localStorage.setItem("eleve_slug", eleve.slug);
                         renderEspaceEleve(eleve);
                     } else {
+                        console.log('[runInit] admin+noSlug → renderAdminChooser');
                         renderAdminChooser(j.email);
                     }
                     return;
                 }
                 if (authed && j.slug) {
+                    console.log('[runInit] BRANCH=eleve sessionSlug=', j.slug);
                     if (pathSlug && pathSlug === j.slug) {
+                        console.log('[runInit] eleve+slugMatch → renderEspaceEleve');
                         var meEleve = findEleveBySlug(j.slug)
                             || { slug: j.slug, display: j.slug.charAt(0).toUpperCase() + j.slug.slice(1) };
                         localStorage.setItem("eleve_slug", meEleve.slug);
                         renderEspaceEleve(meEleve);
                     } else {
-                        // pathSlug absent OU slug ne matche pas → redirect vers sa propre fiche
                         if (window.location.pathname !== "/" + j.slug) {
+                            console.log('[runInit] eleve+slugMismatch → REDIRECT to /' + j.slug);
                             window.location.replace("/" + j.slug);
                         } else {
+                            console.log('[runInit] eleve+sameUrl → renderEspaceEleve fallback');
                             var meEleve2 = findEleveBySlug(j.slug)
                                 || { slug: j.slug, display: j.slug.charAt(0).toUpperCase() + j.slug.slice(1) };
                             renderEspaceEleve(meEleve2);
@@ -781,15 +788,20 @@
                     }
                     return;
                 }
-                // Non authentifié — afficher login (URL préservée si /japhet)
+                console.log('[runInit] BRANCH=unauth → renderLoginEmail');
                 renderLoginEmail(initialError);
             })
-            .catch(function() { renderLoginEmail(initialError); });
+            .catch(function(err) {
+                console.error('[runInit] whoami fetch CATCH err=', err);
+                renderLoginEmail(initialError);
+            });
     }
 
     // Source de vérité : /api/eleves (KV eleves:list). Fallback ELEVES_WHITELIST
     // hardcodé en cas de KV/réseau down.
+    console.log('[bootstrap] fetch /api/eleves...');
     fetch('/api/eleves').then(function(r) { return r.json(); }).then(function(j) {
+        console.log('[bootstrap] /api/eleves response=', JSON.stringify(j));
         if (j && j.ok && Array.isArray(j.eleves) && j.eleves.length) {
             var fresh = {};
             j.eleves.forEach(function(s) {
@@ -799,8 +811,13 @@
                 fresh[key] = { display: display, aliases: [key] };
             });
             ELEVES_WHITELIST = fresh;
+            console.log('[bootstrap] ELEVES_WHITELIST updated keys=', Object.keys(fresh));
+        } else {
+            console.log('[bootstrap] /api/eleves invalid response → keep hardcoded fallback');
         }
-    }).catch(function() { /* fallback hardcodé */ }).then(runInit, runInit);
+    }).catch(function(e) {
+        console.warn('[bootstrap] /api/eleves fetch failed=', e && e.message);
+    }).then(runInit, runInit);
 
     // ──────────────────────────────────────────────
     //  Mode super-admin — écran "Choisir un élève"
@@ -808,6 +825,7 @@
     //  Le browser navigate natively. Aucune chance d'interception possible.
     // ──────────────────────────────────────────────
     function renderAdminChooser(adminEmail) {
+        console.log('[renderAdminChooser] CALLED email=', adminEmail, 'pathname=', window.location.pathname);
         var greeting = document.getElementById("greeting");
         if (greeting) greeting.innerHTML = '<p class="greeting">Connecté super-admin · ' + escapeHtml(adminEmail || '') + '</p>';
         var content = document.getElementById("content");
@@ -848,6 +866,7 @@
     //  Mode 1 — élève non identifié : login email (magic link)
     // ──────────────────────────────────────────────
     function renderLoginEmail(error) {
+        console.log('[renderLoginEmail] CALLED error=', error, 'pathname=', window.location.pathname);
         var greeting = document.getElementById("greeting");
         if (greeting) greeting.innerHTML = '';
         var footer = document.getElementById("footer");
@@ -931,6 +950,7 @@
     //  (programme, devoirs, résumé dernier cours, ressources)
     // ──────────────────────────────────────────────
     function renderEspaceEleve(eleve) {
+        console.log('[renderEspaceEleve] CALLED eleve=', eleve, 'pathname=', window.location.pathname);
         var greeting = document.getElementById("greeting");
         greeting.innerHTML = '<p class="greeting">Bonjour ' + escapeHtml(eleve.display) + ' \uD83D\uDC4B</p>';
 
@@ -987,8 +1007,10 @@
     }
 
     function fetchDashboardData(eleve) {
+        console.log('[fetchDashboardData] CALLED eleve=', eleve);
         fetch('/api/eleves/' + eleve.slug + '/public', { credentials: 'include' })
             .then(function(r) {
+                console.log('[fetchDashboardData] response status=', r.status, 'eleve.slug=', eleve.slug);
                 if (r.status === 401) {
                     var err = new Error('unauthorized');
                     err.unauthorized = true;
@@ -1003,6 +1025,7 @@
                 renderResume(data && data.derniere_seance, data && data.doc_url);
             })
             .catch(function(e) {
+                console.warn('[fetchDashboardData] CATCH err=', e && e.message, 'unauthorized=', e && e.unauthorized);
                 if (e && e.unauthorized) {
                     renderLoginEmail('expired');
                     return;
