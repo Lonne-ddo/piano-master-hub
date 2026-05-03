@@ -90,24 +90,56 @@
     this.duration = 0;
     this.isPlaying = false;
     this.rafId = null;
-    this.peaksCalcStarted = false;
     this.peaksPostedToServer = false;
     this._destroyed = false;
 
-    // Préchargement : on bloque le play tant que les 6 audios ne sont pas
-    // bufferisés (élimine le lag du premier play / seek sur mobile).
-    this._readySet = new Set();
-    this._readyTotal = 0;
-    this._loaderEl = null;
-    this._loaderCountEl = null;
-    this._readyTimeoutId = null;
+    // Pré-modal : overlay fullscreen + container off-screen pour les <audio>.
+    // On charge tout (buffers audio + peaks) AVANT de monter le modal pour
+    // qu'il apparaisse avec waveforms dessinés et play prêt — zéro lag perçu.
+    this._preloadOverlay = null;
+    this._preloadHost = null;
+    this._preloadTimeoutId = null;
   }
 
+  // Open async : overlay → preload all → build modal → render → hide overlay.
+  // Si timeout 30s, on ouvre quand même (le player continuera à charger lazy).
   MultitrackPlayer.prototype.open = function () {
-    this._buildUI();
-    this._setupAudioGraph();
-    if (this.waveformsCache) this._renderWaveformsFromCache();
-    else this._renderWaveformsPlaceholders();
+    const self = this;
+    this._showPreloadOverlay();
+
+    const PRELOAD_TIMEOUT_MS = 30000;
+    let timedOut = false;
+    const timeoutPromise = new Promise(function (resolve) {
+      self._preloadTimeoutId = setTimeout(function () {
+        timedOut = true;
+        console.warn('[MultitrackPlayer] preload timeout 30s — opening modal anyway');
+        resolve('timeout');
+      }, PRELOAD_TIMEOUT_MS);
+    });
+
+    Promise.race([this._preloadResources(), timeoutPromise]).then(function () {
+      if (self._preloadTimeoutId) {
+        clearTimeout(self._preloadTimeoutId);
+        self._preloadTimeoutId = null;
+      }
+      if (self._destroyed) return;
+
+      // Si peaks calculés pendant le preload, alimenter le cache pour le rendu.
+      if (!self.waveformsCache && Object.keys(self.peaks).length) {
+        self.waveformsCache = self.peaks;
+      }
+
+      self._buildUI();
+      if (self.waveformsCache) self._renderWaveformsFromCache();
+      else self._renderWaveformsPlaceholders();
+      self._hidePreloadOverlay();
+
+      if (timedOut) {
+        // Cas dégradé : certains audios pas encore prêts. On laisse le browser
+        // continuer à streamer ; le 1er play peut laguer mais tout marche.
+        console.warn('[MultitrackPlayer] modal opened in degraded mode');
+      }
+    });
   };
 
   MultitrackPlayer.prototype.destroy = function () {
@@ -115,9 +147,9 @@
     this._destroyed = true;
     if (this.rafId != null) cancelAnimationFrame(this.rafId);
     this.rafId = null;
-    if (this._readyTimeoutId) {
-      clearTimeout(this._readyTimeoutId);
-      this._readyTimeoutId = null;
+    if (this._preloadTimeoutId) {
+      clearTimeout(this._preloadTimeoutId);
+      this._preloadTimeoutId = null;
     }
     Object.values(this.audioEls).forEach(function (a) {
       try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e) {}
@@ -127,6 +159,14 @@
     }
     if (this.modal && this.modal.parentNode) {
       this.modal.parentNode.removeChild(this.modal);
+    }
+    if (this._preloadOverlay && this._preloadOverlay.parentNode) {
+      this._preloadOverlay.parentNode.removeChild(this._preloadOverlay);
+      this._preloadOverlay = null;
+    }
+    if (this._preloadHost && this._preloadHost.parentNode) {
+      this._preloadHost.parentNode.removeChild(this._preloadHost);
+      this._preloadHost = null;
     }
     document.body.style.overflow = '';
   };
@@ -169,8 +209,7 @@
     playBtn.className = 'mtp-play';
     playBtn.setAttribute('aria-label', 'Lecture');
     playBtn.innerHTML = '▶';
-    playBtn.disabled = true; // libéré par _markTrackReady() quand 6/6 prêts
-    playBtn.title = 'Chargement des pistes…';
+    playBtn.title = 'Lecture (espace)';
     playBtn.addEventListener('click', function () { self._togglePlay(); });
     const timeEl = document.createElement('div');
     timeEl.className = 'mtp-time';
@@ -194,24 +233,6 @@
     root.appendChild(header);
     root.appendChild(tracksWrap);
     root.appendChild(transport);
-
-    // Overlay loader pendant le préchargement audio (élimine lag premier play).
-    // Disparaît une fois tous les <audio> bufferisés (canplaythrough ou fallback).
-    const loader = document.createElement('div');
-    loader.className = 'mtp-loader';
-    const loaderInner = document.createElement('div');
-    loaderInner.className = 'mtp-loader-inner';
-    const spinner = document.createElement('div');
-    spinner.className = 'mtp-spinner';
-    const loaderText = document.createElement('div');
-    loaderText.className = 'mtp-loader-text';
-    loaderText.textContent = 'Chargement des pistes… 0 / ' + this.tracks.length;
-    loaderInner.appendChild(spinner);
-    loaderInner.appendChild(loaderText);
-    loader.appendChild(loaderInner);
-    root.appendChild(loader);
-    this._loaderEl = loader;
-    this._loaderCountEl = loaderText;
 
     // Esc pour fermer
     this._onKey = function (e) {
@@ -309,107 +330,145 @@
     return row;
   };
 
-  // ─── Audio graph ──────────────────────────────────────────────
-  MultitrackPlayer.prototype._setupAudioGraph = function () {
+  // ─── Preload (overlay + audios off-screen + peaks) ────────────
+  // Affiche un overlay fullscreen avec spinner pendant qu'on charge tout.
+  MultitrackPlayer.prototype._showPreloadOverlay = function () {
+    const overlay = document.createElement('div');
+    overlay.className = 'mtp-preload-overlay';
+    overlay.setAttribute('role', 'status');
+    overlay.setAttribute('aria-live', 'polite');
+    const spinner = document.createElement('div');
+    spinner.className = 'mtp-preload-spinner';
+    const txt = document.createElement('div');
+    txt.className = 'mtp-preload-text';
+    txt.textContent = 'Chargement…';
+    overlay.appendChild(spinner);
+    overlay.appendChild(txt);
+    document.body.appendChild(overlay);
+    document.body.style.overflow = 'hidden'; // lock scroll dès l'overlay
+    this._preloadOverlay = overlay;
+  };
+
+  MultitrackPlayer.prototype._hidePreloadOverlay = function () {
+    if (!this._preloadOverlay) return;
+    const ov = this._preloadOverlay;
+    ov.classList.add('mtp-preload-hidden');
+    setTimeout(function () {
+      if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+    }, 250);
+    this._preloadOverlay = null;
+  };
+
+  // Charge en parallèle :
+  //   - les 6 <audio> (dans un host off-screen, preload='auto', attente
+  //     canplaythrough/loadeddata/error)
+  //   - les 6 peaks waveforms (fetch + decodeAudioData + downsample) si pas
+  //     déjà fournis via opts.waveforms
+  // Retourne une Promise qui résout quand tout est prêt (ou échec individuel).
+  MultitrackPlayer.prototype._preloadResources = function () {
     const self = this;
+
     const Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) {
       console.warn('[MultitrackPlayer] Web Audio API non supportée');
-      return;
+      return Promise.resolve();
     }
     this.audioCtx = new Ctx();
-    this._readyTotal = this.tracks.length;
-    this._readySet.clear();
 
-    this.tracks.forEach(function (t) {
-      const audio = document.createElement('audio');
-      audio.crossOrigin = 'anonymous';   // pour decodeAudioData ultérieur (peaks)
-      audio.preload = 'auto';
-      audio.src = t.url;
-      audio.style.display = 'none';
-      // Important : ajouter au DOM pour que MediaElementAudioSource fonctionne
-      // de manière fiable sur tous les navigateurs.
-      self.modal.appendChild(audio);
+    // Container off-screen pour les <audio>. MediaElementAudioSource exige
+    // que les éléments soient dans le DOM — on les laisse ici jusqu'à destroy.
+    const host = document.createElement('div');
+    host.className = 'mtp-preload-host';
+    host.style.cssText = 'position:absolute;left:-9999px;top:0;width:0;height:0;overflow:hidden;';
+    document.body.appendChild(host);
+    this._preloadHost = host;
 
-      let source;
-      try {
-        source = self.audioCtx.createMediaElementSource(audio);
-      } catch (e) {
-        console.warn('[MultitrackPlayer] createMediaElementSource failed', t.id, e);
-        return;
-      }
-      const gain = self.audioCtx.createGain();
-      gain.gain.value = 1;
-      source.connect(gain).connect(self.audioCtx.destination);
+    // 1) Audios : create + Web Audio graph + attente buffering
+    const audioPromises = this.tracks.map(function (t) {
+      return new Promise(function (resolve) {
+        const audio = document.createElement('audio');
+        audio.crossOrigin = 'anonymous';
+        audio.preload = 'auto';
+        audio.src = t.url;
+        host.appendChild(audio);
 
-      audio.addEventListener('loadedmetadata', function () {
-        if (!self.duration && Number.isFinite(audio.duration)) {
-          self.duration = audio.duration;
-          self._renderTime();
+        try {
+          const source = self.audioCtx.createMediaElementSource(audio);
+          const gain = self.audioCtx.createGain();
+          gain.gain.value = 1;
+          source.connect(gain).connect(self.audioCtx.destination);
+          self.audioEls[t.id] = audio;
+          self.gainNodes[t.id] = gain;
+          self.volumes[t.id] = 1;
+        } catch (e) {
+          console.warn('[MultitrackPlayer] createMediaElementSource failed', t.id, e);
+          resolve();
+          return;
         }
-      });
-      audio.addEventListener('ended', function () {
-        // Quand n'importe quelle piste finit, on stoppe tout proprement
-        self._pauseAll();
-        self._seekAll(0);
-      });
-      // Préchargement : marque la piste comme prête au 1er event 'canplaythrough'.
-      // Fallback 'loadeddata' en double sécurité (Firefox parfois ne déclenche
-      // pas canplaythrough avant un user gesture).
-      function markReady() { self._markTrackReady(t.id); }
-      audio.addEventListener('canplaythrough', markReady, { once: true });
-      audio.addEventListener('loadeddata', markReady, { once: true });
 
-      self.audioEls[t.id] = audio;
-      self.gainNodes[t.id] = gain;
+        audio.addEventListener('loadedmetadata', function () {
+          if (!self.duration && Number.isFinite(audio.duration)) {
+            self.duration = audio.duration;
+          }
+        });
+        audio.addEventListener('ended', function () {
+          self._pauseAll();
+          self._seekAll(0);
+        });
+
+        let resolved = false;
+        function done() {
+          if (resolved) return;
+          resolved = true;
+          resolve();
+        }
+        audio.addEventListener('canplaythrough', done, { once: true });
+        audio.addEventListener('loadeddata', done, { once: true });
+        audio.addEventListener('error', function () {
+          console.warn('[MultitrackPlayer] audio load failed', t.id);
+          done();
+        });
+      });
     });
 
-    // iOS Safari : 'canplaythrough' ne déclenche parfois jamais sans user
-    // gesture. Fallback timeout 8s : on relit readyState et on considère prêt
-    // toute piste avec readyState >= 2 (HAVE_CURRENT_DATA).
-    this._readyTimeoutId = setTimeout(function () {
-      if (self._destroyed) return;
-      const stillPending = self._readyTotal - self._readySet.size;
-      if (stillPending <= 0) return;
-      console.warn('[MultitrackPlayer] preload timeout 8s — fallback readyState', {
-        ready: self._readySet.size, total: self._readyTotal,
+    // 2) Peaks waveforms en parallèle (skip si déjà fournis via cache R2)
+    let peaksPromise = Promise.resolve();
+    if (!this.waveformsCache) {
+      peaksPromise = Promise.all(this.tracks.map(function (t) {
+        return fetch(t.url, { credentials: 'same-origin' })
+          .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
+          .then(function (buf) {
+            if (!buf) return null;
+            return new Promise(function (res, rej) {
+              self.audioCtx.decodeAudioData(buf, res, rej);
+            });
+          })
+          .then(function (audioBuf) {
+            if (!audioBuf) return null;
+            const ch = audioBuf.getChannelData(0);
+            const peaks = computePeaks(ch, PEAK_RESOLUTION);
+            self.peaks[t.id] = peaks;
+            return { id: t.id, peaks: peaks };
+          })
+          .catch(function (e) {
+            console.warn('[MultitrackPlayer] peaks calc failed', t.id, e?.message);
+            return null;
+          });
+      })).then(function (results) {
+        // POST cache R2 une fois tous calculés (callback fourni par l'appelant)
+        const allPeaks = {};
+        let count = 0;
+        results.forEach(function (r) {
+          if (r && Array.isArray(r.peaks)) { allPeaks[r.id] = r.peaks; count++; }
+        });
+        if (count >= 1 && self.onWaveformsCalculated && !self.peaksPostedToServer) {
+          self.peaksPostedToServer = true;
+          try { self.onWaveformsCalculated(allPeaks); } catch (e) {}
+        }
       });
-      Object.keys(self.audioEls).forEach(function (id) {
-        const a = self.audioEls[id];
-        if (a && a.readyState >= 2) self._markTrackReady(id);
-      });
-    }, 8000);
-  };
+    }
 
-  // Compteur de pistes bufferisées. Dès que 6/6 sont prêts, libère le bouton
-  // play et masque le loader (fade-out via classe CSS).
-  MultitrackPlayer.prototype._markTrackReady = function (id) {
-    if (!id || this._readySet.has(id)) return;
-    this._readySet.add(id);
-    if (this._loaderCountEl) {
-      this._loaderCountEl.textContent =
-        'Chargement des pistes… ' + this._readySet.size + ' / ' + this._readyTotal;
-    }
-    if (this._readySet.size >= this._readyTotal) {
-      if (this._readyTimeoutId) {
-        clearTimeout(this._readyTimeoutId);
-        this._readyTimeoutId = null;
-      }
-      if (this.playBtn) {
-        this.playBtn.disabled = false;
-        this.playBtn.title = 'Lecture (espace)';
-      }
-      if (this._loaderEl) {
-        this._loaderEl.classList.add('mtp-loader-hidden');
-        // Retire du DOM après la transition CSS (~300ms)
-        const el = this._loaderEl;
-        setTimeout(function () {
-          if (el && el.parentNode) el.parentNode.removeChild(el);
-        }, 350);
-        this._loaderEl = null;
-        this._loaderCountEl = null;
-      }
-    }
+    return Promise.all([Promise.all(audioPromises), peaksPromise]);
   };
 
   MultitrackPlayer.prototype._togglePlay = function () {
@@ -422,15 +481,10 @@
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
       this.audioCtx.resume().catch(function () {});
     }
-    const playPromises = Object.values(this.audioEls).map(function (a) {
-      return a.play().catch(function (e) {
+    Object.values(this.audioEls).forEach(function (a) {
+      a.play().catch(function (e) {
         console.warn('[MultitrackPlayer] play() rejected', e?.message);
       });
-    });
-    Promise.all(playPromises).then(function () {
-      // On démarre les peaks au premier play (plutôt qu'à open) pour ne
-      // calculer que si l'utilisateur écoute vraiment.
-      self._maybeStartPeaksCalc();
     });
     this.isPlaying = true;
     this.playBtn.innerHTML = '⏸';
@@ -579,56 +633,6 @@
     const self = this;
     this.tracks.forEach(function (t) {
       self._drawSkeleton(t.id, t.color);
-    });
-  };
-
-  // Lance le calcul des peaks après le 1er play. Charge les fichiers en
-  // parallèle, décode, downsample, dessine, et appelle onWaveformsCalculated
-  // une fois tous calculés (cache R2).
-  MultitrackPlayer.prototype._maybeStartPeaksCalc = function () {
-    if (this.peaksCalcStarted) return;
-    if (this.waveformsCache) return; // déjà rendus depuis cache
-    this.peaksCalcStarted = true;
-    const self = this;
-
-    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-    // Note : on réutilise l'AudioContext du player pour decodeAudioData
-    // (compatible cross-browser). Ne crée pas de nouveau contexte.
-    const decodeCtx = this.audioCtx;
-    if (!decodeCtx) return;
-
-    Promise.all(this.tracks.map(function (t) {
-      return fetch(t.url, { credentials: 'same-origin' })
-        .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
-        .then(function (buf) {
-          if (!buf) return null;
-          return new Promise(function (resolve, reject) {
-            decodeCtx.decodeAudioData(buf, resolve, reject);
-          });
-        })
-        .then(function (audioBuf) {
-          if (!audioBuf) return null;
-          const ch = audioBuf.getChannelData(0);
-          const peaks = computePeaks(ch, PEAK_RESOLUTION);
-          self.peaks[t.id] = peaks;
-          self._drawWaveform(t.id, peaks, t.color);
-          return { id: t.id, peaks: peaks };
-        })
-        .catch(function (e) {
-          console.warn('[MultitrackPlayer] peaks calc failed', t.id, e?.message);
-          return null;
-        });
-    })).then(function (results) {
-      if (self._destroyed) return;
-      const allPeaks = {};
-      let count = 0;
-      results.forEach(function (r) {
-        if (r && Array.isArray(r.peaks)) { allPeaks[r.id] = r.peaks; count++; }
-      });
-      if (count >= 1 && self.onWaveformsCalculated && !self.peaksPostedToServer) {
-        self.peaksPostedToServer = true;
-        try { self.onWaveformsCalculated(allPeaks); } catch (e) {}
-      }
     });
   };
 
