@@ -977,6 +977,7 @@
                 activePlayer = new window.MultitrackPlayer({
                     container: document.body,
                     title: sep.title || 'Lecture multipiste',
+                    separationId: sep.id,
                     tracks: tracks,
                     waveforms: waveforms,
                     readOnly: true,
@@ -1318,6 +1319,7 @@
     })();
     </script>
 
+    <script src="/assets/js/stems-cache.js"></script>
     <script src="/assets/js/multitrack-player.js"></script>
 
 </body>

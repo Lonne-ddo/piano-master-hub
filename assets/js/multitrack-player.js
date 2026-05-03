@@ -74,6 +74,7 @@
     this.tracks = (opts.tracks || []).slice();
     this.title = opts.title || '';
     this.readOnly = !!opts.readOnly;
+    this.separationId = opts.separationId || '';
     this.waveformsCache = opts.waveforms || null;
     this.onWaveformsCalculated = opts.onWaveformsCalculated || null;
 
@@ -152,7 +153,16 @@
       this._preloadTimeoutId = null;
     }
     Object.values(this.audioEls).forEach(function (a) {
-      try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e) {}
+      try {
+        a.pause();
+        // Révoque les blob URLs créées par createObjectURL pour libérer la RAM
+        const src = a.currentSrc || a.src;
+        if (src && src.indexOf('blob:') === 0) {
+          try { URL.revokeObjectURL(src); } catch (e) {}
+        }
+        a.removeAttribute('src');
+        a.load();
+      } catch (e) {}
     });
     if (this.audioCtx && this.audioCtx.state !== 'closed') {
       try { this.audioCtx.close(); } catch (e) {}
@@ -383,109 +393,169 @@
     document.body.appendChild(host);
     this._preloadHost = host;
 
-    // 1) Audios : create + Web Audio graph + attente buffering.
-    // Pas de `crossOrigin = 'anonymous'` : le proxy /api/stems/.../audio/...
-    // est same-origin, donc CORS pas requis. L'attribut crossorigin sur
-    // <audio> peut déclencher un preflight CORS que le proxy R2 ne gère pas
-    // (pas de onRequestOptions sur cet endpoint), bloquant silencieusement
-    // le download → duration NaN, play() no-op. Bug observé en prod.
-    const audioPromises = this.tracks.map(function (t) {
-      return new Promise(function (resolve) {
-        const audio = document.createElement('audio');
-        audio.preload = 'auto';
-        audio.src = t.url;
-        host.appendChild(audio);
+    // Stratégie unifiée par piste :
+    //   1. Cache IndexedDB hit (audio + peaks) → audio.src = blob URL,
+    //      peaks chargés → 0 réseau.
+    //   2. Cache miss → fetch() le blob, le mettre en cache, decodeAudioData
+    //      pour calculer les peaks, mettre peaks en cache. Audio.src = blob URL.
+    //
+    // Avantage : 1 seul fetch par stem (au lieu de 2 : audio.src + fetch peaks).
+    //
+    // Pas de `crossOrigin = 'anonymous'` sur <audio> (same-origin proxy R2 sans
+    // onRequestOptions, déclencherait preflight bloquant — bug commit D fixé).
+    const sepId = this.separationId;
+    const cacheAvailable = typeof global !== 'undefined' && global.StemsCache;
+    const skipPeaksCalc = !!this.waveformsCache; // peaks déjà fournies via R2
+    let cacheHits = 0;
+    let cacheMisses = 0;
+    const allPeaks = {};
 
-        try {
-          const source = self.audioCtx.createMediaElementSource(audio);
-          const gain = self.audioCtx.createGain();
-          gain.gain.value = 1;
-          source.connect(gain).connect(self.audioCtx.destination);
-          self.audioEls[t.id] = audio;
-          self.gainNodes[t.id] = gain;
-          self.volumes[t.id] = 1;
-        } catch (e) {
-          console.warn('[MultitrackPlayer] createMediaElementSource failed', t.id, e);
-          resolve();
-          return;
-        }
+    const trackPromises = this.tracks.map(function (t) {
+      return Promise.resolve().then(function () {
+        // 1) Tentative récupération depuis IndexedDB
+        const audioPromise = (cacheAvailable && sepId)
+          ? global.StemsCache.getAudio(sepId, t.id) : Promise.resolve(null);
+        const peaksPromise = (cacheAvailable && sepId && !skipPeaksCalc)
+          ? global.StemsCache.getPeaks(sepId, t.id) : Promise.resolve(null);
+        return Promise.all([audioPromise, peaksPromise]);
+      }).then(function (cached) {
+        const cachedBlob = cached[0];
+        const cachedPeaks = cached[1];
+        const needsAudio = !(cachedBlob instanceof Blob);
+        const needsPeaks = !skipPeaksCalc && !Array.isArray(cachedPeaks);
 
-        audio.addEventListener('loadedmetadata', function () {
-          if (!self.duration && Number.isFinite(audio.duration)) {
-            self.duration = audio.duration;
-          }
-        });
-        audio.addEventListener('ended', function () {
-          self._pauseAll();
-          self._seekAll(0);
-        });
+        if (!needsAudio && !needsPeaks) cacheHits++;
+        else cacheMisses++;
 
-        let resolved = false;
-        function done() {
-          if (resolved) return;
-          resolved = true;
-          // Defense-in-depth : log si duration toujours indispo (CORS, format
-          // audio invalide, network corrupted, etc.). Le modal s'ouvrira
-          // quand même mais avec timer "0:00 / 0:00".
-          if (!Number.isFinite(audio.duration)) {
-            console.warn('[MultitrackPlayer] audio ready but duration NaN', t.id, {
-              readyState: audio.readyState,
-              networkState: audio.networkState,
-              src: audio.currentSrc,
+        // 2) Si quelque chose manque → fetch. On télécharge UNE fois et on
+        // utilise le blob pour audio.src ET decodeAudioData (peaks).
+        let blobPromise;
+        if (needsAudio || needsPeaks) {
+          blobPromise = fetch(t.url, { credentials: 'same-origin' })
+            .then(function (r) {
+              if (!r.ok) throw new Error('fetch_' + r.status);
+              return r.blob();
             });
-          }
-          resolve();
+        } else {
+          blobPromise = Promise.resolve(cachedBlob);
         }
-        audio.addEventListener('canplaythrough', done, { once: true });
-        audio.addEventListener('loadeddata', done, { once: true });
-        audio.addEventListener('error', function () {
-          console.warn('[MultitrackPlayer] audio load failed', t.id, {
-            errorCode: audio.error?.code,
-            errorMessage: audio.error?.message,
+
+        return blobPromise.then(function (blob) {
+          // 3) Cache write si on a fetch (et IndexedDB dispo)
+          if (cacheAvailable && sepId && needsAudio && blob) {
+            global.StemsCache.setAudio(sepId, t.id, blob);
+          }
+
+          // 4) Peaks : si miss, decodeAudioData + downsample + cache
+          let peaksPromise2 = Promise.resolve(cachedPeaks);
+          if (needsPeaks && blob) {
+            peaksPromise2 = blob.arrayBuffer()
+              .then(function (buf) {
+                return new Promise(function (res, rej) {
+                  self.audioCtx.decodeAudioData(buf.slice(0), res, rej);
+                });
+              })
+              .then(function (audioBuf) {
+                if (!audioBuf) return null;
+                const ch = audioBuf.getChannelData(0);
+                const peaks = computePeaks(ch, PEAK_RESOLUTION);
+                if (cacheAvailable && sepId) {
+                  global.StemsCache.setPeaks(sepId, t.id, peaks);
+                }
+                return peaks;
+              })
+              .catch(function (e) {
+                console.warn('[MultitrackPlayer] peaks calc failed', t.id, e?.message);
+                return null;
+              });
+          }
+
+          return peaksPromise2.then(function (peaks) {
+            if (Array.isArray(peaks)) {
+              self.peaks[t.id] = peaks;
+              allPeaks[t.id] = peaks;
+            }
+            return blob;
           });
-          done();
+        });
+      }).then(function (blob) {
+        // 5) Crée <audio> + Web Audio graph + attend canplaythrough
+        return new Promise(function (resolve) {
+          const audio = document.createElement('audio');
+          audio.preload = 'auto';
+          if (blob instanceof Blob) {
+            audio.src = URL.createObjectURL(blob);
+          } else {
+            // Fallback : fetch a échoué et pas de cache → on tente quand même
+            // l'URL distante (le browser stream natif). Modal s'ouvrira en
+            // mode dégradé.
+            audio.src = t.url;
+          }
+          host.appendChild(audio);
+
+          try {
+            const source = self.audioCtx.createMediaElementSource(audio);
+            const gain = self.audioCtx.createGain();
+            gain.gain.value = 1;
+            source.connect(gain).connect(self.audioCtx.destination);
+            self.audioEls[t.id] = audio;
+            self.gainNodes[t.id] = gain;
+            self.volumes[t.id] = 1;
+          } catch (e) {
+            console.warn('[MultitrackPlayer] createMediaElementSource failed', t.id, e);
+            resolve();
+            return;
+          }
+
+          audio.addEventListener('loadedmetadata', function () {
+            if (!self.duration && Number.isFinite(audio.duration)) {
+              self.duration = audio.duration;
+            }
+          });
+          audio.addEventListener('ended', function () {
+            self._pauseAll();
+            self._seekAll(0);
+          });
+
+          let resolved = false;
+          function done() {
+            if (resolved) return;
+            resolved = true;
+            if (!Number.isFinite(audio.duration)) {
+              console.warn('[MultitrackPlayer] audio ready but duration NaN', t.id, {
+                readyState: audio.readyState,
+                networkState: audio.networkState,
+                src: audio.currentSrc,
+              });
+            }
+            resolve();
+          }
+          audio.addEventListener('canplaythrough', done, { once: true });
+          audio.addEventListener('loadeddata', done, { once: true });
+          audio.addEventListener('error', function () {
+            console.warn('[MultitrackPlayer] audio load failed', t.id, {
+              errorCode: audio.error?.code,
+              errorMessage: audio.error?.message,
+            });
+            done();
+          });
         });
       });
     });
 
-    // 2) Peaks waveforms en parallèle (skip si déjà fournis via cache R2)
-    let peaksPromise = Promise.resolve();
-    if (!this.waveformsCache) {
-      peaksPromise = Promise.all(this.tracks.map(function (t) {
-        return fetch(t.url, { credentials: 'same-origin' })
-          .then(function (r) { return r.ok ? r.arrayBuffer() : null; })
-          .then(function (buf) {
-            if (!buf) return null;
-            return new Promise(function (res, rej) {
-              self.audioCtx.decodeAudioData(buf, res, rej);
-            });
-          })
-          .then(function (audioBuf) {
-            if (!audioBuf) return null;
-            const ch = audioBuf.getChannelData(0);
-            const peaks = computePeaks(ch, PEAK_RESOLUTION);
-            self.peaks[t.id] = peaks;
-            return { id: t.id, peaks: peaks };
-          })
-          .catch(function (e) {
-            console.warn('[MultitrackPlayer] peaks calc failed', t.id, e?.message);
-            return null;
-          });
-      })).then(function (results) {
-        // POST cache R2 une fois tous calculés (callback fourni par l'appelant)
-        const allPeaks = {};
-        let count = 0;
-        results.forEach(function (r) {
-          if (r && Array.isArray(r.peaks)) { allPeaks[r.id] = r.peaks; count++; }
-        });
-        if (count >= 1 && self.onWaveformsCalculated && !self.peaksPostedToServer) {
-          self.peaksPostedToServer = true;
-          try { self.onWaveformsCalculated(allPeaks); } catch (e) {}
-        }
-      });
-    }
+    return Promise.all(trackPromises).then(function () {
+      // Stats cache pour debug
+      const hitTotal = self.tracks.length;
+      console.log('[StemsCache] ' + cacheHits + '/' + hitTotal + ' HIT, '
+        + cacheMisses + '/' + hitTotal + ' MISS');
 
-    return Promise.all([Promise.all(audioPromises), peaksPromise]);
+      // POST cache R2 si on a calculé des peaks (et callback fourni)
+      if (!skipPeaksCalc && Object.keys(allPeaks).length >= 1
+          && self.onWaveformsCalculated && !self.peaksPostedToServer) {
+        self.peaksPostedToServer = true;
+        try { self.onWaveformsCalculated(allPeaks); } catch (e) {}
+      }
+    });
   };
 
   MultitrackPlayer.prototype._togglePlay = function () {
