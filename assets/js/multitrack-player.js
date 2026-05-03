@@ -383,11 +383,15 @@
     document.body.appendChild(host);
     this._preloadHost = host;
 
-    // 1) Audios : create + Web Audio graph + attente buffering
+    // 1) Audios : create + Web Audio graph + attente buffering.
+    // Pas de `crossOrigin = 'anonymous'` : le proxy /api/stems/.../audio/...
+    // est same-origin, donc CORS pas requis. L'attribut crossorigin sur
+    // <audio> peut déclencher un preflight CORS que le proxy R2 ne gère pas
+    // (pas de onRequestOptions sur cet endpoint), bloquant silencieusement
+    // le download → duration NaN, play() no-op. Bug observé en prod.
     const audioPromises = this.tracks.map(function (t) {
       return new Promise(function (resolve) {
         const audio = document.createElement('audio');
-        audio.crossOrigin = 'anonymous';
         audio.preload = 'auto';
         audio.src = t.url;
         host.appendChild(audio);
@@ -420,12 +424,25 @@
         function done() {
           if (resolved) return;
           resolved = true;
+          // Defense-in-depth : log si duration toujours indispo (CORS, format
+          // audio invalide, network corrupted, etc.). Le modal s'ouvrira
+          // quand même mais avec timer "0:00 / 0:00".
+          if (!Number.isFinite(audio.duration)) {
+            console.warn('[MultitrackPlayer] audio ready but duration NaN', t.id, {
+              readyState: audio.readyState,
+              networkState: audio.networkState,
+              src: audio.currentSrc,
+            });
+          }
           resolve();
         }
         audio.addEventListener('canplaythrough', done, { once: true });
         audio.addEventListener('loadeddata', done, { once: true });
         audio.addEventListener('error', function () {
-          console.warn('[MultitrackPlayer] audio load failed', t.id);
+          console.warn('[MultitrackPlayer] audio load failed', t.id, {
+            errorCode: audio.error?.code,
+            errorMessage: audio.error?.message,
+          });
           done();
         });
       });
