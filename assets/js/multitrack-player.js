@@ -93,6 +93,14 @@
     this.peaksCalcStarted = false;
     this.peaksPostedToServer = false;
     this._destroyed = false;
+
+    // Préchargement : on bloque le play tant que les 6 audios ne sont pas
+    // bufferisés (élimine le lag du premier play / seek sur mobile).
+    this._readySet = new Set();
+    this._readyTotal = 0;
+    this._loaderEl = null;
+    this._loaderCountEl = null;
+    this._readyTimeoutId = null;
   }
 
   MultitrackPlayer.prototype.open = function () {
@@ -107,6 +115,10 @@
     this._destroyed = true;
     if (this.rafId != null) cancelAnimationFrame(this.rafId);
     this.rafId = null;
+    if (this._readyTimeoutId) {
+      clearTimeout(this._readyTimeoutId);
+      this._readyTimeoutId = null;
+    }
     Object.values(this.audioEls).forEach(function (a) {
       try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e) {}
     });
@@ -157,6 +169,8 @@
     playBtn.className = 'mtp-play';
     playBtn.setAttribute('aria-label', 'Lecture');
     playBtn.innerHTML = '▶';
+    playBtn.disabled = true; // libéré par _markTrackReady() quand 6/6 prêts
+    playBtn.title = 'Chargement des pistes…';
     playBtn.addEventListener('click', function () { self._togglePlay(); });
     const timeEl = document.createElement('div');
     timeEl.className = 'mtp-time';
@@ -180,6 +194,24 @@
     root.appendChild(header);
     root.appendChild(tracksWrap);
     root.appendChild(transport);
+
+    // Overlay loader pendant le préchargement audio (élimine lag premier play).
+    // Disparaît une fois tous les <audio> bufferisés (canplaythrough ou fallback).
+    const loader = document.createElement('div');
+    loader.className = 'mtp-loader';
+    const loaderInner = document.createElement('div');
+    loaderInner.className = 'mtp-loader-inner';
+    const spinner = document.createElement('div');
+    spinner.className = 'mtp-spinner';
+    const loaderText = document.createElement('div');
+    loaderText.className = 'mtp-loader-text';
+    loaderText.textContent = 'Chargement des pistes… 0 / ' + this.tracks.length;
+    loaderInner.appendChild(spinner);
+    loaderInner.appendChild(loaderText);
+    loader.appendChild(loaderInner);
+    root.appendChild(loader);
+    this._loaderEl = loader;
+    this._loaderCountEl = loaderText;
 
     // Esc pour fermer
     this._onKey = function (e) {
@@ -286,6 +318,8 @@
       return;
     }
     this.audioCtx = new Ctx();
+    this._readyTotal = this.tracks.length;
+    this._readySet.clear();
 
     this.tracks.forEach(function (t) {
       const audio = document.createElement('audio');
@@ -319,10 +353,63 @@
         self._pauseAll();
         self._seekAll(0);
       });
+      // Préchargement : marque la piste comme prête au 1er event 'canplaythrough'.
+      // Fallback 'loadeddata' en double sécurité (Firefox parfois ne déclenche
+      // pas canplaythrough avant un user gesture).
+      function markReady() { self._markTrackReady(t.id); }
+      audio.addEventListener('canplaythrough', markReady, { once: true });
+      audio.addEventListener('loadeddata', markReady, { once: true });
 
       self.audioEls[t.id] = audio;
       self.gainNodes[t.id] = gain;
     });
+
+    // iOS Safari : 'canplaythrough' ne déclenche parfois jamais sans user
+    // gesture. Fallback timeout 8s : on relit readyState et on considère prêt
+    // toute piste avec readyState >= 2 (HAVE_CURRENT_DATA).
+    this._readyTimeoutId = setTimeout(function () {
+      if (self._destroyed) return;
+      const stillPending = self._readyTotal - self._readySet.size;
+      if (stillPending <= 0) return;
+      console.warn('[MultitrackPlayer] preload timeout 8s — fallback readyState', {
+        ready: self._readySet.size, total: self._readyTotal,
+      });
+      Object.keys(self.audioEls).forEach(function (id) {
+        const a = self.audioEls[id];
+        if (a && a.readyState >= 2) self._markTrackReady(id);
+      });
+    }, 8000);
+  };
+
+  // Compteur de pistes bufferisées. Dès que 6/6 sont prêts, libère le bouton
+  // play et masque le loader (fade-out via classe CSS).
+  MultitrackPlayer.prototype._markTrackReady = function (id) {
+    if (!id || this._readySet.has(id)) return;
+    this._readySet.add(id);
+    if (this._loaderCountEl) {
+      this._loaderCountEl.textContent =
+        'Chargement des pistes… ' + this._readySet.size + ' / ' + this._readyTotal;
+    }
+    if (this._readySet.size >= this._readyTotal) {
+      if (this._readyTimeoutId) {
+        clearTimeout(this._readyTimeoutId);
+        this._readyTimeoutId = null;
+      }
+      if (this.playBtn) {
+        this.playBtn.disabled = false;
+        this.playBtn.title = 'Lecture (espace)';
+      }
+      if (this._loaderEl) {
+        this._loaderEl.classList.add('mtp-loader-hidden');
+        // Retire du DOM après la transition CSS (~300ms)
+        const el = this._loaderEl;
+        setTimeout(function () {
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        }, 350);
+        this._loaderEl = null;
+        this._loaderCountEl = null;
+      }
+    }
   };
 
   MultitrackPlayer.prototype._togglePlay = function () {
