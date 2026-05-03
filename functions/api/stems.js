@@ -26,7 +26,10 @@
 import { requireAdminPassword } from './_lib/session.js';
 
 // ─── Constantes ────────────────────────────────────────────────
-const REPLICATE_VERSION = '25a173108cff36ef9f80f854c162d01df9e6528be175794b81158fa03836d953';
+// Provider : ryan5453/demucs (fork moderne maintenu, schéma Output dynamique
+// avec extra='allow' qui rend les fields correspondant au modèle choisi).
+// Version 5a7041cc...= 1 an 4 mois — supporte natively htdemucs_6s à 6 stems.
+const REPLICATE_VERSION = '5a7041cc9b82e5a558fea6b3d7b12dea89625e89da33f0447bd727c2d0ab9e77';
 const DEMUCS_MODEL = 'htdemucs_6s'; // 6 stems : vocals/drums/bass/other/piano/guitar
 const STEM_KEYS = ['vocals', 'drums', 'bass', 'piano', 'guitar', 'other'];
 const MAX_SIZE_MB = 50;
@@ -298,6 +301,15 @@ async function handleStatus(request, env) {
 
       const ym = ymString();
       const key = `stems:${ym}:${separationId}`;
+      // outputShape : keys reçues de Replicate, triées. Sert de diag pour
+      // détecter un futur silently-fallback du modèle (ex : si seulement
+      // ['bass','drums','other','vocals'] au lieu de 6).
+      const outputShape = {
+        rawType: Array.isArray(data.output) ? 'array' : typeof data.output,
+        rawLength: Array.isArray(data.output) ? data.output.length : null,
+        normalizedKeys: Object.keys(stemUrls).sort(),
+        uploadedKeys: presentKeys.slice().sort(),
+      };
       const entry = {
         id: separationId,
         ts: new Date().toISOString(),
@@ -309,6 +321,7 @@ async function handleStatus(request, env) {
         costEUR: COST_EUR_PER_RUN,
         replicateId: predId,
         r2Keys,
+        outputShape,
         assignedTo: [],
       };
       try {

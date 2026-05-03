@@ -1,0 +1,302 @@
+/* ─── MultitrackPlayer styles ─────────────────────────────────────
+   Composant modal plein écran type Moises pour la lecture multipiste
+   des stems Demucs. Layout desktop horizontal, mobile cards stackées.
+   Cohérent avec le design system Master Hub.
+   ───────────────────────────────────────────────────────────── */
+
+.mtp-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #09090f;
+  color: #eeeaf8;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  animation: mtp-fade-in 0.18s ease-out;
+}
+@keyframes mtp-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Header ─────────────────────────────────────────────────── */
+.mtp-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: #0f0e18;
+}
+.mtp-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  color: #eeeaf8;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mtp-close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: #9d9ab5;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.mtp-close:hover {
+  color: #eeeaf8;
+  border-color: #8B6FE8;
+  background: rgba(139, 111, 232, 0.12);
+}
+
+/* ── Tracks container ──────────────────────────────────────── */
+.mtp-tracks {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+
+/* ── Track row (desktop = horizontal ; mobile = card) ─────── */
+.mtp-track {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.mtp-track:last-child { border-bottom: none; }
+
+.mtp-track-ctrls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mtp-track-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--stem-color, #888);
+  width: 70px;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+.mtp-track-btns {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.mtp-mute, .mtp-solo {
+  width: 28px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s;
+  letter-spacing: 0.04em;
+}
+.mtp-mute:hover, .mtp-solo:hover {
+  color: #eeeaf8;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.mtp-mute.active {
+  background: rgba(248, 113, 113, 0.22);
+  color: #f87171;
+  border-color: #f87171;
+}
+.mtp-solo.active {
+  background: rgba(234, 179, 8, 0.22);
+  color: #eab308;
+  border-color: #eab308;
+}
+
+.mtp-vol-wrap {
+  flex: 1;
+  min-width: 60px;
+  display: flex;
+  align-items: center;
+}
+.mtp-vol {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+.mtp-vol::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--stem-color, #8B6FE8);
+  border: 2px solid #09090f;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.mtp-vol::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.mtp-vol::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--stem-color, #8B6FE8);
+  border: 2px solid #09090f;
+  cursor: pointer;
+}
+
+/* ── Waveform ─────────────────────────────────────────────── */
+.mtp-track-wave {
+  position: relative;
+  height: 60px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+}
+.mtp-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mtp-playhead {
+  position: absolute;
+  top: 0; bottom: 0;
+  left: 0;
+  width: 2px;
+  background: #ffffff;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+/* ── Transport ────────────────────────────────────────────── */
+.mtp-transport {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: #0f0e18;
+}
+.mtp-play {
+  flex-shrink: 0;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: #8B6FE8;
+  color: #ffffff;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  display: flex; align-items: center; justify-content: center;
+}
+.mtp-play:hover { background: #6b54c4; }
+.mtp-play:active { transform: scale(0.95); }
+.mtp-time {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 13px;
+  color: #9d9ab5;
+  min-width: 96px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mtp-seek {
+  flex: 1;
+  min-width: 80px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+.mtp-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #eeeaf8;
+  border: 2px solid #0f0e18;
+  cursor: pointer;
+}
+.mtp-seek::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #eeeaf8;
+  border: 2px solid #0f0e18;
+  cursor: pointer;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Mobile (< 768px) — cards stackées par piste
+   ────────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .mtp-header {
+    padding: 12px 14px;
+  }
+  .mtp-title { font-size: 15px; }
+  .mtp-close { width: 32px; height: 32px; font-size: 14px; }
+
+  .mtp-tracks {
+    padding: 12px 14px;
+  }
+
+  .mtp-track {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    background: #161524;
+    border: 1px solid #25233a;
+    border-left: 3px solid var(--stem-color, #888);
+    border-radius: 12px;
+    margin-bottom: 8px;
+  }
+  .mtp-track:last-child { border-bottom: 1px solid #25233a; border-left: 3px solid var(--stem-color, #888); }
+
+  .mtp-track-ctrls {
+    width: 100%;
+  }
+  .mtp-track-label {
+    width: auto;
+    flex: 1;
+  }
+  .mtp-track-wave {
+    width: 100%;
+    height: 50px;
+  }
+
+  .mtp-transport {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .mtp-play { width: 44px; height: 44px; font-size: 16px; }
+  .mtp-time { font-size: 12px; min-width: 86px; }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Très petit écran (< 380px) — compactage extrême
+   ────────────────────────────────────────────────────────────── */
+@media (max-width: 379px) {
+  .mtp-track-label { font-size: 12px; }
+  .mtp-mute, .mtp-solo { width: 26px; height: 24px; font-size: 10px; }
+  .mtp-time { min-width: 76px; font-size: 11px; }
+}

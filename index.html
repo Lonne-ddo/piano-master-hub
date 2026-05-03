@@ -561,37 +561,26 @@
         .sep-item-head {
             display: flex; align-items: center; gap: 10px;
             padding: 12px 14px;
-            cursor: pointer;
             background: rgba(255,255,255,0.02);
-            transition: background 0.15s;
         }
-        .sep-item-head:hover { background: rgba(255,255,255,0.05); }
-        .sep-item-title { font-size: 0.95rem; font-weight: 600; color: var(--text); flex: 1; }
-        .sep-item-date { font-size: 0.75rem; color: var(--text-muted); font-family: monospace; }
-        .sep-item-chevron { color: var(--text-muted); font-size: 0.9rem; transition: transform 0.2s; }
-        .sep-item.expanded .sep-item-chevron { transform: rotate(180deg); }
-        .sep-item-body {
-            display: none;
-            padding: 12px 14px 14px;
-            background: rgba(0,0,0,0.15);
-            flex-direction: column; gap: 8px;
+        .sep-item-title { font-size: 0.95rem; font-weight: 600; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sep-item-date { font-size: 0.75rem; color: var(--text-muted); font-family: monospace; flex-shrink: 0; }
+        .sep-open-btn {
+            flex-shrink: 0;
+            font-family: inherit;
+            font-size: 0.82rem;
+            font-weight: 600;
+            background: var(--accent, #8B6FE8);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 7px 14px;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+            min-height: 36px;
         }
-        .sep-item.expanded .sep-item-body { display: flex; }
-        .sep-stem-row {
-            display: flex; align-items: center; gap: 10px;
-            flex-wrap: wrap;
-        }
-        .sep-stem-row .label {
-            font-size: 0.82rem; font-weight: 600;
-            min-width: 70px; flex-shrink: 0;
-        }
-        .sep-stem-row[data-stem="vocals"] .label { color: #5ecb8b; }
-        .sep-stem-row[data-stem="drums"]  .label { color: #8B6FE8; }
-        .sep-stem-row[data-stem="bass"]   .label { color: #60a5fa; }
-        .sep-stem-row[data-stem="piano"]  .label { color: #ec4899; }
-        .sep-stem-row[data-stem="guitar"] .label { color: #f97316; }
-        .sep-stem-row[data-stem="other"]  .label { color: #f0b429; }
-        .sep-stem-row audio { flex: 1; min-width: 200px; height: 32px; }
+        .sep-open-btn:hover { background: #6b54c4; }
+        .sep-open-btn:active { transform: scale(0.97); }
 
         .doc-btn {
             display: inline-flex;
@@ -654,6 +643,7 @@
         }
 
     </style>
+    <link rel="stylesheet" href="/assets/css/multitrack.css" />
 </head>
 <body>
 
@@ -896,7 +886,7 @@
     }
 
     // Charge la liste des séparations Demucs assignées à cet élève (lecture seule).
-    // Affiche un accordion ; chaque entrée déploie 6 lecteurs <audio> via le proxy R2.
+    // Chaque entrée a un bouton "Ouvrir" qui lance le MultitrackPlayer en modal.
     function loadSeparationsForEleve(slug) {
         var zone = document.getElementById("separations-zone");
         if (!zone) return;
@@ -911,14 +901,23 @@
             .catch(function () { /* silent */ });
     }
 
+    var STEM_LABELS_FR = { vocals: 'Chant', drums: 'Batterie', bass: 'Basse', piano: 'Piano', guitar: 'Guitare', other: 'Autres' };
+    var STEM_ORDER_FR = ['vocals', 'drums', 'bass', 'piano', 'guitar', 'other'];
+    var STEM_COLORS = {
+        vocals: '#A78BFA',
+        drums:  '#FB923C',
+        bass:   '#34D399',
+        piano:  '#60A5FA',
+        guitar: '#F87171',
+        other:  '#94A3B8',
+    };
+    var activePlayer = null;
+
     function renderSeparations(zone, items, slug) {
         if (!items.length) {
-            // Si vide : on n'affiche rien (pas de bruit visuel)
             zone.innerHTML = '';
             return;
         }
-        var STEM_LABELS = { vocals: 'Chant', drums: 'Batterie', bass: 'Basse', piano: 'Piano', guitar: 'Guitare', other: 'Autres' };
-        var STEM_ORDER = ['vocals', 'drums', 'bass', 'piano', 'guitar', 'other'];
         var monthsShort = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
 
         function fmtDate(iso) {
@@ -931,45 +930,68 @@
         var html = '<div class="separations-block">' +
             '<h2>🎹 Mes séparations</h2>';
         items.forEach(function (s, idx) {
-            var stems = Array.isArray(s.stems) ? s.stems : [];
             html += '<div class="sep-item" data-idx="' + idx + '">' +
                 '<div class="sep-item-head">' +
                     '<span class="sep-item-title">' + escapeHtml(s.title || 'Sans titre') + '</span>' +
                     '<span class="sep-item-date">' + escapeHtml(fmtDate(s.ts)) + '</span>' +
-                    '<span class="sep-item-chevron">▾</span>' +
+                    '<button type="button" class="sep-open-btn" data-id="' + escapeHtml(s.id) + '">▶ Ouvrir</button>' +
                 '</div>' +
-                '<div class="sep-item-body" data-id="' + escapeHtml(s.id) + '"></div>' +
             '</div>';
         });
         html += '</div>';
         zone.innerHTML = html;
 
-        zone.querySelectorAll('.sep-item').forEach(function (el) {
-            var head = el.querySelector('.sep-item-head');
-            var body = el.querySelector('.sep-item-body');
-            head.addEventListener('click', function () {
-                if (el.classList.contains('expanded')) {
-                    el.classList.remove('expanded');
-                    body.innerHTML = '';
-                    return;
-                }
-                var idx = parseInt(el.getAttribute('data-idx'), 10);
-                var sep = items[idx];
-                if (!sep) return;
-                var sepStems = Array.isArray(sep.stems) ? sep.stems : [];
-                var rows = STEM_ORDER
-                    .filter(function (k) { return sepStems.indexOf(k) !== -1; })
-                    .map(function (k) {
-                        var url = '/api/stems/' + encodeURIComponent(sep.id) + '/audio/' + k;
-                        return '<div class="sep-stem-row" data-stem="' + k + '">' +
-                            '<span class="label">' + (STEM_LABELS[k] || k) + '</span>' +
-                            '<audio controls preload="none" src="' + url + '"></audio>' +
-                        '</div>';
-                    }).join('');
-                body.innerHTML = rows || '<div class="separations-empty">Aucune piste disponible.</div>';
-                el.classList.add('expanded');
+        zone.querySelectorAll('.sep-open-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var idx = parseInt(btn.closest('.sep-item').getAttribute('data-idx'), 10);
+                openMultitrackPlayer(items[idx]);
             });
         });
+    }
+
+    function openMultitrackPlayer(sep) {
+        if (!sep) return;
+        if (activePlayer) { try { activePlayer.destroy(); } catch (e) {} activePlayer = null; }
+        if (typeof window.MultitrackPlayer !== 'function') {
+            console.warn('MultitrackPlayer non chargé');
+            return;
+        }
+
+        // Tente de fetcher les peaks cachés depuis R2 d'abord
+        fetch('/api/stems/' + encodeURIComponent(sep.id) + '/waveforms', { credentials: 'include' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .catch(function () { return null; })
+            .then(function (j) {
+                var waveforms = (j && j.peaks) ? j.peaks : null;
+                var sepStems = Array.isArray(sep.stems) ? sep.stems : [];
+                var tracks = STEM_ORDER_FR
+                    .filter(function (k) { return sepStems.indexOf(k) !== -1; })
+                    .map(function (k) {
+                        return {
+                            id: k,
+                            label: STEM_LABELS_FR[k] || k,
+                            color: STEM_COLORS[k] || '#888',
+                            url: '/api/stems/' + encodeURIComponent(sep.id) + '/audio/' + k,
+                        };
+                    });
+                activePlayer = new window.MultitrackPlayer({
+                    container: document.body,
+                    title: sep.title || 'Lecture multipiste',
+                    tracks: tracks,
+                    waveforms: waveforms,
+                    readOnly: true,
+                    onWaveformsCalculated: function (peaks) {
+                        // Élève peut aussi cacher les peaks (auth élève-assigné OK côté backend)
+                        fetch('/api/stems/' + encodeURIComponent(sep.id) + '/waveforms', {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ peaks: peaks }),
+                        }).catch(function () {});
+                    },
+                });
+                activePlayer.open();
+            });
     }
 
     function renderDynamicSkeleton() {
@@ -1295,6 +1317,8 @@
         window.addEventListener("pagehide", stopAnim);
     })();
     </script>
+
+    <script src="/assets/js/multitrack-player.js"></script>
 
 </body>
 </html>

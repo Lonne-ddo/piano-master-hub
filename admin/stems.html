@@ -10,6 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="MH Admin" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/multitrack.css" />
   <style>
     :root {
       --v:       #8B6FE8;
@@ -495,6 +496,7 @@
   </div>
 </div>
 
+<script src="/assets/js/multitrack-player.js"></script>
 <script>
 // ─── Séparateur stems — Master Hub Admin ─────────────────────────
 // Auth admin (cookie mh_admin_pw) requis. Toutes les fetch utilisent
@@ -853,7 +855,7 @@ function renderList() {
     card.querySelectorAll('button[data-act]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const act = btn.getAttribute('data-act');
-        if (act === 'toggle') toggleCard(card, id);
+        if (act === 'toggle') openPlayer(id);
         else if (act === 'assign') openAssignModal(id);
         else if (act === 'delete') deleteSep(id);
       });
@@ -861,29 +863,65 @@ function renderList() {
   });
 }
 
-function toggleCard(card, id) {
-  if (card.classList.contains('expanded')) {
-    card.classList.remove('expanded');
-    card.querySelector('.sep-players').innerHTML = '';
-    return;
-  }
-  // Charge les players
+// Couleurs des stems alignées avec multitrack.css
+const STEM_COLORS = {
+  vocals: '#A78BFA',
+  drums:  '#FB923C',
+  bass:   '#34D399',
+  piano:  '#60A5FA',
+  guitar: '#F87171',
+  other:  '#94A3B8',
+};
+
+let activePlayer = null;
+
+async function openPlayer(id) {
   const sep = separationsCache.find((s) => s.id === id);
   if (!sep) return;
-  const players = STEM_ORDER
+  if (activePlayer) { try { activePlayer.destroy(); } catch (e) {} activePlayer = null; }
+  if (typeof window.MultitrackPlayer !== 'function') {
+    toast('Composant player non chargé.');
+    return;
+  }
+
+  // Tente de récupérer les peaks cachés depuis R2 (rendu instant si dispo)
+  let waveforms = null;
+  try {
+    const r = await fetch('/api/stems/' + encodeURIComponent(id) + '/waveforms', {
+      credentials: 'same-origin',
+    });
+    if (r.ok) {
+      const j = await r.json();
+      if (j && j.peaks) waveforms = j.peaks;
+    }
+  } catch { /* silent — sera calculé côté client après play */ }
+
+  const tracks = STEM_ORDER
     .filter((stem) => sep.stems.includes(stem))
-    .map((stem) => {
-      const label = STEM_LABELS[stem] || stem;
-      const audioUrl = '/api/stems/' + encodeURIComponent(id) + '/audio/' + stem;
-      return (
-        '<div class="stem-row" data-stem="' + stem + '">' +
-          '<span class="stem-label">' + label + '</span>' +
-          '<audio controls preload="none" src="' + audioUrl + '"></audio>' +
-        '</div>'
-      );
-    }).join('');
-  card.querySelector('.sep-players').innerHTML = players;
-  card.classList.add('expanded');
+    .map((stem) => ({
+      id: stem,
+      label: STEM_LABELS[stem] || stem,
+      color: STEM_COLORS[stem] || '#888',
+      url: '/api/stems/' + encodeURIComponent(id) + '/audio/' + stem,
+    }));
+
+  activePlayer = new window.MultitrackPlayer({
+    container: document.body,
+    title: sep.title || 'Lecture multipiste',
+    tracks,
+    waveforms,
+    readOnly: false,
+    onWaveformsCalculated: function (peaks) {
+      // POST cache R2 (admin) — fail silently
+      fetch('/api/stems/' + encodeURIComponent(id) + '/waveforms', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ peaks }),
+      }).catch(function () {});
+    },
+  });
+  activePlayer.open();
 }
 
 async function deleteSep(id) {

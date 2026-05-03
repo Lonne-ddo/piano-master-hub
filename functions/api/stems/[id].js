@@ -73,6 +73,9 @@ export async function onRequestDelete({ params, request, env }) {
       catch (e) { console.warn('[stems] R2 delete failed', stem, e?.message); }
     }
   }));
+  // Supprime aussi le cache waveforms (si calculé)
+  try { await env.STEMS_R2.delete(`stems/${id}/waveforms.json`); }
+  catch (e) { /* non-bloquant — fichier peut ne pas exister */ }
 
   // Supprime entrée KV
   try { await env.MASTERHUB_HISTORY.delete(found.key); }
