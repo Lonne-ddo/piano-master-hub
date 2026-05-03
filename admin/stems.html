@@ -641,6 +641,11 @@ function setFile(file) {
       sizeMB.toFixed(1) + ' Mo · ' + formatDuration(d);
     document.getElementById('file-info').style.display = 'flex';
     document.getElementById('analyze-btn').disabled = false;
+    // Auto-remplit le titre si vide (n'écrase pas si admin a déjà saisi)
+    const titleEl = document.getElementById('title-input');
+    if (titleEl && !titleEl.value.trim()) {
+      titleEl.value = file.name.replace(/\.[^.]+$/, '').trim();
+    }
   });
   probe.addEventListener('error', () => {
     URL.revokeObjectURL(url);
