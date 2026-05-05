@@ -1,7 +1,9 @@
 // ─── GET /api/auth/whoami ────────────────────────────────────────
-// Retourne { ok: true, slug, email } si cookie mh_session valide, sinon 401.
+// Retourne { ok: true, slug, email, name?, isAdminImpersonation? } si cookie
+// mh_session valide, sinon 401.
 // Utilisé par /index.html pour décider entre "écran login" et "redirect /{slug}"
-// quand l'URL ne contient pas de slug.
+// quand l'URL ne contient pas de slug, et pour afficher le bandeau orange
+// si la session est issue d'une impersonation admin (cf /api/admin/impersonate).
 
 import { getSessionFromRequest } from '../_lib/session.js';
 
@@ -27,5 +29,12 @@ export async function onRequestGet({ request, env }) {
   if (!session || !session.slug) {
     return jsonResponse({ ok: false }, 401);
   }
-  return jsonResponse({ ok: true, slug: session.slug, email: session.email || null });
+  const payload = {
+    ok: true,
+    slug: session.slug,
+    email: session.email || null,
+  };
+  if (session.name) payload.name = session.name;
+  if (session.isAdminImpersonation) payload.isAdminImpersonation = true;
+  return jsonResponse(payload);
 }

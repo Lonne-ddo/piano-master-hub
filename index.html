@@ -470,6 +470,38 @@
             margin-top: 2px;
         }
 
+        /* ── Bandeau impersonation admin (mode "Voir son espace") ── */
+        .impersonation-banner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            background: #FB923C;
+            color: #1a1a1a;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 0.88rem;
+            font-weight: 500;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 12px rgba(251, 146, 60, 0.25);
+        }
+        .impersonation-banner strong { font-weight: 700; }
+        .impersonation-banner button {
+            background: #1a1a1a;
+            color: #FB923C;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .impersonation-banner button:hover { opacity: 0.85; }
+        .impersonation-banner button:disabled { opacity: 0.5; cursor: wait; }
+
         .devoirs-empty {
             font-size: 0.92rem;
             color: var(--text-muted);
@@ -910,6 +942,7 @@
 
         var content = document.getElementById("content");
         content.innerHTML =
+            '<div id="impersonation-banner-host"></div>' +
             '<div id="programme-zone"></div>' +
             '<div id="devoirs-zone"></div>' +
             '<div id="resume-zone"></div>' +
@@ -917,11 +950,37 @@
             '<div class="cards-section-title">Ressources</div>' +
             '<div class="cards dashboard-cards" id="cards"></div>';
 
+        renderImpersonationBanner(eleve);
         renderResourceCards(eleve);
         renderFooter();
         renderDynamicSkeleton();
         fetchDashboardData(eleve);
         loadSeparationsForEleve(eleve.slug);
+    }
+
+    // Bandeau orange visible si la session courante est issue d'une
+    // impersonation admin (cf POST /api/admin/impersonate/:slug). Permet \u00E0
+    // l'admin de quitter le mode impersonation et revenir \u00E0 /admin/eleves.html
+    // sans perdre son cookie admin (qui reste valide en parall\u00E8le).
+    function renderImpersonationBanner(eleve) {
+        if (!_lastWhoami || !_lastWhoami.isAdminImpersonation) return;
+        var host = document.getElementById("impersonation-banner-host");
+        if (!host) return;
+        var name = _lastWhoami.name || (eleve && eleve.display) || _lastWhoami.slug || '';
+        host.innerHTML =
+            '<div class="impersonation-banner">' +
+                '<span>\uD83D\uDC41 <strong>Mode impersonation</strong> \u2014 connect\u00E9 en tant que ' + escapeHtml(name) + '</span>' +
+                '<button type="button" id="exit-impersonation-btn">Quitter</button>' +
+            '</div>';
+        document.getElementById("exit-impersonation-btn").addEventListener("click", exitImpersonation);
+    }
+
+    function exitImpersonation() {
+        var btn = document.getElementById("exit-impersonation-btn");
+        if (btn) { btn.disabled = true; btn.textContent = '\u2026'; }
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+            .catch(function () {})
+            .then(function () { window.location.href = '/admin/eleves.html'; });
     }
 
     // Charge la liste des séparations Demucs assignées à cet élève (lecture seule).

@@ -206,14 +206,31 @@
       margin-top: 4px;
     }
 
-    /* ── Bouton supprimer (en bas du profil) ─────────────── */
+    /* ── Boutons admin (en bas du profil) ────────────────── */
     .delete-eleve-row {
       margin-top: 32px;
       padding-top: 16px;
       border-top: 1px solid var(--border);
       display: flex;
       justify-content: flex-end;
+      gap: 8px;
     }
+    .impersonate-btn {
+      background: transparent;
+      border: 1px solid rgba(139, 111, 232, 0.45);
+      color: var(--v);
+      padding: 7px 13px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      transition: background .15s;
+    }
+    .impersonate-btn:hover {
+      background: var(--v-dim);
+    }
+    .impersonate-btn[disabled] { opacity: .5; cursor: wait; }
     .delete-eleve-btn {
       background: transparent;
       border: 1px solid rgba(224, 92, 107, 0.4);
@@ -1149,6 +1166,9 @@ function renderProfile(s) {
       </div>
     </div>
     <div class="delete-eleve-row">
+      <button type="button" class="impersonate-btn" onclick="impersonateEleve('${s.id}')">
+        👁 Voir son espace
+      </button>
       <button type="button" class="delete-eleve-btn" onclick="deleteEleve('${s.id}','${escapeHtml(s.nom || s.id).replace(/'/g, "&#39;")}')">
         🗑 Supprimer cet élève
       </button>
@@ -1656,6 +1676,28 @@ async function deleteEleve(slug, displayName) {
   }
 }
 window.deleteEleve = deleteEleve;
+
+// ─── Impersonation : voir l'espace d'un élève sans magic link ─
+// POST /api/admin/impersonate/:slug → set cookie mh_session avec
+// flag isAdminImpersonation, puis redirect /?eleve=<slug>. Le cookie
+// admin (mh_admin_pw) reste valide en parallèle (non destructif).
+async function impersonateEleve(slug) {
+  try {
+    const r = await fetch('/api/admin/impersonate/' + encodeURIComponent(slug), {
+      method: 'POST',
+      credentials: 'same-origin',
+    });
+    const j = await r.json().catch(function () { return {}; });
+    if (!r.ok || !j.ok) {
+      showToast('Erreur : ' + (j.error || r.status));
+      return;
+    }
+    window.location.href = '/?eleve=' + encodeURIComponent(slug);
+  } catch (e) {
+    showToast('Erreur réseau, réessaie.');
+  }
+}
+window.impersonateEleve = impersonateEleve;
 
 async function init() {
   // Source de vérité : /api/eleves (KV eleves:list). Fallback STUDENT_LIST hardcodé.
