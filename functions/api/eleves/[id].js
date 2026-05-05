@@ -21,13 +21,15 @@ async function resolveStudent(id, env) {
   if (!validSlugs.includes(id)) return null;
 
   // 2. doc_id : `eleve:<id>.doc_id` (KV) → fallback FALLBACK_REGISTRY[id].docId
+  // docId peut être null/undefined pour les élèves créés via POST /api/eleves
+  // sans Google Doc attaché. Le GET handler gérera ce cas en retournant le
+  // cache KV brut sans tenter de fetch + parser le Doc.
   let cached = null;
   try {
     cached = await env.MASTERHUB_STUDENTS.get(`eleve:${id}`, { type: 'json' });
   } catch { /* fallback ci-dessous */ }
   const fb = FALLBACK_REGISTRY[id] || {};
-  const docId = cached?.doc_id || fb.docId;
-  if (!docId) return null;
+  const docId = cached?.doc_id || fb.docId || null;
 
   return {
     id,
@@ -325,6 +327,21 @@ export async function onRequestGet({ params, request, env }) {
   const cacheKey = `eleve:${id}`;
   const cachedRaw = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'text' });
   const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
+
+  // 0. Pas de Google Doc attaché → on retourne le cache KV brut.
+  // Cas typique : élève créé via POST /api/eleves sans doc_id. L'admin pourra
+  // attacher un Doc plus tard via PATCH (UI inline 'Ajouter un Google Doc').
+  // Sans cette branche, le code essaierait fetch un Doc inexistant + crash.
+  if (!student.docId) {
+    if (cached) return jsonResponse({ ...cached, source: 'no_doc' });
+    return jsonResponse({
+      id,
+      nom: student.nom,
+      programme: student.programme,
+      statut: student.statut,
+      source: 'empty',
+    });
+  }
 
   // 1. Cache frais (TTL KV géré nativement)
   if (cached && !forceSync) {
