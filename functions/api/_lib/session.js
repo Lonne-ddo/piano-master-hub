@@ -41,7 +41,7 @@ export function generateToken(bytes = 32) {
 // ─── Auth admin par mot de passe (cookie mh_admin_pw HMAC stateless) ────
 //
 // Le cookie a la forme `<expiresAtMs>.<base64url(HMAC-SHA256(secret, expiresAtMs))>`
-// avec `secret = adminPasswordOrFallback(env)`.
+// avec `secret = env.ADMIN_PASSWORD` (throw si var non configurée).
 //
 // Avantages de cette approche :
 //   - Stateless : pas de KV write/read sur chaque requête
@@ -53,10 +53,10 @@ export function generateToken(bytes = 32) {
 const ADMIN_COOKIE_NAME = 'mh_admin_pw';
 const ADMIN_COOKIE_TTL_S = 90 * 24 * 3600; // 90 jours
 
-// TODO(cleanup): retirer ce fallback une fois ADMIN_PASSWORD set sur CF Pages
-// (Production + Preview). Voir notice de déploiement du commit refactor auth.
-function adminPasswordOrFallback(env) {
-  return (env && env.ADMIN_PASSWORD) ? env.ADMIN_PASSWORD : '4697';
+function getAdminPassword(env) {
+  const pw = env && env.ADMIN_PASSWORD;
+  if (!pw) throw new Error('ADMIN_PASSWORD env var not configured');
+  return pw;
 }
 
 function base64urlEncode(bytes) {
@@ -90,7 +90,7 @@ function constantTimeStrEq(a, b) {
 // Construit la valeur du cookie admin signée pour un TTL en secondes.
 export async function buildAdminPasswordCookieValue(env, ttlSeconds = ADMIN_COOKIE_TTL_S) {
   const expiresAt = String(Date.now() + ttlSeconds * 1000);
-  const secret = adminPasswordOrFallback(env);
+  const secret = getAdminPassword(env);
   const sig = await hmacSha256(secret, expiresAt);
   return `${expiresAt}.${sig}`;
 }
@@ -108,6 +108,7 @@ export function buildAdminPasswordClearCookie() {
 
 // Lit le cookie admin et vérifie expiration + signature HMAC.
 // Retourne true si cookie valide non expiré, false sinon.
+// Throw si env.ADMIN_PASSWORD n'est pas configuré (CF Pages 500).
 export async function requireAdminPassword(request, env) {
   const cookie = request.headers.get('cookie') || '';
   const match = cookie.match(/(?:^|;\s*)mh_admin_pw=([^;]+)/);
@@ -123,7 +124,7 @@ export async function requireAdminPassword(request, env) {
   const expiresAt = parseInt(expiresAtStr, 10);
   if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) return false;
 
-  const secret = adminPasswordOrFallback(env);
+  const secret = getAdminPassword(env);
   let expectedSig;
   try {
     expectedSig = await hmacSha256(secret, expiresAtStr);
@@ -133,11 +134,11 @@ export async function requireAdminPassword(request, env) {
   return constantTimeStrEq(sig, expectedSig);
 }
 
-// Vérifie qu'un mot de passe candidate match le mdp admin (avec fallback).
-// Comparaison à temps constant.
+// Vérifie qu'un mot de passe candidate match env.ADMIN_PASSWORD.
+// Comparaison à temps constant. Throw si var non configurée.
 export function checkAdminPassword(candidate, env) {
   if (typeof candidate !== 'string') return false;
-  return constantTimeStrEq(candidate, adminPasswordOrFallback(env));
+  return constantTimeStrEq(candidate, getAdminPassword(env));
 }
 
 // ─── Helper auth pour endpoints élève ─────────────────────────────
