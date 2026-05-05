@@ -4,7 +4,7 @@
 // Phase 2 : 5 cartes progression avec lecture audio block (1 accord = 1 mesure
 // de 4 temps au tempo choisi).
 
-(function () {
+(async function () {
     'use strict';
 
     if (!window.MhTheory) {
@@ -14,17 +14,11 @@
     var MT = window.MhTheory;
 
     // ═══ Slug + persistance ═══
-    var ELEVES = ['japhet', 'tara', 'dexter', 'messon'];
-    var DISPLAY = { japhet: 'Japhet', tara: 'Tara', dexter: 'Dexter', messon: 'Messon' };
-
+    // Whitelist déléguée à /api/eleves via assets/js/eleve-guard.js.
     var params = new URLSearchParams(window.location.search);
     var slugRaw = params.get('eleve');
     var slug = slugRaw ? slugRaw.toLowerCase() : null;
-    if (!slug || ELEVES.indexOf(slug) < 0) {
-        console.warn('[grilles] slug invalide → redirect /');
-        window.location.replace('/');
-        return;
-    }
+    if (!(await window.requireValidEleve(slug))) return;
     try { localStorage.setItem('eleve_slug', slug); } catch (e) {}
 
     var STORAGE_KEY = 'mh_grilles:' + slug;

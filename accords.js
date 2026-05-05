@@ -3,7 +3,7 @@
 // Consomme window.MhTheory pour la théorie ; charge un Tone.Sampler
 // nbrosowsky en lazy-init ; persiste l'état par élève dans localStorage.
 
-(function () {
+(async function () {
     'use strict';
 
     if (!window.MhTheory) {
@@ -13,17 +13,13 @@
     var MT = window.MhTheory;
 
     // ═══ Slug + persistance ═══
-    var ELEVES = ['japhet', 'tara', 'dexter', 'messon'];
-    var DISPLAY = { japhet: 'Japhet', tara: 'Tara', dexter: 'Dexter', messon: 'Messon' };
-
+    // Whitelist déléguée à /api/eleves via assets/js/eleve-guard.js (avec
+    // fallback hardcodé). Permet aux nouveaux élèves créés par l'admin
+    // d'accéder sans patcher ce fichier.
     var params = new URLSearchParams(window.location.search);
     var slugRaw = params.get('eleve');
     var slug = slugRaw ? slugRaw.toLowerCase() : null;
-    if (!slug || ELEVES.indexOf(slug) < 0) {
-        console.warn('[accords] slug invalide → redirect /');
-        window.location.replace('/');
-        return;
-    }
+    if (!(await window.requireValidEleve(slug))) return;
     try { localStorage.setItem('eleve_slug', slug); } catch (e) {}
 
     var STORAGE_KEY = 'mh_accords:' + slug;

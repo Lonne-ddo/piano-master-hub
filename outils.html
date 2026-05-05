@@ -220,9 +220,11 @@
         <div id="content"></div>
     </div>
 
+    <script src="/assets/js/eleve-guard.js"></script>
     <script>
-    var ELEVES_WHITELIST = ['japhet', 'tara', 'dexter', 'messon'];
-    var DISPLAY = { japhet: 'Japhet', tara: 'Tara', dexter: 'Dexter', messon: 'Messon' };
+    // Whitelist déléguée à /api/eleves via assets/js/eleve-guard.js (avec
+    // fallback hardcodé si l'API down). Permet aux nouveaux élèves créés
+    // par l'admin (POST /api/eleves) d'accéder aux outils sans patcher ce code.
 
     function escapeHtml(str) {
         var d = document.createElement("div");
@@ -273,17 +275,13 @@
         }
     ];
 
-    (function init() {
+    (async function init() {
         // Slug lu depuis query string (?eleve=...) — bypass CF Pages multi-segment rewrite.
         var params = new URLSearchParams(window.location.search);
         var slug = params.get('eleve');
         slug = slug ? slug.toLowerCase() : null;
 
-        if (!slug || ELEVES_WHITELIST.indexOf(slug) < 0) {
-            console.warn('[outils] slug invalide → redirect /');
-            window.location.replace('/');
-            return;
-        }
+        if (!(await window.requireValidEleve(slug))) return;
 
         // localStorage écrit (jamais lu) pour cohérence avec dashboard /
         try { localStorage.setItem('eleve_slug', slug); } catch (e) {}

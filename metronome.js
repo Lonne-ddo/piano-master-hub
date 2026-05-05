@@ -3,19 +3,14 @@
 // Persistance par élève : localStorage 'mh_metro:<slug>'.
 // Pré-compte 4 temps optionnel avant démarrage du scheduler principal.
 
-(function () {
+(async function () {
     'use strict';
 
-    var ELEVES = ['japhet', 'tara', 'dexter', 'messon'];
-    var DISPLAY = { japhet: 'Japhet', tara: 'Tara', dexter: 'Dexter', messon: 'Messon' };
-
     // ─── Slug + persistance ───────────────────────────────────────
+    // Whitelist déléguée à /api/eleves via assets/js/eleve-guard.js.
     var params = new URLSearchParams(window.location.search);
     var slug = (params.get('eleve') || '').toLowerCase();
-    if (!slug || ELEVES.indexOf(slug) < 0) {
-        window.location.replace('/');
-        return;
-    }
+    if (!(await window.requireValidEleve(slug))) return;
     try { localStorage.setItem('eleve_slug', slug); } catch (e) {}
 
     var STORAGE_KEY = 'mh_metro:' + slug;

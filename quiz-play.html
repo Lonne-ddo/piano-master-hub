@@ -351,9 +351,9 @@
 
     <script src="/mh-music-theory.js"></script>
     <script src="/quiz-engine.js"></script>
+    <script src="/assets/js/eleve-guard.js"></script>
     <script>
-    var ELEVES = ['japhet', 'tara', 'dexter', 'messon'];
-    var DISPLAY = { japhet: 'Japhet', tara: 'Tara', dexter: 'Dexter', messon: 'Messon' };
+    // Whitelist déléguée à /api/eleves via assets/js/eleve-guard.js.
     var MODE_LABELS = {
         notes: 'Notes',
         intervals: 'Intervalles',
@@ -409,7 +409,7 @@
     var engine = null;
     var slug = null;
 
-    (function init() {
+    (async function init() {
         var params = new URLSearchParams(window.location.search);
         slug = (params.get('eleve') || '').toLowerCase();
         var mode = params.get('mode');
@@ -417,11 +417,7 @@
         var typesParam = params.get('types') || '';
         var customTypes = typesParam ? typesParam.split(',').map(function (s) { return s.trim(); }).filter(Boolean) : [];
 
-        if (!slug || ELEVES.indexOf(slug) < 0) {
-            console.warn('[quiz-play] slug invalide → redirect /');
-            window.location.replace('/');
-            return;
-        }
+        if (!(await window.requireValidEleve(slug))) return;
         if (!mode || VALID_MODES.indexOf(mode) < 0
             || !level || VALID_LEVELS.indexOf(level) < 0) {
             console.warn('[quiz-play] mode/level invalide → redirect quiz');

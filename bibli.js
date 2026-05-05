@@ -4,7 +4,7 @@
 // Phase 2 : rendu paroles + accords ChordPro alignés en monospace, avec
 // transpose, slider tempo, lecture audio block enchaînée.
 
-(function () {
+(async function () {
     'use strict';
 
     if (!window.MhTheory) {
@@ -14,16 +14,11 @@
     var MT = window.MhTheory;
 
     // ═══ Slug + persistance ═══
-    var ELEVES = ['japhet', 'tara', 'dexter', 'messon'];
-
+    // Whitelist déléguée à /api/eleves via assets/js/eleve-guard.js.
     var params = new URLSearchParams(window.location.search);
     var slugRaw = params.get('eleve');
     var slug = slugRaw ? slugRaw.toLowerCase() : null;
-    if (!slug || ELEVES.indexOf(slug) < 0) {
-        console.warn('[bibli] slug invalide → redirect /');
-        window.location.replace('/');
-        return;
-    }
+    if (!(await window.requireValidEleve(slug))) return;
     try { localStorage.setItem('eleve_slug', slug); } catch (e) {}
 
     var STORAGE_KEY = 'mh_bibli:' + slug;

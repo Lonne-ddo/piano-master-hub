@@ -1,16 +1,15 @@
 // ─── Bottom nav réutilisable pour les pages d'outils élève ─────────
 // Usage : <script src="/nav-outils.js" data-active="quiz"></script>
 //   data-active = quiz | grilles | metro | accords (item à highlighter)
-// Le script lit le slug élève dans ?eleve=… (whitelist 4 slugs).
-// Si pas de slug valide, no-op (la page hôte gère son propre redirect).
+// Le script lit le slug élève dans ?eleve=… ; pas de check whitelist ici
+// (la page hôte appelle requireValidEleve() avant init et gère le redirect
+// vers / si invalide). Si pas de slug du tout dans l'URL, no-op silencieux.
 // Pas d'item "Retour" : le ← Retour du header de page suffit.
 (function () {
-    var ELEVES = ['japhet', 'tara', 'dexter', 'messon'];
-
     var params = new URLSearchParams(window.location.search);
     var slugRaw = params.get('eleve');
-    var slug = slugRaw ? slugRaw.toLowerCase() : null;
-    if (!slug || ELEVES.indexOf(slug) < 0) return;
+    var slug = slugRaw ? slugRaw.toLowerCase().trim() : null;
+    if (!slug) return;
 
     var script = document.currentScript;
     if (!script) {
