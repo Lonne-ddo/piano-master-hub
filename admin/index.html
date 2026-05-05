@@ -138,6 +138,98 @@
       border-color: var(--amber);
       color: var(--amber);
     }
+    .add-btn { color: var(--v); border-color: var(--v); }
+    .add-btn:hover { background: var(--v-dim); }
+    .hbtn.primary {
+      background: var(--v); border-color: var(--v); color: #fff;
+    }
+    .hbtn.primary:hover { background: var(--v-soft); border-color: var(--v-soft); }
+
+    /* ── Modal Ajouter un élève ──────────────────────────── */
+    .add-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .add-modal {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .add-modal-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text1);
+      margin: 0 0 4px;
+    }
+    .add-field {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .add-field span {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text2);
+      letter-spacing: .04em;
+    }
+    .add-field em { color: var(--text3); font-style: normal; font-weight: 400; }
+    .add-field input {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg2);
+      color: var(--text1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .add-field input:focus { border-color: var(--v); }
+    .add-hint { color: var(--text3); font-size: 11px; }
+    .add-error {
+      min-height: 18px;
+      font-size: 12px;
+      color: var(--red);
+      line-height: 1.4;
+    }
+    .add-actions {
+      display: flex; gap: 8px; justify-content: flex-end;
+      margin-top: 4px;
+    }
+
+    /* ── Bouton supprimer (en bas du profil) ─────────────── */
+    .delete-eleve-row {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+    }
+    .delete-eleve-btn {
+      background: transparent;
+      border: 1px solid rgba(224, 92, 107, 0.4);
+      color: var(--red);
+      padding: 7px 13px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      transition: background .15s;
+    }
+    .delete-eleve-btn:hover {
+      background: rgba(224, 92, 107, 0.12);
+    }
+    .delete-eleve-btn[disabled] { opacity: .5; cursor: wait; }
 
     @media (max-width: 500px) {
       .sync-btn .label { display: none; }
@@ -672,6 +764,9 @@
       </div>
     </div>
     <div class="header-actions">
+      <button type="button" class="hbtn add-btn" id="addEleveBtn" onclick="openAddEleveModal()" title="Créer un élève">
+        <span class="icon">&#43;</span><span class="label">Ajouter</span>
+      </button>
       <button type="button" class="hbtn sync-btn" id="syncAllBtn" onclick="syncFromGDocs()" title="Sync depuis Google Docs">
         <span class="icon">&#128260;</span><span class="label">Sync All</span>
       </button>
@@ -682,6 +777,33 @@
 
   <nav class="tab-bar" id="tabBar"></nav>
   <main id="mainContent"></main>
+</div>
+
+<!-- ═══ MODAL : Ajouter un élève ════════════════════════════════ -->
+<div class="add-modal-overlay" id="addEleveOverlay" style="display:none">
+  <div class="add-modal">
+    <h2 class="add-modal-title">Ajouter un &eacute;l&egrave;ve</h2>
+    <form id="addEleveForm" autocomplete="off">
+      <label class="add-field">
+        <span>Nom *</span>
+        <input type="text" id="addEleveNom" maxlength="80" required placeholder="Ex : Lucas Émilien" />
+      </label>
+      <label class="add-field">
+        <span>Email *</span>
+        <input type="email" id="addEleveEmail" required placeholder="lucas@email.com" />
+        <small class="add-hint">Pour le magic link de connexion</small>
+      </label>
+      <label class="add-field">
+        <span>Lien Drive <em>(optionnel)</em></span>
+        <input type="url" id="addEleveDrive" placeholder="https://drive.google.com/drive/folders/..." />
+      </label>
+      <div class="add-error" id="addEleveError"></div>
+      <div class="add-actions">
+        <button type="button" class="hbtn" onclick="closeAddEleveModal()">Annuler</button>
+        <button type="submit" class="hbtn primary" id="addEleveSubmit">Cr&eacute;er</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- ═══ SCRIPTS ═══════════════════════════════════════════════ -->
@@ -968,6 +1090,25 @@ function renderProfile(s) {
                 <span class="link-arrow">↗</span>
               </a>
             </div>` : ''}
+          <!-- Drive (éditable) -->
+          <div data-row="drive">
+            ${s.canaux?.drive?.url ? `
+              <div class="link-item editable" data-channel="drive">
+                <div class="link-icon dr">📁</div>
+                <div class="link-info">
+                  <a href="${escapeHtml(s.canaux.drive.url)}" target="_blank" rel="noopener" class="link-link">
+                    <div class="link-name">Drive (ressources élève)</div>
+                    <div class="link-sub">${escapeHtml(s.canaux.drive.handle || '')}</div>
+                  </a>
+                </div>
+                <button type="button" class="link-edit-btn" onclick="editChannel('${s.id}','drive')" title="Éditer le lien">✏️</button>
+              </div>
+            ` : `
+              <button type="button" class="link-add" onclick="editChannel('${s.id}','drive')">
+                <span style="font-size:14px;">📁</span> + Ajouter un Drive
+              </button>
+            `}
+          </div>
           <!-- Google Doc (éditable) -->
           <div data-row="doc">
             ${s.doc_url || s.doc_id ? `
@@ -1006,6 +1147,11 @@ function renderProfile(s) {
           </div>
         </div>
       </div>
+    </div>
+    <div class="delete-eleve-row">
+      <button type="button" class="delete-eleve-btn" onclick="deleteEleve('${s.id}','${escapeHtml(s.nom || s.id).replace(/'/g, "&#39;")}')">
+        🗑 Supprimer cet élève
+      </button>
     </div>
   `;
 
@@ -1257,6 +1403,7 @@ function editChannel(studentId, channel) {
   const placeholders = {
     doc: 'https://docs.google.com/document/d/...',
     telegram: 'https://t.me/handle',
+    drive: 'https://drive.google.com/drive/folders/...',
     email: 'eleve@email.com',
   };
   const currentValue = (channel === 'doc')
@@ -1316,6 +1463,16 @@ function editChannel(studentId, channel) {
         const handle = tgm ? tgm[1] : (data.canaux?.telegram?.handle || '');
         body = { canaux: { telegram: { url: raw, handle: handle } } };
       }
+    } else if (channel === 'drive') {
+      if (raw === '') {
+        body = { canaux: { drive: { url: null, handle: '' } } };
+      } else {
+        if (!/^https?:\/\//i.test(raw)) {
+          showErr('URL invalide (doit commencer par https://)');
+          return;
+        }
+        body = { canaux: { drive: { url: raw, handle: data.canaux?.drive?.handle || '' } } };
+      }
     } else if (channel === 'email') {
       if (raw === '') {
         body = { email: null };
@@ -1353,6 +1510,7 @@ function editChannel(studentId, channel) {
       showToast(
         channel === 'doc' ? 'Lien Google Doc mis à jour ✓' :
         channel === 'email' ? 'Email mis à jour ✓' :
+        channel === 'drive' ? 'Drive mis à jour ✓' :
         'Telegram mis à jour ✓'
       );
     } catch (e) {
@@ -1369,6 +1527,135 @@ function editChannel(studentId, channel) {
   });
 }
 window.editChannel = editChannel;
+
+// ─── Modal "Ajouter un élève" ─────────────────────────────────
+// Toggle l'overlay + reset du form. Submit = POST /api/eleves, slug auto-généré
+// côté serveur via slugify. Toast d'erreur sur 409 (slug/email déjà pris).
+function openAddEleveModal() {
+  const overlay = document.getElementById('addEleveOverlay');
+  if (!overlay) return;
+  document.getElementById('addEleveForm').reset();
+  document.getElementById('addEleveError').textContent = '';
+  overlay.style.display = 'flex';
+  setTimeout(() => { try { document.getElementById('addEleveNom').focus(); } catch (e) {} }, 50);
+}
+window.openAddEleveModal = openAddEleveModal;
+
+function closeAddEleveModal() {
+  const overlay = document.getElementById('addEleveOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+window.closeAddEleveModal = closeAddEleveModal;
+
+(function bindAddEleveForm() {
+  const form = document.getElementById('addEleveForm');
+  if (!form) return;
+  form.addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    const errEl = document.getElementById('addEleveError');
+    const submitBtn = document.getElementById('addEleveSubmit');
+    errEl.textContent = '';
+
+    const nom = document.getElementById('addEleveNom').value.trim();
+    const email = document.getElementById('addEleveEmail').value.trim().toLowerCase();
+    const driveUrl = document.getElementById('addEleveDrive').value.trim();
+
+    if (!nom) { errEl.textContent = 'Nom requis.'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.textContent = 'Email invalide.'; return; }
+    if (driveUrl && !/^https?:\/\//i.test(driveUrl)) {
+      errEl.textContent = 'Lien Drive invalide (https:// requis).';
+      return;
+    }
+
+    const body = { nom, email };
+    if (driveUrl) body.canaux = { drive: { url: driveUrl, handle: '' } };
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = '…';
+    try {
+      const res = await fetch('/api/eleves', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.status === 409) {
+        const detail = j.error === 'email_already_exists'
+          ? 'Cet email est déjà utilisé par un autre élève.'
+          : 'Un élève avec ce nom existe déjà (slug pris).';
+        errEl.textContent = detail;
+        return;
+      }
+      if (!res.ok || !j.ok) {
+        errEl.textContent = j.detail || j.error || ('Erreur ' + res.status);
+        return;
+      }
+      // Succès : ferme modal + refresh STUDENT_LIST + sélectionne le nouveau
+      closeAddEleveModal();
+      showToast('Élève créé : ' + (j.nom || j.slug) + ' ✓');
+      await reloadStudentList();
+      delete clientCache[j.slug];
+      selectStudent(j.slug, true);
+    } catch (e) {
+      errEl.textContent = 'Erreur réseau, réessaie.';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Créer';
+    }
+  });
+})();
+
+// Recharge STUDENT_LIST depuis /api/eleves (utilisé après création/suppression)
+async function reloadStudentList() {
+  try {
+    const r = await fetch('/api/eleves');
+    const j = await r.json();
+    if (j && j.ok && Array.isArray(j.eleves) && j.eleves.length) {
+      STUDENT_LIST = j.eleves.map(slug => ({
+        id: String(slug).toLowerCase(),
+        nom: String(slug).charAt(0).toUpperCase() + String(slug).slice(1),
+      }));
+      renderTabs();
+    }
+  } catch (e) { /* fallback : list inchangée */ }
+}
+
+// ─── Suppression élève ────────────────────────────────────────
+// Confirm + DELETE /api/eleves/:slug. Pas de cascade (orphelins KV laissés
+// volontairement — stems/quiz/loops gardent leurs données historiques).
+async function deleteEleve(slug, displayName) {
+  const ok = window.confirm(
+    'Supprimer définitivement « ' + displayName + ' » ?\n\n' +
+    'Le profil et l\'index email seront effacés. Les données stems/quiz/' +
+    'loops liées resteront en KV (orphelines, sans impact UI).\n\n' +
+    'Cette action est irréversible.'
+  );
+  if (!ok) return;
+
+  try {
+    const res = await fetch('/api/eleves/' + encodeURIComponent(slug), {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.ok) {
+      showToast('Erreur : ' + (j.error || res.status));
+      return;
+    }
+    showToast('Élève supprimé ✓');
+    delete clientCache[slug];
+    await reloadStudentList();
+    // Sélectionne le 1er élève restant, ou affiche empty state
+    const next = STUDENT_LIST[0];
+    activeId = null;
+    if (next) selectStudent(next.id);
+    else renderEmpty();
+  } catch (e) {
+    showToast('Erreur réseau, réessaie.');
+  }
+}
+window.deleteEleve = deleteEleve;
 
 async function init() {
   // Source de vérité : /api/eleves (KV eleves:list). Fallback STUDENT_LIST hardcodé.

@@ -62,7 +62,7 @@ const PROTECTED_FIELDS = [
 // ─── CORS ────────────────────────────────────────────────────────
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, PATCH, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -470,8 +470,8 @@ export async function onRequestPatch({ params, request, env }) {
     }
   }
 
-  // ── Handle canaux partial merge (telegram/discord/bonzai) ────
-  // body.canaux = { telegram?: { url?, handle? }|null, discord?: ..., bonzai?: ... }
+  // ── Handle canaux partial merge (telegram/discord/bonzai/drive) ────
+  // body.canaux = { telegram?: { url?, handle? }|null, discord?: ..., bonzai?: ..., drive?: ... }
   // url = '' ou null → vide le lien (handle préservé sauf override)
   if (body.canaux !== undefined) {
     if (!body.canaux || typeof body.canaux !== 'object' || Array.isArray(body.canaux)) {
@@ -479,7 +479,7 @@ export async function onRequestPatch({ params, request, env }) {
     }
     const existingCanaux = (existing.canaux && typeof existing.canaux === 'object') ? existing.canaux : {};
     const merged = { ...existingCanaux };
-    for (const channel of ['telegram', 'discord', 'bonzai']) {
+    for (const channel of ['telegram', 'discord', 'bonzai', 'drive']) {
       const patch = body.canaux[channel];
       if (patch === undefined) continue;
       if (patch === null) { delete merged[channel]; continue; }
@@ -519,6 +519,18 @@ export async function onRequestPatch({ params, request, env }) {
     }
   }
 
+  // ── Handle nom (et alias `name`) — éditable mais slug stable ──
+  // L'admin peut renommer un élève sans changer son slug (qui reste l'id KV).
+  const nameInput = (body.nom !== undefined) ? body.nom
+                   : (body.name !== undefined) ? body.name
+                   : undefined;
+  if (nameInput !== undefined) {
+    if (typeof nameInput !== 'string' || !nameInput.trim() || nameInput.length > 80) {
+      return jsonResponse({ error: 'nom invalide (1-80 chars)' }, 400);
+    }
+    updated.nom = nameInput.trim();
+  }
+
   // ── Backwards-compat : permet PATCH de champs libres (notes, statut, programme) ──
   const ALLOW_FIELDS = ['notes', 'statut', 'programme'];
   for (const f of ALLOW_FIELDS) {
@@ -543,3 +555,59 @@ export async function onRequestPatch({ params, request, env }) {
 
   return jsonResponse({ ok: true, success: true, data: updated, stats: updated.stats || null });
 }
+
+// ─── DELETE /api/eleves/{id} ─────────────────────────────────────
+// Suppression admin only (cookie mh_admin_pw). Pas de cascade :
+//   - eleve:<slug>     → supprimé
+//   - eleves:list      → slug retiré
+//   - email:<email>    → supprimé (index inverse)
+//   - stems/quiz/loops → laissés orphelins (les apps gèrent les références
+//     manquantes par filtre côté liste, pas de cleanup auto pour éviter
+//     les pertes de données accidentelles).
+//
+// Réponse : 200 { ok: true, slug } ou 404 si élève introuvable.
+export async function onRequestDelete({ params, request, env }) {
+  const authErr = await requireAuth(request, env);
+  if (authErr) return authErr;
+
+  const id = String(params?.id || '').toLowerCase();
+  if (!id) return jsonResponse({ error: 'invalid_slug' }, 400);
+
+  const cacheKey = `eleve:${id}`;
+  let existing;
+  try {
+    const raw = await env.MASTERHUB_STUDENTS.get(cacheKey);
+    existing = raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return jsonResponse({ error: 'kv_get_failed', detail: e?.message || '' }, 500);
+  }
+  if (!existing) return jsonResponse({ error: 'not_found' }, 404);
+
+  // 1) Delete eleve:<slug>
+  try { await env.MASTERHUB_STUDENTS.delete(cacheKey); }
+  catch (e) {
+    return jsonResponse({ error: 'kv_delete_failed', detail: e?.message || '' }, 500);
+  }
+
+  // 2) Splice slug de eleves:list (best-effort)
+  try {
+    const listRaw = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
+    if (Array.isArray(listRaw)) {
+      const next = listRaw.filter(s => String(s).toLowerCase() !== id);
+      if (next.length !== listRaw.length) {
+        await env.MASTERHUB_STUDENTS.put('eleves:list', JSON.stringify(next));
+      }
+    }
+  } catch (e) {
+    console.warn('[eleves/DELETE] eleves:list update failed:', e?.message || e);
+  }
+
+  // 3) Delete index inverse email
+  if (existing.email && typeof existing.email === 'string') {
+    try { await env.MASTERHUB_STUDENTS.delete(`email:${existing.email.toLowerCase()}`); }
+    catch (e) { console.warn('[eleves/DELETE] email index delete failed:', e?.message || e); }
+  }
+
+  return jsonResponse({ ok: true, slug: id });
+}
+
