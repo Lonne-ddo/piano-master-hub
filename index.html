@@ -46,8 +46,11 @@
 
       function showFormAndCleanup() {
         document.documentElement.style.removeProperty('--mh-bootguard');
-        // Affiche le body (le formulaire est rendu par le script principal plus bas)
-        document.body.style.display = '';
+        // 'block' (pas '') pour overrider la règle CSS body{display:none} de
+        // l'inline <style> ligne 9. Avec '', l'inline style est retiré mais la
+        // règle CSS reste appliquée → body invisible. Bug observé sur ?eleve=
+        // qui appelait showFormAndCleanup via early-return puis runInit().
+        document.body.style.display = 'block';
         if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
       }
 
