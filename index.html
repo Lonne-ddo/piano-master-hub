@@ -563,80 +563,6 @@
             margin-bottom: 18px;
         }
 
-        /* Section Mes ressources (liens personnalisés Doc/Drive/Telegram) */
-        .eleve-resources-block {
-            width: 100%;
-            margin-top: 16px;
-            background: var(--bg-card);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: var(--radius);
-            padding: 20px;
-        }
-        .eleve-resources-block h2 {
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 12px;
-        }
-        .resource-links {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .resource-link {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 14px;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            text-decoration: none;
-            color: var(--text);
-            transition: background 0.15s, border-color 0.15s, transform 0.1s;
-        }
-        .resource-link:hover {
-            background: rgba(139, 111, 232, 0.08);
-            border-color: rgba(139, 111, 232, 0.35);
-        }
-        .resource-link:active { transform: scale(0.98); }
-        .res-icon {
-            font-size: 1.4rem;
-            flex-shrink: 0;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 10px;
-            background: rgba(139, 111, 232, 0.1);
-        }
-        .res-meta {
-            flex: 1;
-            min-width: 0;
-        }
-        .res-title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: var(--text);
-            line-height: 1.3;
-        }
-        .res-sub {
-            font-size: 0.78rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-        .res-arrow {
-            color: var(--text-muted);
-            font-size: 0.95rem;
-            flex-shrink: 0;
-            transition: transform 0.15s;
-        }
-        .resource-link:hover .res-arrow {
-            color: var(--accent);
-            transform: translate(2px, -2px);
-        }
-
         /* Section Mes séparations (audio Demucs assignés par l'admin) */
         .separations-block {
             width: 100%;
@@ -1021,7 +947,6 @@
             '<div id="devoirs-zone"></div>' +
             '<div id="resume-zone"></div>' +
             '<div id="separations-zone"></div>' +
-            '<div id="eleve-resources-zone"></div>' +
             '<div class="cards-section-title">Ressources</div>' +
             '<div class="cards dashboard-cards" id="cards"></div>';
 
@@ -1205,7 +1130,9 @@
                 renderProgramme(data && data.stats);
                 renderDevoirs(data && data.derniere_seance);
                 renderResume(data && data.derniere_seance, data && data.doc_url);
-                renderEleveResources(data);
+                // Re-render des cartes Ressources avec les liens personnalisés
+                // condi (Doc/Drive/Telegram) prefixés aux 4 cartes génériques.
+                renderResourceCards(eleve, data);
             })
             .catch(function(e) {
                 if (e && e.unauthorized) {
@@ -1305,65 +1232,60 @@
         return parseInt(m[3], 10) + " " + months[parseInt(m[2], 10) - 1] + " " + m[1];
     }
 
-    // Rend la section "Mes ressources" (liens personnalisés Doc/Drive/Telegram).
-    // Hide totalement si aucun lien présent dans la réponse /api/eleves/.../public.
-    // Appelé depuis fetchDashboardData après réception du payload.
-    function renderEleveResources(data) {
-        var zone = document.getElementById("eleve-resources-zone");
-        if (!zone) return;
-        var docUrl = data && data.doc_url;
-        var driveUrl = data && data.links && data.links.drive;
-        var telegramUrl = data && data.links && data.links.telegram;
-        if (!docUrl && !driveUrl && !telegramUrl) {
-            zone.innerHTML = '';
-            return;
-        }
-        var html = '<section class="eleve-resources-block">' +
-            '<h2>📚 Mes ressources</h2>' +
-            '<div class="resource-links">';
-        if (docUrl) {
-            html += '<a class="resource-link" href="' + escapeHtml(docUrl) + '" target="_blank" rel="noopener noreferrer">' +
-                '<span class="res-icon">📄</span>' +
-                '<div class="res-meta">' +
-                    '<div class="res-title">Suivi de progression</div>' +
-                    '<div class="res-sub">Google Doc</div>' +
-                '</div>' +
-                '<span class="res-arrow">↗</span>' +
-            '</a>';
-        }
-        if (driveUrl) {
-            html += '<a class="resource-link" href="' + escapeHtml(driveUrl) + '" target="_blank" rel="noopener noreferrer">' +
-                '<span class="res-icon">📁</span>' +
-                '<div class="res-meta">' +
-                    '<div class="res-title">Mes ressources Drive</div>' +
-                    '<div class="res-sub">Partitions, audio, vidéos</div>' +
-                '</div>' +
-                '<span class="res-arrow">↗</span>' +
-            '</a>';
-        }
-        if (telegramUrl) {
-            html += '<a class="resource-link" href="' + escapeHtml(telegramUrl) + '" target="_blank" rel="noopener noreferrer">' +
-                '<span class="res-icon">💬</span>' +
-                '<div class="res-meta">' +
-                    '<div class="res-title">Telegram</div>' +
-                    '<div class="res-sub">Discussions avec Lonne</div>' +
-                '</div>' +
-                '<span class="res-arrow">↗</span>' +
-            '</a>';
-        }
-        html += '</div></section>';
-        zone.innerHTML = html;
-    }
-
-    function renderResourceCards(eleve) {
+    function renderResourceCards(eleve, data) {
         var cardsContainer = document.getElementById("cards");
         var slug = eleve.slug;
         var koalendarUrl = "https://koalendar.com/e/cours-piano-master?name=" + encodeURIComponent(eleve.display);
         var koalendarInitialized = false;
 
+        // Cartes conditionnelles personnalisées (Doc/Drive/Telegram) — préfixées
+        // aux 4 cartes génériques. Présentes uniquement si data fourni (après
+        // fetch /api/eleves/:slug/public) ET le lien est défini pour cet élève.
+        // 1er render avant fetch : seules les 4 cartes génériques sont affichées,
+        // puis re-render quand fetchDashboardData reçoit les liens.
+        var docUrl = data && data.doc_url;
+        var driveUrl = data && data.links && data.links.drive;
+        var telegramUrl = data && data.links && data.links.telegram;
+
+        var personalCards = '';
+        if (docUrl) {
+            personalCards +=
+                '<a class="card" href="' + escapeHtml(docUrl) + '" target="_blank" rel="noopener noreferrer">' +
+                    '<div class="card-icon">📄</div>' +
+                    '<div class="card-body">' +
+                        '<div class="card-title">Suivi de progression</div>' +
+                        '<div class="card-sub">Google Doc</div>' +
+                    '</div>' +
+                    '<span class="card-arrow">↗</span>' +
+                '</a>';
+        }
+        if (driveUrl) {
+            personalCards +=
+                '<a class="card" href="' + escapeHtml(driveUrl) + '" target="_blank" rel="noopener noreferrer">' +
+                    '<div class="card-icon">📁</div>' +
+                    '<div class="card-body">' +
+                        '<div class="card-title">Mes ressources Drive</div>' +
+                        '<div class="card-sub">Partitions, audio, vidéos</div>' +
+                    '</div>' +
+                    '<span class="card-arrow">↗</span>' +
+                '</a>';
+        }
+        if (telegramUrl) {
+            personalCards +=
+                '<a class="card" href="' + escapeHtml(telegramUrl) + '" target="_blank" rel="noopener noreferrer">' +
+                    '<div class="card-icon">💬</div>' +
+                    '<div class="card-body">' +
+                        '<div class="card-title">Telegram</div>' +
+                        '<div class="card-sub">Discussions avec Lonne</div>' +
+                    '</div>' +
+                    '<span class="card-arrow">↗</span>' +
+                '</a>';
+        }
+
         // Cartes générées en HTML template inline. Outils est un vrai <a> avec
         // href interpolé sur le slug courant — pas de div+JS handler.
         cardsContainer.innerHTML =
+            personalCards +
             // Outils — anchor interne, slug en query string (bypass CF Pages multi-segment rewrite)
             '<a class="card" href="/outils?eleve=' + encodeURIComponent(slug) + '">' +
                 '<div class="card-icon">' + ICONS.tools + '</div>' +
