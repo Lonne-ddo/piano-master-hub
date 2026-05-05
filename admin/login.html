@@ -170,7 +170,7 @@
 fetch('/api/admin/check', { credentials: 'same-origin' })
   .then(function (r) { return r.ok ? r.json() : null; })
   .then(function (j) {
-    if (j && j.ok) window.location.replace('/admin/outils.html');
+    if (j && j.ok) window.location.replace('/admin/');
   })
   .catch(function () { /* silently — affiche la page */ });
 
@@ -191,7 +191,7 @@ document.getElementById('login-form').addEventListener('submit', function (ev) {
   })
     .then(function (r) {
       if (r.ok) {
-        window.location.replace('/admin/outils.html');
+        window.location.replace('/admin/');
         return null;
       }
       return r.json().catch(function () { return {}; });
@@ -234,7 +234,7 @@ document.getElementById('login-form').addEventListener('submit', function (ev) {
 </script>
 
 <script>
-// ── Fond animé — touches piano flottantes (cohérent /admin/outils) ──
+// ── Fond animé — touches piano flottantes (cohérent /admin/) ──
 (function () {
   var canvas = document.getElementById('bg-canvas');
   if (!canvas) return;

@@ -58,7 +58,7 @@
       // ?eleve=<slug>, on laisse le script principal gérer le rendu (auth
       // via /api/eleves/:slug/public côté backend, qui accepte aussi le
       // cookie admin pour la consultation cross-élève par l'admin).
-      // Évite que admin/?eleve=messon soit écrasé par redirect vers /admin/outils.
+      // Évite que admin/?eleve=messon soit écrasé par redirect vers /admin/.
       var initialParams;
       try { initialParams = new URLSearchParams(window.location.search); }
       catch (e) { initialParams = null; }
@@ -108,7 +108,7 @@
             .then(function (r2) { return r2.ok ? r2.json() : null; })
             .then(function (j2) {
               if (j2 && j2.ok) {
-                window.location.replace('/admin/outils.html');
+                window.location.replace('/admin/');
                 return 'redirected';
               }
               return null;

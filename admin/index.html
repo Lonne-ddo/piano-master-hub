@@ -1,1726 +1,439 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <style>body{display:none}</style>
-  <script>
-  // Garde admin via cookie mh_admin_pw — affiche la page seulement
-  // après confirmation par /api/admin/check.
-  fetch('/api/admin/check', { credentials: 'same-origin' })
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (j) {
-      if (!j || !j.ok) { window.location.replace('/admin/login.html'); return; }
-      document.body.style.display = 'block';
-    })
-    .catch(function () { window.location.replace('/admin/login.html'); });
-  </script>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Élèves — Master Hub Admin</title>
-  <meta name="theme-color" content="#09090f">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="MH Admin">
-  <link rel="icon" id="app-icon">
-  <link rel="apple-touch-icon" id="app-touch-icon" sizes="180x180">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    <style>body{display:none}</style>
+    <script>
+    // Garde admin via cookie mh_admin_pw — affiche la page seulement
+    // après confirmation par /api/admin/check.
+    fetch('/api/admin/check', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        if (!j || !j.ok) { window.location.replace('/admin/login.html'); return; }
+        document.body.style.display = 'block';
+      })
+      .catch(function () { window.location.replace('/admin/login.html'); });
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Master Hub Admin &mdash; Outils</title>
+    <meta name="theme-color" content="#0f0f14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MH Admin">
+    <meta name="description" content="Master Hub Admin &mdash; console d'outils">
+    <link rel="icon" id="app-icon">
+    <link rel="apple-touch-icon" id="app-touch-icon" sizes="180x180">
+    <style>
+        :root {
+            --bg: #0f0f14;
+            --bg-card: #1a1a24;
+            --bg-card-hover: #22222f;
+            --text: #eee;
+            --text-muted: #888;
+            --accent: #8B6FE8;
+            --accent-soft: rgba(139, 111, 232, 0.14);
+            --radius: 16px;
+            --tap-min: 48px;
+        }
 
-    :root {
-      --v:       #8B6FE8;
-      --v-dim:   #8B6FE826;
-      --v-soft:  #6b54c4;
-      --bg0:     #09090f;
-      --bg1:     #0f0e18;
-      --bg2:     #161524;
-      --bg3:     #1e1c30;
-      --text1:   #eeeaf8;
-      --text2:   #9d9ab5;
-      --text3:   #5a5870;
-      --border:  #25233a;
-      --green:   #5ecb8b;
-      --amber:   #f0b429;
-      --red:     #e05c6b;
-    }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    html, body { min-height: 100%; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+            overflow-x: hidden;
+        }
 
-    body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      background: var(--bg0);
-      color: var(--text1);
-      min-height: 100vh;
-      min-height: 100dvh;
-      -webkit-font-smoothing: antialiased;
-    }
+        #bg-canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
 
-    /* ── App shell ─────────────────────────────────────────── */
-    .app {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 24px 24px 60px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 24px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            min-height: 100dvh;
+            justify-content: flex-start;
+        }
 
-    .app-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 4px 0;
-      flex-wrap: wrap;
-    }
-    .logo-block {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-shrink: 0;
-      order: 0;
-    }
-    .logo-icon {
-      width: 40px; height: 40px;
-      background: var(--v);
-      border-radius: 10px;
-      display: grid; place-items: center;
-      flex-shrink: 0;
-    }
-    .logo-icon svg { width: 26px; height: 26px; display: block; }
-    .logo-text {
-      font-size: 15px; font-weight: 700;
-      color: var(--text1); letter-spacing: -.01em;
-    }
-    .logo-sub {
-      font-size: 10.5px; color: var(--text3);
-      font-family: 'DM Mono', monospace;
-      text-transform: uppercase; letter-spacing: .08em;
-    }
+        .back-link {
+            align-self: flex-start;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-decoration: none;
+            padding: 4px 8px;
+            margin-bottom: 4px;
+        }
 
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
-      order: 1;
-      flex-wrap: nowrap;
-    }
-    .hbtn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--bg1);
-      border: 1px solid var(--border);
-      color: var(--text2);
-      font-family: inherit;
-      font-size: 11.5px;
-      font-weight: 500;
-      padding: 7px 11px;
-      border-radius: 8px;
-      text-decoration: none;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: border-color .15s, color .15s, opacity .15s;
-    }
-    .hbtn:hover { border-color: var(--v); color: var(--text1); }
-    .hbtn[disabled] { opacity: 0.5; cursor: wait; }
-    .hbtn .icon { font-size: 13px; line-height: 1; display: inline-block; }
-    .sync-btn.syncing .icon {
-      animation: spin 1s linear infinite;
-    }
-    @keyframes stalePulse {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(240, 180, 41, 0); }
-      50%      { transform: scale(1.06); box-shadow: 0 0 0 6px rgba(240, 180, 41, 0.18); }
-    }
-    .sync-btn.stale-pulse {
-      animation: stalePulse 1.1s ease-in-out 2;
-      border-color: var(--amber);
-      color: var(--amber);
-    }
-    .add-btn { color: var(--v); border-color: var(--v); }
-    .add-btn:hover { background: var(--v-dim); }
-    .hbtn.primary {
-      background: var(--v); border-color: var(--v); color: #fff;
-    }
-    .hbtn.primary:hover { background: var(--v-soft); border-color: var(--v-soft); }
+        .back-link:hover { color: var(--text); }
 
-    /* ── Modal Ajouter un élève ──────────────────────────── */
-    .add-modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px);
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .add-modal {
-      width: 100%;
-      max-width: 420px;
-      background: var(--bg1);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 24px;
-      display: flex; flex-direction: column; gap: 14px;
-    }
-    .add-modal-title {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--text1);
-      margin: 0 0 4px;
-    }
-    .add-field {
-      display: flex; flex-direction: column; gap: 4px;
-    }
-    .add-field span {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text2);
-      letter-spacing: .04em;
-    }
-    .add-field em { color: var(--text3); font-style: normal; font-weight: 400; }
-    .add-field input {
-      width: 100%;
-      padding: 10px 12px;
-      background: var(--bg2);
-      color: var(--text1);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: inherit;
-      outline: none;
-      transition: border-color .15s;
-    }
-    .add-field input:focus { border-color: var(--v); }
-    .add-hint { color: var(--text3); font-size: 11px; }
-    .add-error {
-      min-height: 18px;
-      font-size: 12px;
-      color: var(--red);
-      line-height: 1.4;
-    }
-    .add-actions {
-      display: flex; gap: 8px; justify-content: flex-end;
-      margin-top: 4px;
-    }
+        .header {
+            text-align: center;
+            padding: 24px 0 8px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
 
-    /* ── Bouton supprimer (en bas du profil) ─────────────── */
-    .delete-eleve-row {
-      margin-top: 32px;
-      padding-top: 16px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: flex-end;
-    }
-    .delete-eleve-btn {
-      background: transparent;
-      border: 1px solid rgba(224, 92, 107, 0.4);
-      color: var(--red);
-      padding: 7px 13px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: inherit;
-      font-size: 12px;
-      font-weight: 500;
-      transition: background .15s;
-    }
-    .delete-eleve-btn:hover {
-      background: rgba(224, 92, 107, 0.12);
-    }
-    .delete-eleve-btn[disabled] { opacity: .5; cursor: wait; }
+        .header .logo {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            display: block;
+        }
 
-    @media (max-width: 500px) {
-      .sync-btn .label { display: none; }
-      .sync-btn { padding: 7px 9px; }
-      .hbtn { font-size: 10.5px; padding: 6px 9px; }
-    }
+        .header h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #ffffff;
+        }
 
-    /* ── Tab bar ───────────────────────────────────────────── */
-    .tab-bar {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 4px 4px;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .tab-bar::-webkit-scrollbar { display: none; }
+        .header .subtitle {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
 
-    .tab-eleve {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 8px;
-      border-radius: 10px;
-      cursor: pointer;
-      background: none; border: none; color: inherit;
-      font-family: inherit;
-      transition: transform .15s;
-      flex-shrink: 0;
-      min-width: 64px;
-    }
+        .cards {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 28px;
+            width: 100%;
+        }
 
-    .tab-circle {
-      width: 48px; height: 48px;
-      border-radius: 50%;
-      background: var(--bg2);
-      border: 1.5px solid var(--border);
-      color: var(--text2);
-      display: grid; place-items: center;
-      font-size: 18px; font-weight: 700;
-      transition: background .15s, border-color .15s, color .15s, transform .15s;
-    }
-    .tab-name {
-      font-size: 12px;
-      color: var(--text2);
-      font-weight: 500;
-      transition: color .15s;
-    }
+        .card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: var(--radius);
+            padding: 16px;
+            text-decoration: none;
+            color: var(--text);
+            min-height: var(--tap-min);
+            transition: background 0.2s, transform 0.15s;
+            opacity: 0;
+            transform: translateY(12px);
+            animation: fadeInUp 0.4s ease forwards;
+        }
 
-    .tab-eleve:hover .tab-circle {
-      border-color: var(--v-soft);
-      color: var(--v);
-    }
-    .tab-eleve.active .tab-circle {
-      background: var(--v);
-      border-color: var(--v);
-      color: #fff;
-      transform: scale(1.06);
-    }
-    .tab-eleve.active .tab-name {
-      color: var(--text1);
-      font-weight: 600;
-    }
+        .card:nth-child(1) { animation-delay: 0.05s; }
+        .card:nth-child(2) { animation-delay: 0.10s; }
+        .card:nth-child(3) { animation-delay: 0.15s; }
+        .card:nth-child(4) { animation-delay: 0.20s; }
 
-    @media (max-width: 768px) {
-      .tab-circle { width: 56px; height: 56px; font-size: 20px; }
-      .tab-eleve { min-width: 72px; }
-    }
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
 
-    /* ── Progression bar ───────────────────────────────────── */
-    .prog-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin: 8px 0 20px;
-      padding: 0 6px;
-    }
-    .prog-bar {
-      flex: 1;
-      height: 6px;
-      background: var(--bg2);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-    .prog-fill {
-      height: 100%;
-      background: var(--v);
-      border-radius: 3px;
-      transition: width 0.4s ease;
-    }
-    .prog-pct {
-      font-size: 13px;
-      color: var(--text2);
-      font-family: 'DM Mono', monospace;
-      min-width: 38px;
-      text-align: right;
-    }
+        .card:active {
+            transform: scale(0.97);
+            background: var(--bg-card-hover);
+        }
 
-    /* ── Dates row (editable) ──────────────────────────────── */
-    .dates-row {
-      display: flex;
-      gap: 24px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-      padding: 0 6px;
-    }
-    .date-edit {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .date-label {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text3);
-      font-family: 'DM Mono', monospace;
-    }
-    .date-value {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text1);
-      padding: 4px 8px;
-      border: 1px solid transparent;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
-      display: inline-block;
-      outline: none;
-    }
-    .date-value:hover,
-    .date-value:focus {
-      border-color: var(--border);
-      background: var(--bg2);
-    }
-    .date-value.editing {
-      background: var(--bg2);
-      border-color: var(--v);
-      padding: 2px 4px;
-    }
-    .date-value.override-active {
-      border-bottom: 1px dashed var(--v);
-    }
-    .date-value.override-active::after {
-      content: "✎";
-      margin-left: 4px;
-      font-size: 10px;
-      color: var(--v);
-      opacity: 0.7;
-    }
-    .date-value input[type="date"] {
-      background: transparent;
-      border: none;
-      color: var(--text1);
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 500;
-      outline: none;
-      padding: 2px 4px;
-      color-scheme: dark;
-    }
-    .date-reset-btn {
-      margin-left: 4px;
-      background: none;
-      border: none;
-      color: var(--text3);
-      cursor: pointer;
-      font-size: 13px;
-      padding: 2px 4px;
-      border-radius: 4px;
-      transition: color .15s, background .15s;
-      line-height: 1;
-    }
-    .date-reset-btn:hover {
-      color: var(--v);
-      background: var(--bg2);
-    }
-    /* ── Cards ─────────────────────────────────────────────── */
-    .card-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 18px;
-    }
-    @media (max-width: 900px) {
-      .card-grid { grid-template-columns: 1fr; gap: 14px; }
-    }
+        @media (hover: hover) {
+            .card:hover {
+                background: var(--bg-card-hover);
+                transform: translateY(-2px);
+            }
+        }
 
-    .card {
-      background: var(--bg1);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 18px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
+        .card.disabled {
+            opacity: 0.5;
+            cursor: default;
+            pointer-events: none;
+        }
 
-    .card-title {
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .09em;
-      color: var(--text3);
-      font-family: 'DM Mono', monospace;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+        .card.disabled:hover,
+        .card.disabled:active {
+            background: var(--bg-card);
+            transform: none;
+        }
 
-    .card-section { display: flex; flex-direction: column; gap: 6px; }
-    .card-section-label {
-      font-size: 10.5px;
-      color: var(--text3);
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      font-family: 'DM Mono', monospace;
-      margin-bottom: 2px;
-    }
+        .card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: var(--accent-soft);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 1.3rem;
+        }
 
-    /* ── Carte Dernière séance ─────────────────────────────── */
-    .ds-date-pill {
-      margin-left: auto;
-      font-size: 11px;
-      color: var(--text3);
-      font-family: 'DM Mono', monospace;
-      text-transform: none;
-      letter-spacing: 0;
-      font-weight: 500;
-    }
-    .ds-title {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text1);
-      line-height: 1.3;
-      margin-top: 2px;
-      margin-bottom: 2px;
-    }
-    .ds-section {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      margin-top: 10px;
-    }
-    .ds-section-label {
-      font-size: 10.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--text3);
-      font-family: 'DM Mono', monospace;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .ds-section.devoirs .ds-section-label { color: var(--green); }
-    .ds-doc-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 14px;
-      padding: 8px 14px;
-      border: 1px solid var(--v);
-      border-radius: 8px;
-      color: var(--v);
-      text-decoration: none;
-      font-size: 13px;
-      font-weight: 500;
-      align-self: flex-start;
-      transition: background .15s;
-    }
-    .ds-doc-btn:hover { background: var(--v-dim); }
+        .card-body {
+            flex: 1;
+            min-width: 0;
+        }
 
-    .bullets {
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .bullets li {
-      font-size: 13.5px;
-      color: var(--text1);
-      padding-left: 14px;
-      position: relative;
-      line-height: 1.45;
-    }
-    .bullets li::before {
-      content: '–';
-      position: absolute;
-      left: 0;
-      color: var(--v);
-    }
-    .bullets.muted li { color: var(--text2); font-size: 13px; }
-    .bullets.muted li::before { color: var(--text3); }
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            line-height: 1.3;
+        }
 
-    .card .empty-note {
-      font-size: 12.5px;
-      color: var(--text3);
-      font-style: italic;
-    }
+        .card-sub {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
 
-    /* ── Théorie grid ──────────────────────────────────────── */
-    .theory-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 6px;
-    }
-    .theory-item {
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 10px; border-radius: 7px;
-      background: var(--bg2); border: 1px solid var(--border);
-      cursor: pointer;
-      transition: border-color .15s;
-    }
-    .theory-item:hover { border-color: var(--text3); }
-    .theory-check {
-      width: 16px; height: 16px; border-radius: 4px;
-      display: grid; place-items: center;
-      font-size: 9.5px;
-      flex-shrink: 0;
-    }
-    .theory-item.done        .theory-check { background: #5ecb8b1a; color: var(--green); }
-    .theory-item.todo        .theory-check { background: var(--bg1); color: var(--text3); border: 1px solid var(--border); }
-    .theory-item.in-progress .theory-check { background: var(--v-dim); color: var(--v); }
-    .theory-label { font-size: 12px; color: var(--text2); line-height: 1.3; }
-    .theory-item.done .theory-label { color: var(--text1); }
+        .card-arrow {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
 
-    /* ── Link list (canaux + doc) ──────────────────────────── */
-    .link-list { display: flex; flex-direction: column; gap: 6px; }
-    .link-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      text-decoration: none;
-      transition: border-color .15s, background .15s;
-    }
-    .link-item:hover { border-color: var(--v); background: var(--v-dim); }
-    .link-icon {
-      width: 26px; height: 26px; border-radius: 7px;
-      display: grid; place-items: center;
-      font-size: 13px; flex-shrink: 0;
-    }
-    .link-icon.tg { background: #229ED91a; }
-    .link-icon.dc { background: #5865F21a; }
-    .link-icon.bz { background: var(--v-dim); }
-    .link-icon.dr { background: #f0b4291a; }
-    .link-info { flex: 1; min-width: 0; }
-    .link-name { font-size: 13px; font-weight: 600; color: var(--text1); }
-    .link-sub {
-      font-size: 11px; color: var(--text3);
-      font-family: 'DM Mono', monospace;
-      margin-top: 1px;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .link-arrow { color: var(--text3); font-size: 12px; flex-shrink: 0; }
+        .logout {
+            margin-top: 32px;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            text-decoration: none;
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: inherit;
+            padding: 8px 12px;
+        }
 
-    /* ── Link items éditables (Doc + Telegram) ───────────────── */
-    .link-item.editable {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      transition: border-color .15s, background .15s;
-    }
-    .link-item.editable:hover { border-color: var(--v); background: var(--v-dim); }
-    .link-item.editable .link-link {
-      flex: 1; min-width: 0;
-      text-decoration: none; color: inherit;
-      display: block;
-    }
-    .link-edit-btn {
-      background: none; border: none;
-      color: var(--text3);
-      cursor: pointer;
-      font-size: 14px;
-      padding: 4px 6px;
-      border-radius: 4px;
-      opacity: 0.4;
-      transition: opacity .15s, color .15s, background .15s;
-      flex-shrink: 0;
-      line-height: 1;
-    }
-    .link-item.editable:hover .link-edit-btn { opacity: 1; }
-    .link-edit-btn:hover { opacity: 1; color: var(--v); background: var(--bg1); }
-
-    .link-add {
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 12px;
-      width: 100%;
-      border-radius: 8px;
-      background: var(--bg2);
-      border: 1px dashed var(--border);
-      color: var(--text2);
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      text-align: left;
-      transition: border-color .15s, color .15s, background .15s;
-    }
-    .link-add:hover { border-color: var(--v); color: var(--v); background: var(--v-dim); }
-
-    .link-edit-row {
-      display: flex; flex-direction: column; gap: 8px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      background: var(--bg2);
-      border: 1px solid var(--v);
-    }
-    .link-edit-row input {
-      width: 100%;
-      background: var(--bg1); color: var(--text1);
-      border: 1px solid var(--border); border-radius: 6px;
-      padding: 8px 10px; font-size: 13px; font-family: inherit;
-      outline: none;
-      transition: border-color .15s;
-    }
-    .link-edit-row input:focus { border-color: var(--v); }
-    .link-edit-row .err {
-      font-size: 11px; color: var(--red);
-      min-height: 1em; line-height: 1.3;
-    }
-    .link-edit-row .actions {
-      display: flex; gap: 6px; justify-content: flex-end;
-    }
-    .link-edit-row .actions button {
-      background: var(--bg1);
-      border: 1px solid var(--border);
-      color: var(--text2);
-      font-family: inherit;
-      font-size: 12px; font-weight: 500;
-      padding: 6px 12px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: border-color .15s, color .15s, background .15s;
-    }
-    .link-edit-row .actions button:hover { border-color: var(--v); color: var(--text1); }
-    .link-edit-row .actions button.save {
-      background: var(--v); border-color: var(--v); color: #fff;
-    }
-    .link-edit-row .actions button.save:hover { background: var(--v-soft); }
-    .link-edit-row .actions button[disabled] { opacity: 0.5; cursor: wait; }
-
-    /* ── Toast ─────────────────────────────────────────────── */
-    .pk-toast {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-      background: #1a1a24; color: #eeeaf8;
-      border: 1px solid rgba(139,111,232,0.4);
-      padding: 10px 18px; border-radius: 10px;
-      font-size: 13px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      z-index: 9999;
-      opacity: 0; transition: opacity 0.2s;
-    }
-    .pk-toast.show { opacity: 1; }
-
-    /* ── Empty state / loader / error ──────────────────────── */
-    .empty-state, .loader, .error-state {
-      padding: 50px 20px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-      color: var(--text3);
-      text-align: center;
-    }
-    .empty-state .ns-icon { font-size: 40px; opacity: .3; margin-bottom: 8px; }
-    .empty-state p { font-size: 14px; }
-    .loader p { font-size: 13px; }
-    .loader .sub { font-size: 11px; color: var(--text3); opacity: .6; }
-    .spinner {
-      width: 28px; height: 28px;
-      border: 2px solid var(--border);
-      border-top-color: var(--v);
-      border-radius: 50%;
-      animation: spin .8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .error-state .warn { font-size: 32px; }
-    .error-state .msg {
-      font-size: 14px; color: var(--text2); max-width: 420px;
-      line-height: 1.5;
-    }
-    .error-state .details {
-      font-size: 11px; font-family: 'DM Mono', monospace;
-      color: var(--text3); max-width: 420px;
-      word-break: break-all;
-    }
-    .error-state .retry-btn {
-      margin-top: 8px;
-      padding: 8px 16px;
-      background: var(--v);
-      color: #fff; border: none; border-radius: 8px;
-      cursor: pointer; font-size: 13px;
-      font-family: inherit; font-weight: 600;
-    }
-    .error-state .retry-btn:hover { background: var(--v-soft); }
-
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-    /* ── Mobile ────────────────────────────────────────────── */
-    @media (max-width: 768px) {
-      .app { padding: 18px 14px 60px; }
-      .card { padding: 16px; }
-    }
-  </style>
+        .logout:hover {
+            color: var(--text);
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
 
-<!-- ═══ APP ═══════════════════════════════════════════════════ -->
-<div class="app">
-  <header class="app-header">
-    <div class="logo-block">
-      <div class="logo-icon">
-        <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
-          <rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
-          <rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
-          <rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
-          <rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
-          <rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
-        </svg>
-      </div>
-      <div>
-        <div class="logo-text">Master Hub</div>
-        <div class="logo-sub">Admin &middot; &Eacute;l&egrave;ves</div>
-      </div>
-    </div>
-    <div class="header-actions">
-      <button type="button" class="hbtn add-btn" id="addEleveBtn" onclick="openAddEleveModal()" title="Créer un élève">
-        <span class="icon">&#43;</span><span class="label">Ajouter</span>
-      </button>
-      <button type="button" class="hbtn sync-btn" id="syncAllBtn" onclick="syncFromGDocs()" title="Sync depuis Google Docs">
-        <span class="icon">&#128260;</span><span class="label">Sync All</span>
-      </button>
-      <a class="hbtn" href="/admin/outils.html">Outils &rarr;</a>
-      <a class="hbtn" href="/" title="Retour à l'espace élève">&larr; Espace &eacute;l&egrave;ve</a>
-    </div>
-  </header>
+    <canvas id="bg-canvas"></canvas>
 
-  <nav class="tab-bar" id="tabBar"></nav>
-  <main id="mainContent"></main>
-</div>
+    <div class="container">
+        <a href="/" class="back-link">&larr; Espace &eacute;l&egrave;ve</a>
+        <header class="header">
+            <svg class="logo" width="64" height="64" viewBox="0 0 72 72">
+                <circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+                <rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+                <rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+                <rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+                <rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+                <rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+            </svg>
+            <h1>Master Hub Admin</h1>
+            <p class="subtitle">Outils</p>
+        </header>
 
-<!-- ═══ MODAL : Ajouter un élève ════════════════════════════════ -->
-<div class="add-modal-overlay" id="addEleveOverlay" style="display:none">
-  <div class="add-modal">
-    <h2 class="add-modal-title">Ajouter un &eacute;l&egrave;ve</h2>
-    <form id="addEleveForm" autocomplete="off">
-      <label class="add-field">
-        <span>Nom *</span>
-        <input type="text" id="addEleveNom" maxlength="80" required placeholder="Ex : Lucas Émilien" />
-      </label>
-      <label class="add-field">
-        <span>Email *</span>
-        <input type="email" id="addEleveEmail" required placeholder="lucas@email.com" />
-        <small class="add-hint">Pour le magic link de connexion</small>
-      </label>
-      <label class="add-field">
-        <span>Lien Drive <em>(optionnel)</em></span>
-        <input type="url" id="addEleveDrive" placeholder="https://drive.google.com/drive/folders/..." />
-      </label>
-      <div class="add-error" id="addEleveError"></div>
-      <div class="add-actions">
-        <button type="button" class="hbtn" onclick="closeAddEleveModal()">Annuler</button>
-        <button type="submit" class="hbtn primary" id="addEleveSubmit">Cr&eacute;er</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ═══ SCRIPTS ═══════════════════════════════════════════════ -->
-<script>
-// ─── App logic ─────────────────────────────────────────────────
-// Fallback hardcodé — remplacé par /api/eleves au boot (cf init()).
-// En cas de KV/réseau down, le fallback garantit le rendu des onglets.
-let STUDENT_LIST = [
-  { id: 'japhet', nom: 'Japhet' },
-  { id: 'messon', nom: 'Messon' },
-  { id: 'dexter', nom: 'Dexter' },
-  { id: 'tara',   nom: 'Tara' }
-];
-
-let activeId = null;
-let clientCache = {};
-
-// Auth : cookie mh_session envoyé automatiquement (same-origin fetch).
-// Toutes les fetch /api/eleves/* passent par credentials: 'same-origin'.
-
-function escapeHtml(s) {
-  if (s === null || s === undefined) return '';
-  const d = document.createElement('div');
-  d.textContent = String(s);
-  return d.innerHTML;
-}
-
-const MONTHS_SHORT = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
-
-function renderTabs() {
-  const bar = document.getElementById('tabBar');
-  bar.innerHTML = STUDENT_LIST.map(s => `
-    <button type="button" class="tab-eleve ${activeId === s.id ? 'active' : ''}" onclick="selectStudent('${s.id}')">
-      <div class="tab-circle">${escapeHtml(s.nom[0])}</div>
-      <div class="tab-name">${escapeHtml(s.nom)}</div>
-    </button>
-  `).join('');
-}
-
-function triggerStalePulse() {
-  const btn = document.getElementById('syncAllBtn');
-  if (!btn) return;
-  btn.classList.remove('stale-pulse');
-  void btn.offsetWidth; // force reflow
-  btn.classList.add('stale-pulse');
-  setTimeout(() => btn.classList.remove('stale-pulse'), 2400);
-}
-
-function renderEmpty() {
-  document.getElementById('mainContent').innerHTML = `
-    <div class="empty-state">
-      <div class="ns-icon">&#127925;</div>
-      <p>Choisis un élève en haut pour voir son profil</p>
-    </div>
-  `;
-}
-
-function showLoader(nom) {
-  document.getElementById('mainContent').innerHTML = `
-    <div class="loader">
-      <div class="spinner"></div>
-      <p>Chargement du profil de ${escapeHtml(nom)}…</p>
-      <p class="sub">Lecture du Google Doc + parsing Gemini</p>
-    </div>
-  `;
-}
-
-function showError(message, details) {
-  document.getElementById('mainContent').innerHTML = `
-    <div class="error-state">
-      <div class="warn">⚠️</div>
-      <p class="msg">${escapeHtml(message)}</p>
-      ${details ? `<p class="details">${escapeHtml(details)}</p>` : ''}
-      <button type="button" class="retry-btn" onclick="selectStudent('${activeId}', true)">Réessayer</button>
-    </div>
-  `;
-}
-
-function fmtSessionDate(raw) {
-  if (!raw) return '—';
-  // ISO : YYYY-MM-DD
-  const mIso = String(raw).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (mIso) {
-    const [, y, m, d] = mIso;
-    const mi = parseInt(m, 10) - 1;
-    if (mi < 0 || mi > 11) return raw;
-    return `${parseInt(d, 10)} ${MONTHS_SHORT[mi]} ${y}`;
-  }
-  // JJ/MM/YYYY
-  const mSlash = String(raw).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (mSlash) {
-    const [, d, m, y] = mSlash;
-    const mi = parseInt(m, 10) - 1;
-    if (mi < 0 || mi > 11) return raw;
-    return `${parseInt(d, 10)} ${MONTHS_SHORT[mi]} ${y}`;
-  }
-  return raw;
-}
-
-function renderProfile(s) {
-
-  const seances = s.seances || [];
-  const theorie = s.theorie || [];
-  const repertoire = s.repertoire || [];
-
-  // Dernière séance : priorité au champ `derniere_seance` (sync.js v2),
-  // fallback sur seances[last] (ancien schéma [id].js)
-  let ds = s.derniere_seance || null;
-  if (!ds && seances.length) {
-    const last = seances[seances.length - 1];
-    ds = {
-      date: last?.date || '',
-      titre: last?.focus || '',
-      devoirs: Array.isArray(last?.devoirs) ? last.devoirs : [],
-      resume: Array.isArray(last?.contenu) ? last.contenu : [],
-    };
-  }
-  const docUrl = s.doc_url || '';
-
-  // À préparer
-  const theorieInProgress = theorie.filter(t => t.statut === 'in-progress');
-  const lastDevoirs = Array.isArray(ds?.devoirs) ? ds.devoirs : [];
-  const devoirsRecurrents = lastDevoirs.length > 0 ? lastDevoirs : ['Tonedear (ear training)'];
-  const repertoireActif = repertoire.filter(r => r.statut === 'en-cours');
-
-  // Progression : priorité au stats.progression_pct (sync.js v3+), fallback aux anciens champs
-  const stats = s.stats || null;
-  const progression = typeof stats?.progression_pct === 'number' ? stats.progression_pct
-    : typeof s.progression === 'number' ? s.progression
-    : (theorie.length ? Math.round(theorie.filter(t => t.statut === 'done').length / theorie.length * 100) : 0);
-
-  // Dates ISO pour édition inline + labels français
-  const debutIso = stats?.date_debut || '';
-  const finIso   = stats?.date_fin   || '';
-  const debutLabel = stats?.date_debut_label || (s.premier_cours || '—');
-  const finLabel   = stats?.date_fin_label   || (s.fin_prevue     || '—');
-  const debutOverride = stats?.override_active?.date_debut || false;
-  const finOverride   = stats?.override_active?.date_fin   || false;
-  // Total cours : override > défaut (8). Affichage et édition inline.
-  const totalCours = (stats?.total_cours != null) ? stats.total_cours : 8;
-  const totalCoursOverride = stats?.override_active?.total_cours || false;
-
-  const main = document.getElementById('mainContent');
-  main.innerHTML = `
-    <!-- ═ Progression bar ═════════════════════════════════════ -->
-    <div class="prog-row">
-      <div class="prog-bar"><div class="prog-fill" style="width:${progression}%"></div></div>
-      <div class="prog-pct">${progression}%</div>
-    </div>
-
-    <!-- ═ Dates éditables (stats_override via PATCH) ══════════ -->
-    <div class="dates-row">
-      <div class="date-edit" data-field="date_debut">
-        <span class="date-label">Début</span>
-        <span style="display:inline-flex;align-items:center;">
-          <span class="date-value ${debutOverride ? 'override-active' : ''}" tabindex="0" role="button" data-raw="${escapeHtml(debutIso)}">${escapeHtml(debutLabel)}</span>
-          ${debutOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','date_debut')" title="Réinitialiser au calcul auto">↺</button>` : ''}
-        </span>
-      </div>
-      <div class="date-edit" data-field="date_fin">
-        <span class="date-label">Fin prévue</span>
-        <span style="display:inline-flex;align-items:center;">
-          <span class="date-value ${finOverride ? 'override-active' : ''}" tabindex="0" role="button" data-raw="${escapeHtml(finIso)}">${escapeHtml(finLabel)}</span>
-          ${finOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','date_fin')" title="Réinitialiser au calcul auto">↺</button>` : ''}
-        </span>
-      </div>
-      <div class="date-edit" data-field="total_cours" data-kind="number">
-        <span class="date-label">Total cours</span>
-        <span style="display:inline-flex;align-items:center;">
-          <span class="date-value ${totalCoursOverride ? 'override-active' : ''}" tabindex="0" role="button" data-raw="${escapeHtml(String(totalCours))}">${escapeHtml(String(totalCours))}</span>
-          ${totalCoursOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','total_cours')" title="Réinitialiser au défaut (8)">↺</button>` : ''}
-        </span>
-      </div>
-    </div>
-
-    <div class="card-grid">
-      <!-- ══ CARD 1 : DERNIÈRE SÉANCE ═══════════════════════════ -->
-      <div class="card">
-        <div class="card-title">
-          📋 Dernière séance
-          ${ds?.date ? `<span class="ds-date-pill">${escapeHtml(fmtSessionDate(ds.date))}</span>` : ''}
+        <div class="cards">
+            <a class="card" href="/admin/transcripteur.html">
+                <div class="card-icon">&#127897;&#65039;</div>
+                <div class="card-body">
+                    <div class="card-title">Transcripteur</div>
+                    <div class="card-sub">Audio &rarr; texte &rarr; cours</div>
+                </div>
+                <span class="card-arrow">&rsaquo;</span>
+            </a>
+            <a class="card" href="/admin/loops.html">
+                <div class="card-icon">&#129345;</div>
+                <div class="card-body">
+                    <div class="card-title">Mes boucles</div>
+                    <div class="card-sub">Biblioth&egrave;que cross-device</div>
+                </div>
+                <span class="card-arrow">&rsaquo;</span>
+            </a>
+            <a class="card" href="/admin/quiz.html">
+                <div class="card-icon">&#127925;</div>
+                <div class="card-body">
+                    <div class="card-title">Quiz</div>
+                    <div class="card-sub">Sessions &eacute;l&egrave;ves &amp; statistiques</div>
+                </div>
+                <span class="card-arrow">&rsaquo;</span>
+            </a>
+            <a class="card" href="/admin/stems.html">
+                <div class="card-icon">&#127898;&#65039;</div>
+                <div class="card-body">
+                    <div class="card-title">S&eacute;parateur de pistes</div>
+                    <div class="card-sub" id="stems-sub">Demucs &middot; isole chant / batterie / basse</div>
+                </div>
+                <span class="card-arrow">&rsaquo;</span>
+            </a>
+            <a class="card" href="/admin/eleves.html">
+                <div class="card-icon">&#128101;</div>
+                <div class="card-body">
+                    <div class="card-title">&Eacute;l&egrave;ves</div>
+                    <div class="card-sub">Profils &amp; suivi</div>
+                </div>
+                <span class="card-arrow">&rsaquo;</span>
+            </a>
         </div>
-        ${ds?.titre ? `<div class="ds-title">${escapeHtml(ds.titre)}</div>` : ''}
-        ${(ds?.devoirs && ds.devoirs.length) ? `
-          <div class="ds-section devoirs">
-            <div class="ds-section-label">✅ Devoirs</div>
-            <ul class="bullets">${ds.devoirs.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>
-          </div>
-        ` : ''}
-        ${(ds?.resume && ds.resume.length) ? `
-          <div class="ds-section resume">
-            <div class="ds-section-label">📚 Résumé du cours</div>
-            <ul class="bullets">${ds.resume.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
-          </div>
-        ` : ''}
-        ${!ds || (!ds.devoirs?.length && !ds.resume?.length && !ds.titre)
-          ? '<p class="empty-note">Pas encore de séance synchronisée — clique sur 🔄 Sync All.</p>'
-          : ''}
-        ${docUrl ? `<a href="${escapeHtml(docUrl)}" target="_blank" rel="noopener" class="ds-doc-btn">📄 Voir le doc complet ↗</a>` : ''}
-      </div>
 
-      <!-- ══ CARD 2 : À PRÉPARER ═══════════════════════════════ -->
-      <div class="card">
-        <div class="card-title">🎯 À préparer</div>
-        <div class="card-section">
-          <div class="card-section-label">Théorie en cours</div>
-          ${theorieInProgress.length === 0
-            ? '<p class="empty-note">Aucune notion en cours.</p>'
-            : `<ul class="bullets">${theorieInProgress.map(t => `<li>${escapeHtml(t.label)}</li>`).join('')}</ul>`
-          }
-        </div>
-        <div class="card-section">
-          <div class="card-section-label">Devoirs récurrents</div>
-          <ul class="bullets">${devoirsRecurrents.map(d => `<li>${escapeHtml(d)}</li>`).join('')}</ul>
-        </div>
-        <div class="card-section">
-          <div class="card-section-label">Répertoire actif</div>
-          ${repertoireActif.length === 0
-            ? '<p class="empty-note">Aucun morceau en cours.</p>'
-            : `<ul class="bullets">${repertoireActif.map(r => `<li>${escapeHtml(r.titre)}${r.compositeur ? ` <span style="color:var(--text3);font-size:12px;">— ${escapeHtml(r.compositeur)}</span>` : ''}</li>`).join('')}</ul>`
-          }
-        </div>
-      </div>
-
-      <!-- ══ CARD 3 : THÉORIE COUVERTE ═════════════════════════ -->
-      <div class="card">
-        <div class="card-title">📊 Théorie couverte</div>
-        ${theorie.length === 0
-          ? '<p class="empty-note">Aucune notion tracée.</p>'
-          : `<div class="theory-grid">${theorie.map((t, ti) => `
-            <div class="theory-item ${escapeHtml(t.statut || 'todo')}"
-                 onclick="toggleTheory(this, '${s.id}', ${ti})"
-                 title="Cliquer pour changer le statut">
-              <div class="theory-check">${t.statut === 'done' ? '✓' : t.statut === 'in-progress' ? '◐' : '○'}</div>
-              <span class="theory-label">${escapeHtml(t.label)}</span>
-            </div>`).join('')}</div>`
-        }
-      </div>
-
-      <!-- ══ CARD 4 : CANAUX & DOC ═════════════════════════════ -->
-      <div class="card">
-        <div class="card-title">📡 Canaux &amp; 🔗 Doc</div>
-        <div class="link-list" id="canauxList">
-          <!-- Telegram (éditable) -->
-          <div data-row="telegram">
-            ${s.canaux?.telegram?.url ? `
-              <div class="link-item editable" data-channel="telegram">
-                <div class="link-icon tg">✈️</div>
-                <div class="link-info">
-                  <a href="${escapeHtml(s.canaux.telegram.url)}" target="_blank" rel="noopener" class="link-link">
-                    <div class="link-name">Telegram</div>
-                    <div class="link-sub">${escapeHtml(s.canaux.telegram.handle || '')}</div>
-                  </a>
-                </div>
-                <button type="button" class="link-edit-btn" onclick="editChannel('${s.id}','telegram')" title="Éditer">✏️</button>
-              </div>
-            ` : `
-              <button type="button" class="link-add" onclick="editChannel('${s.id}','telegram')">
-                <span style="font-size:14px;">✈️</span> + Ajouter Telegram
-              </button>
-            `}
-          </div>
-          <!-- Discord (read-only) -->
-          ${s.canaux?.discord?.url ? `
-            <div data-row="discord">
-              <a href="${escapeHtml(s.canaux.discord.url)}" target="_blank" rel="noopener" class="link-item">
-                <div class="link-icon dc">💬</div>
-                <div class="link-info">
-                  <div class="link-name">Discord</div>
-                  <div class="link-sub">${escapeHtml(s.canaux.discord.handle || '')}</div>
-                </div>
-                <span class="link-arrow">↗</span>
-              </a>
-            </div>` : ''}
-          <!-- Bonzai (read-only) -->
-          ${s.canaux?.bonzai?.url ? `
-            <div data-row="bonzai">
-              <a href="${escapeHtml(s.canaux.bonzai.url)}" target="_blank" rel="noopener" class="link-item">
-                <div class="link-icon bz">🌿</div>
-                <div class="link-info">
-                  <div class="link-name">Bonzai</div>
-                  <div class="link-sub">${escapeHtml(s.canaux.bonzai.handle || '')}</div>
-                </div>
-                <span class="link-arrow">↗</span>
-              </a>
-            </div>` : ''}
-          <!-- Drive (éditable) -->
-          <div data-row="drive">
-            ${s.canaux?.drive?.url ? `
-              <div class="link-item editable" data-channel="drive">
-                <div class="link-icon dr">📁</div>
-                <div class="link-info">
-                  <a href="${escapeHtml(s.canaux.drive.url)}" target="_blank" rel="noopener" class="link-link">
-                    <div class="link-name">Drive (ressources élève)</div>
-                    <div class="link-sub">${escapeHtml(s.canaux.drive.handle || '')}</div>
-                  </a>
-                </div>
-                <button type="button" class="link-edit-btn" onclick="editChannel('${s.id}','drive')" title="Éditer le lien">✏️</button>
-              </div>
-            ` : `
-              <button type="button" class="link-add" onclick="editChannel('${s.id}','drive')">
-                <span style="font-size:14px;">📁</span> + Ajouter un Drive
-              </button>
-            `}
-          </div>
-          <!-- Google Doc (éditable) -->
-          <div data-row="doc">
-            ${s.doc_url || s.doc_id ? `
-              <div class="link-item editable" data-channel="doc">
-                <div class="link-icon dr">📄</div>
-                <div class="link-info">
-                  <a href="${escapeHtml(s.doc_url || ('https://docs.google.com/document/d/' + s.doc_id + '/edit'))}" target="_blank" rel="noopener" class="link-link">
-                    <div class="link-name">Google Doc élève</div>
-                    <div class="link-sub">Séances · Notes</div>
-                  </a>
-                </div>
-                <button type="button" class="link-edit-btn" onclick="editChannel('${s.id}','doc')" title="Éditer le lien">✏️</button>
-              </div>
-            ` : `
-              <button type="button" class="link-add" onclick="editChannel('${s.id}','doc')">
-                <span style="font-size:14px;">📄</span> + Ajouter un Google Doc
-              </button>
-            `}
-          </div>
-          <!-- Email (éditable, pour magic link auth) -->
-          <div data-row="email">
-            ${s.email ? `
-              <div class="link-item editable" data-channel="email">
-                <div class="link-icon" style="background:#5ecb8b1a;">📧</div>
-                <div class="link-info">
-                  <div class="link-name">Email (magic link)</div>
-                  <div class="link-sub">${escapeHtml(s.email)}</div>
-                </div>
-                <button type="button" class="link-edit-btn" onclick="editChannel('${s.id}','email')" title="Éditer l'email">✏️</button>
-              </div>
-            ` : `
-              <button type="button" class="link-add" onclick="editChannel('${s.id}','email')">
-                <span style="font-size:14px;">📧</span> + Ajouter Email (magic link)
-              </button>
-            `}
-          </div>
-        </div>
-      </div>
+        <button class="logout" id="logout-btn" type="button">Se d&eacute;connecter</button>
     </div>
-    <div class="delete-eleve-row">
-      <button type="button" class="delete-eleve-btn" onclick="deleteEleve('${s.id}','${escapeHtml(s.nom || s.id).replace(/'/g, "&#39;")}')">
-        🗑 Supprimer cet élève
-      </button>
-    </div>
-  `;
 
-  // Bind les champs éditables (dates + total_cours)
-  document.querySelectorAll('.date-value').forEach(el => {
-    const box = el.closest('.date-edit');
-    const field = box ? box.dataset.field : null;
-    if (!field) return;
-    const kind = (box && box.dataset.kind) || 'date';
-    el.addEventListener('click', () => makeDateEditable(el, s.id, field, kind));
-    el.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); makeDateEditable(el, s.id, field, kind); }
+    <script>
+    document.getElementById('logout-btn').addEventListener('click', function () {
+        fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' })
+          .finally(function () { window.location.replace('/admin/login.html'); });
     });
-  });
-}
+    </script>
 
+    <script>
+    // ── Compteur stems mensuel — fail silently si pas de session admin ──
+    (function () {
+        var sub = document.getElementById('stems-sub');
+        if (!sub) return;
+        fetch('/api/stems/stats', { credentials: 'same-origin' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) {
+                if (!j || !j.ok) return;
+                var n = j.count || 0;
+                var cap = j.cap || 20;
+                var cost = (j.costEUR || 0).toLocaleString('fr-FR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                });
+                var word = n === 1 ? 'séparation' : 'séparations';
+                sub.textContent = 'Ce mois : ' + n + ' / ' + cap + ' ' + word + ' · ~' + cost + ' €';
+                if (n >= cap) sub.style.color = '#e05c6b';
+                else if (n >= cap - 3) sub.style.color = '#f0b429';
+            })
+            .catch(function () { /* fail silently — sub reste sur defaultLabel */ });
+    })();
+    </script>
 
-async function selectStudent(id, forceSync = false) {
-  activeId = id;
-  renderTabs();
-  const meta = STUDENT_LIST.find(s => s.id === id);
-  if (!meta) return;
-  const url = new URL(window.location);
-  url.searchParams.set('eleve', id);
-  history.replaceState(null, '', url);
+    <script>
+    // ── Manifest PWA inline (scope /admin/, violet #8B6FE8) ──
+    (function(){
+        var iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="192" height="192">'
+            + '<rect width="72" height="72" rx="16" fill="#8B6FE8"/>'
+            + '<circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="1.5"/>'
+            + '<rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
+            + '<rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
+            + '<rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
+            + '<rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>'
+            + '<rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>'
+            + '</svg>';
+        var iconUrl = 'data:image/svg+xml;base64,' + btoa(iconSvg);
 
-  if (!forceSync && clientCache[id]) { renderProfile(clientCache[id]); return; }
-  showLoader(meta.nom);
-  try {
-    const res = await fetch(`/api/eleves/${id}${forceSync ? '?sync=true' : ''}`, {
-      credentials: 'same-origin'
-    });
-    const data = await res.json();
-    // En mode 'stale', le worker renvoie 200 avec source:'stale' + error — on affiche le profil, pas d'erreur bloquante
-    if (!res.ok && data.source !== 'stale') { showError(data.error || `Erreur ${res.status}`, data.details); return; }
-    if (!data || (data.error && data.source !== 'stale')) { showError(data.error || `Erreur ${res.status}`, data.details); return; }
-    clientCache[id] = data;
-    renderProfile(data);
-    if (data.source === 'stale') triggerStalePulse();
-  } catch (e) {
-    showError('Erreur réseau. Vérifie ta connexion et réessaie.', e.message);
-  }
-}
-window.selectStudent = selectStudent;
+        document.getElementById('app-icon').href = iconUrl;
+        document.getElementById('app-touch-icon').href = iconUrl;
 
-function syncStudent() {
-  if (activeId) { delete clientCache[activeId]; selectStudent(activeId, true); }
-}
-window.syncStudent = syncStudent;
+        var manifest = {
+            name: "Master Hub Admin",
+            short_name: "MH Admin",
+            description: "Console d'outils admin",
+            start_url: "/admin/",
+            scope: "/admin/",
+            display: "standalone",
+            background_color: "#0f0f14",
+            theme_color: "#0f0f14",
+            icons: [
+                { src: iconUrl, sizes: "192x192", type: "image/svg+xml" },
+                { src: iconUrl, sizes: "512x512", type: "image/svg+xml" }
+            ]
+        };
+        var blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+        var link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = URL.createObjectURL(blob);
+        document.head.appendChild(link);
+    })();
+    </script>
 
-async function syncFromGDocs() {
-  const btn = document.getElementById('syncAllBtn');
-  if (!btn) return;
-  btn.classList.add('syncing');
-  btn.disabled = true;
-  try {
-    const res = await fetch('/api/eleves/sync', {
-      method: 'POST',
-      credentials: 'same-origin'
-    });
-    const data = await res.json();
-    if (data.success) {
-      const summary = Object.entries(data.results)
-        .map(([name, r]) => r.ok
-          ? `✓ ${capitalize(name)} (${r.sessions} séances)`
-          : `✗ ${capitalize(name)}: ${r.error}`)
-        .join('\n');
-      alert('Sync terminé :\n' + summary);
-      clientCache = {};
-      if (activeId) selectStudent(activeId);
-    } else {
-      alert('Erreur sync');
-    }
-  } catch (e) {
-    alert('Erreur sync: ' + e.message);
-  } finally {
-    btn.classList.remove('syncing');
-    btn.disabled = false;
-  }
-}
-window.syncFromGDocs = syncFromGDocs;
+    <script>
+    // ── Fond animé — touches piano flottantes (cohérent avec l'index élève) ──
+    (function() {
+        var canvas = document.getElementById("bg-canvas");
+        var ctx = canvas.getContext("2d");
+        var particles = [];
+        var COUNT = 18;
 
-function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
-
-function showToast(msg) {
-  let t = document.querySelector('.pk-toast');
-  if (!t) { t = document.createElement('div'); t.className = 'pk-toast'; document.body.appendChild(t); }
-  t.textContent = msg;
-  requestAnimationFrame(() => t.classList.add('show'));
-  clearTimeout(showToast._tid);
-  showToast._tid = setTimeout(() => t.classList.remove('show'), 2200);
-}
-
-async function makeDateEditable(el, studentId, field, kind = 'date') {
-  // field ∈ {'date_debut','date_fin','total_cours'}
-  // kind  ∈ {'date','number'}
-  if (el.classList.contains('editing')) return;
-
-  const rawBefore = el.dataset.raw || ''; // ISO date OU entier (selon kind)
-  const displayBefore = el.textContent;
-
-  const input = document.createElement('input');
-  if (kind === 'number') {
-    input.type = 'number';
-    input.min = '1';
-    input.max = '100';
-    input.step = '1';
-    input.style.width = '64px';
-  } else {
-    input.type = 'date';
-  }
-  input.value = rawBefore;
-
-  el.classList.add('editing');
-  el.textContent = '';
-  el.appendChild(input);
-  input.focus();
-
-  let settled = false;
-
-  async function commit() {
-    if (settled) return;
-    settled = true;
-
-    const raw = input.value;
-    if (!raw || raw === rawBefore) { restore(); return; }
-
-    let payloadValue;
-    if (kind === 'number') {
-      const n = parseInt(raw, 10);
-      if (!Number.isInteger(n) || n < 1 || n > 100) {
-        restore(); showToast('Valeur entre 1 et 100'); return;
-      }
-      payloadValue = n;
-    } else {
-      payloadValue = raw; // ISO YYYY-MM-DD
-    }
-
-    showToast('Sauvegarde…');
-    try {
-      const res = await fetch(`/api/eleves/${studentId}`, {
-        method: 'PATCH',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stats_override: { [field]: payloadValue } })
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok || payload.error || !(payload.ok || payload.success)) {
-        throw new Error(payload.error || `HTTP ${res.status}`);
-      }
-      let fresh = payload.data || null;
-      if (!fresh) {
-        const getRes = await fetch(`/api/eleves/${studentId}`, { credentials: 'same-origin' });
-        const getData = await getRes.json();
-        if (getRes.ok && !getData.error) fresh = getData;
-      }
-      if (fresh) {
-        clientCache[studentId] = fresh;
-        const scrollY = window.scrollY;
-        renderProfile(fresh);
-        window.scrollTo(0, scrollY);
-      } else {
-        restore();
-      }
-      showToast('Date mise à jour ✓');
-    } catch (e) {
-      restore();
-      showToast('Erreur, réessaie');
-    }
-  }
-
-  function restore() {
-    el.classList.remove('editing');
-    el.textContent = displayBefore;
-  }
-
-  function cancel() {
-    if (settled) return;
-    settled = true;
-    restore();
-  }
-
-  input.addEventListener('blur', () => { commit(); });
-  input.addEventListener('change', () => { input.blur(); });
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
-    if (e.key === 'Escape') { e.preventDefault(); input.blur = () => {}; cancel(); }
-  });
-}
-window.makeDateEditable = makeDateEditable;
-
-async function resetDateOverride(studentId, field) {
-  // field = 'date_debut' ou 'date_fin'
-  showToast('Réinitialisation…');
-  try {
-    const res = await fetch(`/api/eleves/${studentId}`, {
-      method: 'PATCH',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stats_override: { [field]: null } })
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok || payload.error || !(payload.ok || payload.success)) {
-      throw new Error(payload.error || `HTTP ${res.status}`);
-    }
-    let fresh = payload.data || null;
-    if (!fresh) {
-      const getRes = await fetch(`/api/eleves/${studentId}`, { credentials: 'same-origin' });
-      const getData = await getRes.json();
-      if (getRes.ok && !getData.error) fresh = getData;
-    }
-    if (fresh) {
-      clientCache[studentId] = fresh;
-      const scrollY = window.scrollY;
-      renderProfile(fresh);
-      window.scrollTo(0, scrollY);
-    }
-    showToast('Réinitialisé au calcul auto ✓');
-  } catch (e) {
-    showToast('Erreur, réessaie');
-  }
-}
-window.resetDateOverride = resetDateOverride;
-
-function toggleTheory(el, studentId, index) {
-  const order = ['todo', 'in-progress', 'done'];
-  const current = el.classList.contains('done') ? 'done'
-    : el.classList.contains('in-progress') ? 'in-progress' : 'todo';
-  const next = order[(order.indexOf(current) + 1) % order.length];
-  el.classList.remove('done', 'in-progress', 'todo');
-  el.classList.add(next);
-  const check = el.querySelector('.theory-check');
-  if (check) check.textContent = next === 'done' ? '✓' : next === 'in-progress' ? '◐' : '○';
-  if (clientCache[studentId] && clientCache[studentId].theorie && clientCache[studentId].theorie[index]) {
-    clientCache[studentId].theorie[index].statut = next;
-  }
-}
-window.toggleTheory = toggleTheory;
-
-// ─── Édition inline des canaux (Doc + Telegram) ────────────────
-function editChannel(studentId, channel) {
-  const data = clientCache[studentId];
-  if (!data) return;
-  const list = document.getElementById('canauxList');
-  if (!list) return;
-  const wrap = list.querySelector(`[data-row="${channel}"]`);
-  if (!wrap) return;
-
-  const placeholders = {
-    doc: 'https://docs.google.com/document/d/...',
-    telegram: 'https://t.me/handle',
-    drive: 'https://drive.google.com/drive/folders/...',
-    email: 'eleve@email.com',
-  };
-  const currentValue = (channel === 'doc')
-    ? (data.doc_url || (data.doc_id ? `https://docs.google.com/document/d/${data.doc_id}/edit` : ''))
-    : (channel === 'email')
-      ? (data.email || '')
-      : (data.canaux?.[channel]?.url || '');
-  const inputType = channel === 'email' ? 'email' : 'url';
-
-  const originalHtml = wrap.innerHTML;
-
-  wrap.innerHTML = `
-    <div class="link-edit-row">
-      <input type="${inputType}" placeholder="${escapeHtml(placeholders[channel] || 'https://')}" value="${escapeHtml(currentValue)}" />
-      <div class="err"></div>
-      <div class="actions">
-        <button type="button" class="cancel">Annuler</button>
-        <button type="button" class="save">Enregistrer</button>
-      </div>
-    </div>
-  `;
-  const input = wrap.querySelector('input');
-  const errEl = wrap.querySelector('.err');
-  const saveBtn = wrap.querySelector('.save');
-  const cancelBtn = wrap.querySelector('.cancel');
-  input.focus();
-  try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
-
-  function showErr(msg) { errEl.textContent = msg || ''; }
-  function cancel() { wrap.innerHTML = originalHtml; }
-
-  async function commit() {
-    showErr('');
-    const raw = input.value.trim();
-    let body;
-
-    if (channel === 'doc') {
-      if (raw === '') {
-        body = { doc_id: null }; // suppression du lien
-      } else {
-        const m = raw.match(/\/document\/d\/([a-zA-Z0-9_-]+)/);
-        if (!m) {
-          showErr('URL Google Doc invalide. Format attendu : https://docs.google.com/document/d/...');
-          return;
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
         }
-        body = { doc_id: m[1] };
-      }
-    } else if (channel === 'telegram') {
-      if (raw === '') {
-        body = { canaux: { telegram: { url: null, handle: '' } } };
-      } else {
-        if (!/^https?:\/\//i.test(raw)) {
-          showErr('URL invalide (doit commencer par https://)');
-          return;
+        window.addEventListener("resize", resize);
+        resize();
+
+        function createParticle() {
+            var w = 6 + Math.random() * 4;
+            var h = 18 + Math.random() * 10;
+            return {
+                x: Math.random() * canvas.width,
+                y: canvas.height + h,
+                w: w,
+                h: h,
+                r: 2,
+                speed: 0.15 + Math.random() * 0.35,
+                opacity: 0.04 + Math.random() * 0.04,
+                drift: (Math.random() - 0.5) * 0.3
+            };
         }
-        const tgm = raw.match(/t\.me\/([a-zA-Z0-9_]+)/i);
-        const handle = tgm ? tgm[1] : (data.canaux?.telegram?.handle || '');
-        body = { canaux: { telegram: { url: raw, handle: handle } } };
-      }
-    } else if (channel === 'drive') {
-      if (raw === '') {
-        body = { canaux: { drive: { url: null, handle: '' } } };
-      } else {
-        if (!/^https?:\/\//i.test(raw)) {
-          showErr('URL invalide (doit commencer par https://)');
-          return;
+
+        for (var i = 0; i < COUNT; i++) {
+            var p = createParticle();
+            p.y = Math.random() * canvas.height;
+            particles.push(p);
         }
-        body = { canaux: { drive: { url: raw, handle: data.canaux?.drive?.handle || '' } } };
-      }
-    } else if (channel === 'email') {
-      if (raw === '') {
-        body = { email: null };
-      } else {
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw)) {
-          showErr('Email invalide');
-          return;
+
+        function drawRoundRect(x, y, w, h, r, alpha) {
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+            ctx.fill();
         }
-        body = { email: raw.toLowerCase() };
-      }
-    } else {
-      cancel(); return;
-    }
 
-    saveBtn.disabled = true; cancelBtn.disabled = true;
-    showToast('Enregistrement…');
-    try {
-      const res = await fetch(`/api/eleves/${studentId}`, {
-        method: 'PATCH',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok || payload.error || !(payload.ok || payload.success)) {
-        throw new Error(payload.error || `HTTP ${res.status}`);
-      }
-      const fresh = payload.data;
-      if (fresh) {
-        clientCache[studentId] = fresh;
-        const scrollY = window.scrollY;
-        renderProfile(fresh);
-        window.scrollTo(0, scrollY);
-      }
-      showToast(
-        channel === 'doc' ? 'Lien Google Doc mis à jour ✓' :
-        channel === 'email' ? 'Email mis à jour ✓' :
-        channel === 'drive' ? 'Drive mis à jour ✓' :
-        'Telegram mis à jour ✓'
-      );
-    } catch (e) {
-      saveBtn.disabled = false; cancelBtn.disabled = false;
-      showErr('Erreur : ' + (e.message || 'inconnue'));
-    }
-  }
+        var rafId = null;
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (var i = 0; i < particles.length; i++) {
+                var p = particles[i];
+                p.y -= p.speed;
+                p.x += p.drift;
+                drawRoundRect(p.x, p.y, p.w, p.h, p.r, p.opacity);
+                if (p.y + p.h < 0) {
+                    particles[i] = createParticle();
+                }
+            }
+            rafId = requestAnimationFrame(animate);
+        }
+        animate();
+        var stopAnim = function () {
+            if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+            window.removeEventListener("resize", resize);
+        };
+        window.addEventListener("beforeunload", stopAnim);
+        window.addEventListener("pagehide", stopAnim);
+    })();
+    </script>
 
-  saveBtn.addEventListener('click', commit);
-  cancelBtn.addEventListener('click', cancel);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); commit(); }
-    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-  });
-}
-window.editChannel = editChannel;
-
-// ─── Modal "Ajouter un élève" ─────────────────────────────────
-// Toggle l'overlay + reset du form. Submit = POST /api/eleves, slug auto-généré
-// côté serveur via slugify. Toast d'erreur sur 409 (slug/email déjà pris).
-function openAddEleveModal() {
-  const overlay = document.getElementById('addEleveOverlay');
-  if (!overlay) return;
-  document.getElementById('addEleveForm').reset();
-  document.getElementById('addEleveError').textContent = '';
-  overlay.style.display = 'flex';
-  setTimeout(() => { try { document.getElementById('addEleveNom').focus(); } catch (e) {} }, 50);
-}
-window.openAddEleveModal = openAddEleveModal;
-
-function closeAddEleveModal() {
-  const overlay = document.getElementById('addEleveOverlay');
-  if (overlay) overlay.style.display = 'none';
-}
-window.closeAddEleveModal = closeAddEleveModal;
-
-(function bindAddEleveForm() {
-  const form = document.getElementById('addEleveForm');
-  if (!form) return;
-  form.addEventListener('submit', async function (ev) {
-    ev.preventDefault();
-    const errEl = document.getElementById('addEleveError');
-    const submitBtn = document.getElementById('addEleveSubmit');
-    errEl.textContent = '';
-
-    const nom = document.getElementById('addEleveNom').value.trim();
-    const email = document.getElementById('addEleveEmail').value.trim().toLowerCase();
-    const driveUrl = document.getElementById('addEleveDrive').value.trim();
-
-    if (!nom) { errEl.textContent = 'Nom requis.'; return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.textContent = 'Email invalide.'; return; }
-    if (driveUrl && !/^https?:\/\//i.test(driveUrl)) {
-      errEl.textContent = 'Lien Drive invalide (https:// requis).';
-      return;
-    }
-
-    const body = { nom, email };
-    if (driveUrl) body.canaux = { drive: { url: driveUrl, handle: '' } };
-
-    submitBtn.disabled = true;
-    submitBtn.textContent = '…';
-    try {
-      const res = await fetch('/api/eleves', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (res.status === 409) {
-        const detail = j.error === 'email_already_exists'
-          ? 'Cet email est déjà utilisé par un autre élève.'
-          : 'Un élève avec ce nom existe déjà (slug pris).';
-        errEl.textContent = detail;
-        return;
-      }
-      if (!res.ok || !j.ok) {
-        errEl.textContent = j.detail || j.error || ('Erreur ' + res.status);
-        return;
-      }
-      // Succès : ferme modal + refresh STUDENT_LIST + sélectionne le nouveau
-      closeAddEleveModal();
-      showToast('Élève créé : ' + (j.nom || j.slug) + ' ✓');
-      await reloadStudentList();
-      delete clientCache[j.slug];
-      selectStudent(j.slug, true);
-    } catch (e) {
-      errEl.textContent = 'Erreur réseau, réessaie.';
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Créer';
-    }
-  });
-})();
-
-// Recharge STUDENT_LIST depuis /api/eleves (utilisé après création/suppression)
-async function reloadStudentList() {
-  try {
-    const r = await fetch('/api/eleves');
-    const j = await r.json();
-    if (j && j.ok && Array.isArray(j.eleves) && j.eleves.length) {
-      STUDENT_LIST = j.eleves.map(slug => ({
-        id: String(slug).toLowerCase(),
-        nom: String(slug).charAt(0).toUpperCase() + String(slug).slice(1),
-      }));
-      renderTabs();
-    }
-  } catch (e) { /* fallback : list inchangée */ }
-}
-
-// ─── Suppression élève ────────────────────────────────────────
-// Confirm + DELETE /api/eleves/:slug. Pas de cascade (orphelins KV laissés
-// volontairement — stems/quiz/loops gardent leurs données historiques).
-async function deleteEleve(slug, displayName) {
-  const ok = window.confirm(
-    'Supprimer définitivement « ' + displayName + ' » ?\n\n' +
-    'Le profil et l\'index email seront effacés. Les données stems/quiz/' +
-    'loops liées resteront en KV (orphelines, sans impact UI).\n\n' +
-    'Cette action est irréversible.'
-  );
-  if (!ok) return;
-
-  try {
-    const res = await fetch('/api/eleves/' + encodeURIComponent(slug), {
-      method: 'DELETE',
-      credentials: 'same-origin',
-    });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok || !j.ok) {
-      showToast('Erreur : ' + (j.error || res.status));
-      return;
-    }
-    showToast('Élève supprimé ✓');
-    delete clientCache[slug];
-    await reloadStudentList();
-    // Sélectionne le 1er élève restant, ou affiche empty state
-    const next = STUDENT_LIST[0];
-    activeId = null;
-    if (next) selectStudent(next.id);
-    else renderEmpty();
-  } catch (e) {
-    showToast('Erreur réseau, réessaie.');
-  }
-}
-window.deleteEleve = deleteEleve;
-
-async function init() {
-  // Source de vérité : /api/eleves (KV eleves:list). Fallback STUDENT_LIST hardcodé.
-  try {
-    const r = await fetch('/api/eleves');
-    const j = await r.json();
-    if (j && j.ok && Array.isArray(j.eleves) && j.eleves.length) {
-      STUDENT_LIST = j.eleves.map(slug => ({
-        id: String(slug).toLowerCase(),
-        nom: String(slug).charAt(0).toUpperCase() + String(slug).slice(1),
-      }));
-    }
-  } catch (e) { /* fallback hardcodé */ }
-  renderTabs();
-  const params = new URLSearchParams(window.location.search);
-  const eleveParam = (params.get('eleve') || '').toLowerCase();
-  const valid = STUDENT_LIST.find(s => s.id === eleveParam);
-  const targetId = valid ? valid.id : (STUDENT_LIST[0]?.id || 'japhet');
-  renderEmpty();
-  setTimeout(() => selectStudent(targetId), 200);
-}
-</script>
-
-<script>
-// ─── Boot direct (l'URL /admin/ est privée — pas de prompt) ────
-init();
-</script>
-
-<script>
-// ─── Manifest PWA inline (scope /admin/) ───────────────────────
-(function(){
-  const iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="192" height="192">'
-    + '<rect width="72" height="72" rx="16" fill="#8B6FE8"/>'
-    + '<circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="1.5"/>'
-    + '<rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
-    + '<rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
-    + '<rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
-    + '<rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>'
-    + '<rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>'
-    + '</svg>';
-  const iconUrl = 'data:image/svg+xml;base64,' + btoa(iconSvg);
-
-  document.getElementById('app-icon').href = iconUrl;
-  document.getElementById('app-touch-icon').href = iconUrl;
-
-  const manifest = {
-    name: 'Master Hub Admin',
-    short_name: 'MH Admin',
-    description: "Console d'outils admin",
-    start_url: '/admin/',
-    scope: '/admin/',
-    display: 'standalone',
-    background_color: '#09090f',
-    theme_color: '#09090f',
-    icons: [
-      { src: iconUrl, sizes: '192x192', type: 'image/svg+xml' },
-      { src: iconUrl, sizes: '512x512', type: 'image/svg+xml' }
-    ]
-  };
-  const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-  const link = document.createElement('link');
-  link.rel = 'manifest';
-  link.href = URL.createObjectURL(blob);
-  document.head.appendChild(link);
-})();
-</script>
 </body>
 </html>

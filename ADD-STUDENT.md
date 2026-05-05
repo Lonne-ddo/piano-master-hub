@@ -23,7 +23,7 @@ wrangler kv:key put --binding=MASTERHUB_STUDENTS "eleves:list" '["japhet","messo
 
 ## 2. Créer la fiche élève initiale dans le KV
 
-Depuis la console DevTools sur `/admin/` (auth déjà active) :
+Depuis la console DevTools sur `/admin/eleves.html` (auth déjà active) :
 
 ```js
 fetch('/api/eleves/nouveau', {
@@ -63,7 +63,7 @@ Commit + push (CF Pages redéploie automatiquement le routing).
 
 ## 4. Premier sync
 
-Depuis `/admin/`, cliquer **🔄 Sync All**. Le nouveau slug est fetché depuis son Google Doc,
+Depuis `/admin/eleves.html`, cliquer **🔄 Sync All**. Le nouveau slug est fetché depuis son Google Doc,
 parsé par le LLM et complété (théorie, répertoire, canaux, dernière séance).
 
 ## Future : Chantier B
