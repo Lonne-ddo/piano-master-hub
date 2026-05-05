@@ -8,6 +8,7 @@
 
     // ─── Slug + persistance ───────────────────────────────────────
     // Whitelist déléguée à /api/eleves via assets/js/eleve-guard.js.
+    function displayName(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
     var params = new URLSearchParams(window.location.search);
     var slug = (params.get('eleve') || '').toLowerCase();
     if (!(await window.requireValidEleve(slug))) return;
@@ -62,7 +63,7 @@
 
     // ─── Header (élève display) ───────────────────────────────────
     var subtitle = document.getElementById('page-subtitle');
-    if (subtitle && DISPLAY[slug]) subtitle.textContent = 'Pour ' + DISPLAY[slug];
+    if (subtitle) subtitle.textContent = 'Pour ' + displayName(slug);
     var backLink = document.getElementById('back-link');
     if (backLink) backLink.href = '/outils?eleve=' + encodeURIComponent(slug);
 

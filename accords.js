@@ -16,6 +16,7 @@
     // Whitelist déléguée à /api/eleves via assets/js/eleve-guard.js (avec
     // fallback hardcodé). Permet aux nouveaux élèves créés par l'admin
     // d'accéder sans patcher ce fichier.
+    function displayName(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
     var params = new URLSearchParams(window.location.search);
     var slugRaw = params.get('eleve');
     var slug = slugRaw ? slugRaw.toLowerCase() : null;
@@ -514,7 +515,7 @@
         if (back) back.href = '/outils?eleve=' + encodeURIComponent(slug);
 
         var sub = $('page-subtitle');
-        if (sub) sub.textContent = (DISPLAY[slug] || slug) + ' · 22 types · renversements';
+        if (sub) sub.textContent = displayName(slug) + ' · 22 types · renversements';
 
         // ─ Bottom sheet (mobile) ─
         var btnOpen = $('btn-open-sheet');

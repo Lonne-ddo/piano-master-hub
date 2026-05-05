@@ -15,6 +15,7 @@
 
     // ═══ Slug + persistance ═══
     // Whitelist déléguée à /api/eleves via assets/js/eleve-guard.js.
+    function displayName(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
     var params = new URLSearchParams(window.location.search);
     var slugRaw = params.get('eleve');
     var slug = slugRaw ? slugRaw.toLowerCase() : null;
@@ -445,7 +446,7 @@
 
     function renderResults() {
         var sub = $('page-subtitle');
-        if (sub) sub.textContent = (DISPLAY[slug] || slug) + ' · ' + state.progressions.length + ' progressions';
+        if (sub) sub.textContent = displayName(slug) + ' · ' + state.progressions.length + ' progressions';
 
         // Tempo bar sticky en haut de la phase résultats
         var html = '<div class="tempo-bar">';
