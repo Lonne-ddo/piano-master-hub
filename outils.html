@@ -264,15 +264,11 @@
             sub: "22 types · renversements · clavier interactif",
             href: function(slug) { return "/accords?eleve=" + encodeURIComponent(slug); },
             active: true
-        },
-        {
-            id: "bibli",
-            icon: "📖",
-            title: "Bibliothèque musicale",
-            sub: "Paroles + accords · transpose · lecture audio",
-            href: function(slug) { return "/bibli?eleve=" + encodeURIComponent(slug); },
-            active: true
         }
+        // Note : Bibliothèque (id 'bibli') retirée de la liste des outils
+        // accessibles aux élèves. Le fichier bibli.html reste accessible
+        // directement (admin via impersonate + URL /bibli?eleve=<slug>) en
+        // attendant retravail futur (possible feature payante).
     ];
 
     (async function init() {
