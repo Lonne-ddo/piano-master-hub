@@ -51,6 +51,22 @@
         if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
       }
 
+      // Early-return : si l'URL cible explicitement un espace élève via
+      // ?eleve=<slug>, on laisse le script principal gérer le rendu (auth
+      // via /api/eleves/:slug/public côté backend, qui accepte aussi le
+      // cookie admin pour la consultation cross-élève par l'admin).
+      // Évite que admin/?eleve=messon soit écrasé par redirect vers /admin/outils.
+      var initialParams;
+      try { initialParams = new URLSearchParams(window.location.search); }
+      catch (e) { initialParams = null; }
+      if (initialParams && initialParams.get('eleve')) {
+        // Body déjà caché par CSS — on le révèle dès le DOM prêt pour que
+        // le script principal puisse rendre l'espace élève sans flash.
+        if (document.body) showFormAndCleanup();
+        else document.addEventListener('DOMContentLoaded', showFormAndCleanup, { once: true });
+        return;
+      }
+
       // fetch avec timeout 3s en fallback (AbortController).
       function fetchWithTimeout(url, opts, timeoutMs) {
         var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
