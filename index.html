@@ -860,6 +860,26 @@
         }
         var slugParam = normalize(params.get("eleve") || "");
 
+        // Cas spécial : admin en consultation cross-élève. Si l'URL contient
+        // ?eleve=<slug>, l'admin (cookie mh_admin_pw) doit pouvoir consulter
+        // l'espace élève sans avoir de cookie mh_session. Le backend
+        // /api/eleves/:slug/public accepte les deux (cf requireEleveOrAdmin).
+        // → On essaie /api/admin/check d'abord pour cette branche.
+        function tryAdminThenRender() {
+            return fetch("/api/admin/check", { credentials: "include" })
+                .then(function(r) { return r.ok ? r.json() : null; })
+                .then(function(jAdmin) {
+                    if (jAdmin && jAdmin.ok && slugParam) {
+                        var adminEleve = findEleveBySlug(slugParam)
+                            || { slug: slugParam, display: slugParam.charAt(0).toUpperCase() + slugParam.slice(1) };
+                        renderEspaceEleve(adminEleve);
+                        return true;
+                    }
+                    return false;
+                })
+                .catch(function() { return false; });
+        }
+
         fetch("/api/auth/whoami", { credentials: "include" })
             .then(function(r) { return r.ok ? r.json() : null; })
             .then(function(j) {
@@ -867,13 +887,24 @@
                 var authed = j && j.ok;
 
                 if (!authed) {
+                    // Pas de session élève. Si ?eleve= explicite → tente admin.
+                    if (slugParam) {
+                        return tryAdminThenRender().then(function(ok) {
+                            if (!ok) renderLoginEmail(initialError);
+                        });
+                    }
                     renderLoginEmail(initialError);
                     return;
                 }
 
-                // Session élève uniquement (l'admin se logue séparément sur
-                // /admin/login.html). Une session sans slug est anormale → login.
+                // Session élève valide.
                 if (!j.slug) {
+                    // Cas anormal (session sans slug) → fallback admin si ?eleve=
+                    if (slugParam) {
+                        return tryAdminThenRender().then(function(ok) {
+                            if (!ok) renderLoginEmail(initialError);
+                        });
+                    }
                     renderLoginEmail(initialError);
                     return;
                 }
@@ -886,7 +917,15 @@
                 localStorage.setItem("eleve_slug", meEleve.slug);
                 renderEspaceEleve(meEleve);
             })
-            .catch(function() { renderLoginEmail(initialError); });
+            .catch(function() {
+                // Erreur réseau sur whoami : si ?eleve= explicite, tente admin.
+                if (slugParam) {
+                    return tryAdminThenRender().then(function(ok) {
+                        if (!ok) renderLoginEmail(initialError);
+                    });
+                }
+                renderLoginEmail(initialError);
+            });
     }
 
     // Source de vérité : /api/eleves (KV eleves:list). Fallback ELEVES_WHITELIST
