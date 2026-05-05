@@ -54,7 +54,10 @@ export async function onRequestGet({ params, request, env }) {
   }
 
   if (!data) {
-    return jsonResponse({ slug, stats: null, derniere_seance: null, doc_url: null });
+    return jsonResponse({
+      slug, stats: null, derniere_seance: null, doc_url: null,
+      links: { drive: null, telegram: null },
+    });
   }
 
   // Whitelist STRICTE des champs exposés (sécurité côté élève)
@@ -82,5 +85,17 @@ export async function onRequestGet({ params, request, env }) {
   const doc_url = data.doc_url
     || (data.doc_id ? `https://docs.google.com/document/d/${data.doc_id}/edit` : null);
 
-  return jsonResponse({ slug, stats, derniere_seance, doc_url });
+  // Liens canaux personnels exposés à l'élève (whitelist stricte des URLs).
+  // Pas de handle ni autre meta privée. Validation https:// pour éviter
+  // les javascript: et data: URI dans le HTML rendu côté client.
+  function safeUrl(u) {
+    if (typeof u !== 'string') return null;
+    return /^https?:\/\//i.test(u) ? u : null;
+  }
+  const links = {
+    drive: safeUrl(data.canaux?.drive?.url),
+    telegram: safeUrl(data.canaux?.telegram?.url),
+  };
+
+  return jsonResponse({ slug, stats, derniere_seance, doc_url, links });
 }
