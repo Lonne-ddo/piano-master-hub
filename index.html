@@ -1,126 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <style>
-      /* Auto-redirect guard : on cache le contenu pendant le check de session
-         (évite le flash du formulaire login si l'utilisateur est déjà loggé).
-         Le script ci-dessous retire body{display:none} dès que le check est
-         terminé OU au timeout 3s. */
-      body { display: none; }
-      .mh-boot-overlay {
-        position: fixed; inset: 0;
-        z-index: 99999;
-        background: #0f0f14;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 14px;
-      }
-      .mh-boot-spinner {
-        width: 48px; height: 48px;
-        border: 3px solid rgba(255,255,255,0.1);
-        border-top-color: #A78BFA;
-        border-radius: 50%;
-        animation: mh-boot-spin 0.8s linear infinite;
-      }
-      @keyframes mh-boot-spin { to { transform: rotate(360deg); } }
-    </style>
-    <script>
-    // ─── Auto-redirect si session déjà valide ────────────────────────
-    // Au load de / : check séquentiel whoami (élève) → admin/check (admin) →
-    // sinon affiche le formulaire login. Spinner pendant le check.
-    // Timeout 3s par check pour éviter un spinner stuck si l'API ne répond pas.
-    (function () {
-      var overlay = document.createElement('div');
-      overlay.className = 'mh-boot-overlay';
-      var spinner = document.createElement('div');
-      spinner.className = 'mh-boot-spinner';
-      overlay.appendChild(spinner);
-      // L'overlay est mis dans le body dès que ce dernier existe.
-      function mountOverlay() {
-        if (document.body) document.body.appendChild(overlay);
-        else document.addEventListener('DOMContentLoaded', mountOverlay, { once: true });
-      }
-      mountOverlay();
-
-      function showFormAndCleanup() {
-        document.documentElement.style.removeProperty('--mh-bootguard');
-        // 'block' (pas '') pour overrider la règle CSS body{display:none} de
-        // l'inline <style> ligne 9. Avec '', l'inline style est retiré mais la
-        // règle CSS reste appliquée → body invisible. Bug observé sur ?eleve=
-        // qui appelait showFormAndCleanup via early-return puis runInit().
-        document.body.style.display = 'block';
-        if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
-      }
-
-      // Early-return : si l'URL cible explicitement un espace élève via
-      // ?eleve=<slug>, on laisse le script principal gérer le rendu (auth
-      // via /api/eleves/:slug/public côté backend, qui accepte aussi le
-      // cookie admin pour la consultation cross-élève par l'admin).
-      // Évite que admin/?eleve=messon soit écrasé par redirect vers /admin/.
-      var initialParams;
-      try { initialParams = new URLSearchParams(window.location.search); }
-      catch (e) { initialParams = null; }
-      if (initialParams && initialParams.get('eleve')) {
-        // Body déjà caché par CSS — on le révèle dès le DOM prêt pour que
-        // le script principal puisse rendre l'espace élève sans flash.
-        if (document.body) showFormAndCleanup();
-        else document.addEventListener('DOMContentLoaded', showFormAndCleanup, { once: true });
-        return;
-      }
-
-      // fetch avec timeout 3s en fallback (AbortController).
-      function fetchWithTimeout(url, opts, timeoutMs) {
-        var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-        var sigOpts = ctrl ? Object.assign({}, opts || {}, { signal: ctrl.signal }) : (opts || {});
-        var timer = ctrl ? setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, timeoutMs) : null;
-        return fetch(url, sigOpts)
-          .then(function (r) { if (timer) clearTimeout(timer); return r; })
-          .catch(function (e) { if (timer) clearTimeout(timer); throw e; });
-      }
-
-      // Slug courant dans l'URL (si présent → pas redirect si match)
-      function currentSlug() {
-        try {
-          var p = new URLSearchParams(window.location.search);
-          return (p.get('eleve') || '').trim().toLowerCase();
-        } catch (e) { return ''; }
-      }
-
-      // Phase 1 : check session élève
-      fetchWithTimeout('/api/auth/whoami', { credentials: 'include' }, 3000)
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) {
-          if (j && j.ok && j.slug) {
-            // Élève loggé : si déjà sur le bon slug, on laisse le script
-            // principal gérer le rendu. Sinon, redirect vers son slug.
-            var slug = String(j.slug).toLowerCase();
-            if (currentSlug() === slug) {
-              showFormAndCleanup(); // body affiché, init() rendra l'espace élève
-              return null;
-            }
-            window.location.replace('/?eleve=' + encodeURIComponent(slug));
-            return 'redirected';
-          }
-          // Phase 2 : pas d'élève → check session admin
-          return fetchWithTimeout('/api/admin/check', { credentials: 'include' }, 3000)
-            .then(function (r2) { return r2.ok ? r2.json() : null; })
-            .then(function (j2) {
-              if (j2 && j2.ok) {
-                window.location.replace('/admin/');
-                return 'redirected';
-              }
-              return null;
-            });
-        })
-        .catch(function () { /* timeout / réseau : fallback formulaire */ })
-        .then(function (state) {
-          if (state === 'redirected') return; // overlay reste, navigation en cours
-          showFormAndCleanup();
-        });
-    })();
-    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Master Hub — Espace élève</title>
@@ -486,11 +366,6 @@
             text-decoration: none;
         }
         .login-help a:hover { text-decoration: underline; }
-        .login-help a.logout-link {
-            color: var(--text-muted);
-            font-size: 0.78rem;
-        }
-        .login-help a.logout-link:hover { color: var(--text); }
 
         /* Footer "Changer de profil" */
         .footer-actions {
@@ -969,7 +844,6 @@
                 '</form>' +
                 '<div class="login-status" id="login-status"></div>' +
                 '<p class="login-help">Pas encore inscrit ? <a href="https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master" target="_blank" rel="noopener noreferrer">Découvrir Piano Master</a></p>' +
-                '<p class="login-help"><a href="#" id="logout-all-link" class="logout-link">Se connecter avec un autre compte</a></p>' +
             '</div>';
 
         var form = document.getElementById("login-form");
@@ -1024,23 +898,6 @@
         });
 
         setTimeout(function() { try { input.focus(); } catch (e) {} }, 200);
-
-        // Lien "Se connecter avec un autre compte" : POST aux deux logout
-        // (élève + admin), puis reload. Marche aussi sans cookie (no-op sûr).
-        var logoutLink = document.getElementById("logout-all-link");
-        if (logoutLink) {
-            logoutLink.addEventListener("click", function (ev) {
-                ev.preventDefault();
-                logoutLink.style.opacity = '0.5';
-                logoutLink.style.pointerEvents = 'none';
-                Promise.allSettled([
-                    fetch('/api/auth/logout',  { method: 'POST', credentials: 'include' }),
-                    fetch('/api/admin/logout', { method: 'POST', credentials: 'include' }),
-                ]).finally(function () {
-                    window.location.reload();
-                });
-            });
-        }
     }
 
     // ──────────────────────────────────────────────
