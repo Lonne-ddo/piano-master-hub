@@ -144,6 +144,18 @@
       background: var(--v); border-color: var(--v); color: #fff;
     }
     .hbtn.primary:hover { background: var(--v-soft); border-color: var(--v-soft); }
+    .impersonate-header-btn {
+      color: var(--v);
+      border-color: rgba(139, 111, 232, 0.45);
+    }
+    .impersonate-header-btn:hover:not([disabled]) {
+      background: var(--v-dim);
+      border-color: var(--v);
+    }
+    .impersonate-header-btn[disabled] {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
 
     /* ── Modal Ajouter un élève ──────────────────────────── */
     .add-modal-overlay {
@@ -215,22 +227,6 @@
       justify-content: flex-end;
       gap: 8px;
     }
-    .impersonate-btn {
-      background: transparent;
-      border: 1px solid rgba(139, 111, 232, 0.45);
-      color: var(--v);
-      padding: 7px 13px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-family: inherit;
-      font-size: 12px;
-      font-weight: 500;
-      transition: background .15s;
-    }
-    .impersonate-btn:hover {
-      background: var(--v-dim);
-    }
-    .impersonate-btn[disabled] { opacity: .5; cursor: wait; }
     .delete-eleve-btn {
       background: transparent;
       border: 1px solid rgba(224, 92, 107, 0.4);
@@ -788,7 +784,9 @@
         <span class="icon">&#128260;</span><span class="label">Sync All</span>
       </button>
       <a class="hbtn" href="/admin/" title="Retour aux outils admin">&larr; Outils</a>
-      <a class="hbtn" href="/" title="Retour à l'espace élève">&larr; Espace &eacute;l&egrave;ve</a>
+      <button type="button" class="hbtn impersonate-header-btn" id="header-impersonate-btn" disabled title="Sélectionne un élève d'abord" onclick="impersonateActiveEleve()">
+        <span class="icon">&#128065;</span><span class="label">Voir son espace</span>
+      </button>
     </div>
   </header>
 
@@ -876,6 +874,7 @@ function renderEmpty() {
       <p>Choisis un élève en haut pour voir son profil</p>
     </div>
   `;
+  if (typeof refreshHeaderImpersonateBtn === 'function') refreshHeaderImpersonateBtn();
 }
 
 function showLoader(nom) {
@@ -1166,9 +1165,6 @@ function renderProfile(s) {
       </div>
     </div>
     <div class="delete-eleve-row">
-      <button type="button" class="impersonate-btn" onclick="impersonateEleve('${s.id}')">
-        👁 Voir son espace
-      </button>
       <button type="button" class="delete-eleve-btn" onclick="deleteEleve('${s.id}','${escapeHtml(s.nom || s.id).replace(/'/g, "&#39;")}')">
         🗑 Supprimer cet élève
       </button>
@@ -1192,6 +1188,7 @@ function renderProfile(s) {
 async function selectStudent(id, forceSync = false) {
   activeId = id;
   renderTabs();
+  if (typeof refreshHeaderImpersonateBtn === 'function') refreshHeaderImpersonateBtn();
   const meta = STUDENT_LIST.find(s => s.id === id);
   if (!meta) return;
   const url = new URL(window.location);
@@ -1698,6 +1695,28 @@ async function impersonateEleve(slug) {
   }
 }
 window.impersonateEleve = impersonateEleve;
+
+// Bouton "Voir son espace" du header — utilise activeId courant.
+// Désactivé si aucun élève sélectionné (renderEmpty).
+function impersonateActiveEleve() {
+  if (!activeId) return;
+  impersonateEleve(activeId);
+}
+window.impersonateActiveEleve = impersonateActiveEleve;
+
+// Synchronise l'état du bouton header avec le slug actif.
+// Appelé après chaque selectStudent / renderProfile / renderEmpty.
+function refreshHeaderImpersonateBtn() {
+  var btn = document.getElementById('header-impersonate-btn');
+  if (!btn) return;
+  if (activeId) {
+    btn.disabled = false;
+    btn.title = 'Voir l\'espace de cet élève';
+  } else {
+    btn.disabled = true;
+    btn.title = 'Sélectionne un élève d\'abord';
+  }
+}
 
 async function init() {
   // Source de vérité : /api/eleves (KV eleves:list). Fallback STUDENT_LIST hardcodé.
