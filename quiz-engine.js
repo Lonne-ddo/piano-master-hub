@@ -329,6 +329,12 @@
         return Tone.start().then(function () {
             var q = self.current();
             if (!q) return;
+            // Stoppe systématiquement tout son en cours avant de jouer la
+            // question suivante (clearTimeout + sampler.releaseAll). Évite
+            // les chevauchements de notes lorsqu'on enchaîne les réponses
+            // rapidement dans les modes notes/intervals/chords (les modes
+            // scales/progressions le faisaient déjà localement avant).
+            self._clearScheduled();
             if (self.mode === 'notes') {
                 var dur = QUIZ_DATA.notes.duration;
                 self.sampler.triggerAttackRelease(q.payload.tone, dur);
@@ -349,12 +355,12 @@
                     self.sampler.triggerAttackRelease(n, '2n', nowCh);
                 });
             } else if (self.mode === 'scales') {
-                // Replay limit (par niveau)
+                // Replay limit (par niveau). Note : _clearScheduled() a déjà
+                // été appelé au début de playCurrent — un click "Réécouter"
+                // au-delà du quota coupe le son en cours puis ne relance rien.
                 var maxPlays = QUIZ_DATA.scales.REPLAY_BY_LEVEL[self.level] || 999;
                 if (self.replaysUsedForCurrent >= maxPlays) return;
                 self.replaysUsedForCurrent++;
-                // Stop toute lecture en cours avant de re-démarrer (clic Réécouter)
-                self._clearScheduled();
                 var sd = QUIZ_DATA.scales;
                 var rootStr = q.payload.tonic + sd.OCTAVE;
                 var dur = sd.NOTE_DURATION_S;
@@ -366,7 +372,7 @@
                     self._scheduledTimeouts.push(id);
                 });
             } else if (self.mode === 'progressions') {
-                self._clearScheduled();
+                // _clearScheduled() déjà appelé au début de playCurrent.
                 var pd = QUIZ_DATA.progressions;
                 var triads = pd.TRIADS_C_MAJOR;
                 var durP = pd.CHORD_DURATION_S;
