@@ -232,6 +232,19 @@
       display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
     }
     .sep-title { font-size: 14.5px; font-weight: 700; color: var(--text1); flex: 1 1 auto; min-width: 0; }
+    .sep-title-edit {
+      font-size: 14.5px; font-weight: 700; color: var(--text1);
+      flex: 1 1 auto; min-width: 0;
+      font-family: inherit;
+      background: transparent;
+      border: 1px solid rgba(139,111,232,0.3);
+      border-radius: 6px;
+      padding: 1px 6px; margin: -2px -7px;
+      outline: none;
+      transition: border-color .15s, opacity .15s;
+    }
+    .sep-title-edit:focus { border-color: var(--v); }
+    .sep-title-edit:disabled { opacity: 0.6; cursor: progress; }
     .sep-meta {
       font-size: 11px; color: var(--text3);
       font-family: 'DM Mono', monospace; letter-spacing: .03em;
@@ -408,6 +421,8 @@
       opacity: 0; pointer-events: none; transition: opacity 0.2s;
     }
     .st-toast.show { opacity: 1; }
+    .st-toast.success { border-color: rgba(52,211,153,0.45); color: #34D399; }
+    .st-toast.error { border-color: rgba(224,92,107,0.55); color: var(--red); }
 
     .boot {
       display: flex; flex-direction: column; align-items: center; gap: 12px;
@@ -919,6 +934,7 @@ function renderList() {
           '<span class="' + assignedClass + '">' + escapeHtml(assignedLabel) + '</span>' +
           '<div class="sep-actions">' +
             '<button class="sep-btn" data-act="toggle">▶ Écouter</button>' +
+            '<button class="sep-btn" data-act="rename">✏️ Renommer</button>' +
             '<button class="sep-btn" data-act="assign">👥 Assigner</button>' +
             '<button class="sep-btn danger" data-act="delete">🗑</button>' +
           '</div>' +
@@ -934,11 +950,74 @@ function renderList() {
       btn.addEventListener('click', () => {
         const act = btn.getAttribute('data-act');
         if (act === 'toggle') openPlayer(id);
+        else if (act === 'rename') startRename(card, id);
         else if (act === 'assign') openAssignModal(id);
         else if (act === 'delete') deleteSep(id);
       });
     });
   });
+}
+
+// ─── Renommer une séparation ───────────────────────────────
+// Swap inline span ↔ input, optimistic update + rollback si l'API fail.
+// note : player déjà ouvert ne se met pas à jour, by design.
+function startRename(card, id) {
+  const span = card.querySelector('.sep-title');
+  if (!span || card.querySelector('.sep-title-edit')) return;
+
+  const oldTitle = span.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'sep-title-edit';
+  input.value = oldTitle;
+  input.maxLength = 200;
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+
+  function restore(title) {
+    if (done) return;
+    done = true;
+    const s = document.createElement('span');
+    s.className = 'sep-title';
+    s.textContent = title;
+    if (input.parentNode) input.replaceWith(s);
+  }
+
+  async function commit() {
+    if (done || input.disabled) return;
+    const newTitle = input.value.replace(/[\x00-\x1F\x7F]/g, '').trim();
+    if (!newTitle || newTitle === oldTitle) { restore(oldTitle); return; }
+    if (newTitle.length > 200) { restore(oldTitle); toast('Titre trop long (200 max).', 'error'); return; }
+
+    input.disabled = true;
+    try {
+      const r = await fetch('/api/stems/' + encodeURIComponent(id), {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      const idx = separationsCache.findIndex((s) => s.id === id);
+      if (idx >= 0) separationsCache[idx].title = j.title;
+      restore(j.title);
+      toast('Renommé ✓', 'success');
+    } catch (e) {
+      console.error('[stems] rename failed', e);
+      restore(oldTitle);
+      toast('Erreur : ' + (e.message || 'rename failed'), 'error');
+    }
+  }
+
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); restore(oldTitle); }
+  });
+  input.addEventListener('blur', () => { commit(); });
 }
 
 // Couleurs des stems alignées avec multitrack.css
@@ -1085,13 +1164,13 @@ function formatDate(iso) {
   return dd + ' ' + mm + ' · ' + hh + ':' + min;
 }
 
-function toast(msg) {
+function toast(msg, type = 'info') {
   let t = document.querySelector('.st-toast');
   if (!t) {
     t = document.createElement('div');
-    t.className = 'st-toast';
     document.body.appendChild(t);
   }
+  t.className = 'st-toast' + (type === 'success' || type === 'error' ? ' ' + type : '');
   t.textContent = msg;
   requestAnimationFrame(() => t.classList.add('show'));
   clearTimeout(toast._tid);
