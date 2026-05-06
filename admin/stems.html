@@ -231,7 +231,19 @@
     .sep-card-head {
       display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
     }
-    .sep-title { font-size: 14.5px; font-weight: 700; color: var(--text1); flex: 1 1 auto; min-width: 0; }
+    .sep-title {
+      font-size: 14.5px; font-weight: 700; color: var(--text1);
+      flex: 1 1 auto; min-width: 0;
+      cursor: text;
+      transition: opacity .15s ease;
+    }
+    .sep-title:hover {
+      opacity: 0.8;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-decoration-color: color-mix(in srgb, var(--v) 40%, transparent);
+      text-underline-offset: 3px;
+    }
     .sep-title-edit {
       font-size: 14.5px; font-weight: 700; color: var(--text1);
       flex: 1 1 auto; min-width: 0;
@@ -929,12 +941,11 @@ function renderList() {
     return (
       '<div class="sep-card" data-id="' + escapeAttr(s.id) + '">' +
         '<div class="sep-card-head">' +
-          '<span class="sep-title">' + escapeHtml(s.title) + '</span>' +
+          '<span class="sep-title" title="Cliquer pour renommer">' + escapeHtml(s.title) + '</span>' +
           '<span class="sep-meta">' + escapeHtml(date) + '</span>' +
           '<span class="' + assignedClass + '">' + escapeHtml(assignedLabel) + '</span>' +
           '<div class="sep-actions">' +
             '<button class="sep-btn" data-act="toggle">▶ Écouter</button>' +
-            '<button class="sep-btn" data-act="rename">✏️ Renommer</button>' +
             '<button class="sep-btn" data-act="assign">👥 Assigner</button>' +
             '<button class="sep-btn danger" data-act="delete">🗑</button>' +
           '</div>' +
@@ -950,11 +961,12 @@ function renderList() {
       btn.addEventListener('click', () => {
         const act = btn.getAttribute('data-act');
         if (act === 'toggle') openPlayer(id);
-        else if (act === 'rename') startRename(card, id);
         else if (act === 'assign') openAssignModal(id);
         else if (act === 'delete') deleteSep(id);
       });
     });
+    const titleEl = card.querySelector('.sep-title');
+    if (titleEl) titleEl.addEventListener('click', () => startRename(card, id));
   });
 }
 
