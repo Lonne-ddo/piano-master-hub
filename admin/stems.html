@@ -1090,8 +1090,46 @@ async function openPlayer(id) {
         body: JSON.stringify({ peaks }),
       }).catch(function () {});
     },
+    onDownload: function (trackId, btn) {
+      downloadTrack(id, trackId, btn);
+    },
   });
   activePlayer.open();
+}
+
+// Télécharge une piste isolée. Spinner sur le bouton (min 300ms pour éviter
+// flash), download via blob + a[download]. Le filename est dérivé du header
+// Content-Disposition côté serveur (titre courant slugifié).
+async function downloadTrack(sepId, trackId, btn) {
+  if (btn.classList.contains('loading')) return;
+  btn.classList.add('loading');
+  const start = Date.now();
+  try {
+    const r = await fetch(
+      '/api/stems/' + encodeURIComponent(sepId) + '/download/' + encodeURIComponent(trackId),
+      { credentials: 'same-origin' },
+    );
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const blob = await r.blob();
+    const cd = r.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="([^"]+)"/);
+    const filename = m ? m[1] : (sepId + '-' + trackId + '.mp3');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  } catch (e) {
+    console.error('[stems] download failed', e);
+    toast('Téléchargement échoué', 'error');
+  } finally {
+    const elapsed = Date.now() - start;
+    const wait = elapsed < 300 ? 300 - elapsed : 0;
+    setTimeout(function () { btn.classList.remove('loading'); }, wait);
+  }
 }
 
 async function deleteSep(id) {

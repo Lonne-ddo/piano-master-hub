@@ -198,6 +198,38 @@
   cursor: pointer;
 }
 
+.mtp-dl-btn {
+  width: 28px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.12s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.mtp-dl-btn:hover {
+  color: var(--stem-color, #eeeaf8);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.mtp-dl-btn.loading {
+  cursor: progress;
+  pointer-events: none;
+  color: var(--stem-color, #8B6FE8);
+}
+.mtp-dl-btn.loading .mtp-dl-icon {
+  display: inline-block;
+  animation: mtp-dl-spin 0.8s linear infinite;
+}
+@keyframes mtp-dl-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ── Waveform ─────────────────────────────────────────────── */
 .mtp-track-wave {
   position: relative;
@@ -336,5 +368,6 @@
 @media (max-width: 379px) {
   .mtp-track-label { font-size: 12px; }
   .mtp-mute, .mtp-solo { width: 26px; height: 24px; font-size: 10px; }
+  .mtp-dl-btn { width: 26px; height: 24px; font-size: 12px; }
   .mtp-time { min-width: 76px; font-size: 11px; }
 }

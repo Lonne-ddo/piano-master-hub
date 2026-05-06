@@ -309,6 +309,21 @@
     ctrls.appendChild(btnRow);
     ctrls.appendChild(volWrap);
 
+    // Bouton télécharger (optionnel — uniquement si callback fourni)
+    if (typeof this.opts.onDownload === 'function') {
+      const dlBtn = document.createElement('button');
+      dlBtn.type = 'button';
+      dlBtn.className = 'mtp-dl-btn';
+      dlBtn.title = 'Télécharger ' + (track.label || track.id);
+      dlBtn.setAttribute('aria-label', dlBtn.title);
+      dlBtn.innerHTML = '<span class="mtp-dl-icon">⬇</span>';
+      dlBtn.addEventListener('click', function () {
+        if (dlBtn.classList.contains('loading')) return;
+        self.opts.onDownload(track.id, dlBtn);
+      });
+      ctrls.appendChild(dlBtn);
+    }
+
     // Waveform col (right) — canvas + overlay playhead
     const wave = document.createElement('div');
     wave.className = 'mtp-track-wave';
