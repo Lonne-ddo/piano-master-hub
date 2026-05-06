@@ -554,6 +554,56 @@ export async function onRequestPatch({ params, request, env }) {
     if (body[f] !== undefined) updated[f] = body[f];
   }
 
+  // ── Handle derniere_seance (form post-séance) ─────────────────
+  // body.derniere_seance = { date, titre, devoirs[], resume[] }
+  // Pose `manualEdit: true` → sync.js ne réécrasera plus tant que le flag
+  // est présent (cf. extractLatestSession). Pour ré-autoriser le sync auto :
+  // body.derniere_seance_unflag = true (delete le flag).
+  if (body.derniere_seance !== undefined && body.derniere_seance !== null) {
+    const ds = body.derniere_seance;
+    if (typeof ds !== 'object' || Array.isArray(ds)) {
+      return jsonResponse({ error: 'derniere_seance invalide (objet attendu)' }, 400);
+    }
+    if (typeof ds.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(ds.date) || parseIsoDate(ds.date) === null) {
+      return jsonResponse({ error: 'derniere_seance.date invalide (YYYY-MM-DD)' }, 400);
+    }
+    if (typeof ds.titre !== 'string' || !ds.titre.trim() || ds.titre.length > 80) {
+      return jsonResponse({ error: 'derniere_seance.titre invalide (1-80 chars)' }, 400);
+    }
+    const cleanList = (arr, name) => {
+      if (!Array.isArray(arr)) {
+        throw new Error(`derniere_seance.${name} doit être un array`);
+      }
+      const cleaned = arr
+        .filter((s) => typeof s === 'string')
+        .map((s) => s.replace(/[\x00-\x1F\x7F]/g, '').trim())
+        .filter((s) => s.length > 0 && s.length <= 200);
+      return cleaned;
+    };
+    let devoirs, resume;
+    try {
+      devoirs = cleanList(ds.devoirs, 'devoirs');
+      resume  = cleanList(ds.resume,  'resume');
+    } catch (e) {
+      return jsonResponse({ error: e.message }, 400);
+    }
+    updated.derniere_seance = {
+      date: ds.date,
+      titre: ds.titre.trim(),
+      devoirs,
+      resume,
+      manualEdit: true,
+      _editedAt: new Date().toISOString(),
+    };
+  }
+
+  // body.derniere_seance_unflag = true → delete manualEdit flag
+  // (réautorise sync.js à écraser au prochain Sync All)
+  if (body.derniere_seance_unflag === true && updated.derniere_seance) {
+    const { manualEdit, _editedAt, ...rest } = updated.derniere_seance;
+    updated.derniere_seance = rest;
+  }
+
   updated._patchedAt = new Date().toISOString();
   // Pas de TTL : un override saisi manuellement doit persister jusqu'au prochain reset explicite.
   await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated));

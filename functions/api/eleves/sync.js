@@ -383,33 +383,39 @@ export async function onRequestPost(context) {
       const statsAutoRaw = computeAutoStats(sessionTitles);
       console.log(`[sync.js] eleve=${name} step=stats_auto nb_cours=${statsAutoRaw.nb_cours} debut=${statsAutoRaw.date_debut} fin=${statsAutoRaw.date_fin_prevue}`);
 
-      // 3. LLM cascade pour derniere_seance uniquement (Gemini → Groq → Claude)
-      let extracted;
-      try {
-        extracted = await extractLatestSession(docText, name, capitalize(name), env);
-      } catch (llmErr) {
-        // Tous les LLM ont échoué → ne pas toucher le cache existant (stale préservé)
-        const cacheKey = `eleve:${name}`;
-        const existing = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'json' });
-        llmFailed.push({
-          eleve: name,
-          providers_tried: llmErr.tried || [],
-          errors: (llmErr.errors || []).map(e => ({ provider: e.provider, message: e.message })),
-          has_stale_cache: !!existing,
-        });
-        results[name] = {
-          ok: false,
-          error: 'All LLM providers failed',
-          providers_tried: llmErr.tried || [],
-          stale_cache_available: !!existing,
-        };
-        console.error(`[sync.js] eleve=${name} step=llm_cascade status=all_failed providers=${(llmErr.tried || []).join(',')} stale=${!!existing}`);
-        continue;
+      // 3. LLM cascade pour derniere_seance uniquement (Gemini → Groq → Claude).
+      //    Skip si l'admin a édité manuellement la séance (manualEdit === true) :
+      //    on évite l'appel LLM pour économiser et préserver le contenu admin.
+      const cacheKey = `eleve:${name}`;
+      const existing = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'json' }) || {};
+      const keepManualSeance = existing.derniere_seance?.manualEdit === true;
+
+      let extracted = null;
+      if (!keepManualSeance) {
+        try {
+          extracted = await extractLatestSession(docText, name, capitalize(name), env);
+        } catch (llmErr) {
+          // Tous les LLM ont échoué → ne pas toucher le cache existant (stale préservé)
+          llmFailed.push({
+            eleve: name,
+            providers_tried: llmErr.tried || [],
+            errors: (llmErr.errors || []).map(e => ({ provider: e.provider, message: e.message })),
+            has_stale_cache: !!existing,
+          });
+          results[name] = {
+            ok: false,
+            error: 'All LLM providers failed',
+            providers_tried: llmErr.tried || [],
+            stale_cache_available: !!existing,
+          };
+          console.error(`[sync.js] eleve=${name} step=llm_cascade status=all_failed providers=${(llmErr.tried || []).join(',')} stale=${!!existing}`);
+          continue;
+        }
+      } else {
+        console.log(`[sync.js] eleve=${name} step=llm_cascade status=skipped reason=manualEdit`);
       }
 
       // 4. Merge avec KV existant + override prioritaire
-      const cacheKey = `eleve:${name}`;
-      const existing = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'json' }) || {};
       const docUrl = `https://docs.google.com/document/d/${docId}/edit`;
 
       // Override préservé tel quel entre syncs (spread = robuste à l'ajout futur de champs).
@@ -428,7 +434,10 @@ export async function onRequestPost(context) {
         // en cas d'incohérence KV.
         doc_id: existing.doc_id || docId,
         doc_url: existing.doc_url || docUrl,
-        derniere_seance: extracted.parsed,
+        // derniere_seance : si manualEdit posé par admin → préserve, sinon écrase
+        // avec extraction LLM fraîche. Quand on skip (extracted=null), `existing`
+        // est déjà spread donc derniere_seance reste intact.
+        ...(extracted ? { derniere_seance: extracted.parsed } : {}),
         // Stats : bloc fusionné + bloc raw (pour reset) + override (persistant)
         stats,
         stats_auto_raw: statsAutoRaw,
@@ -446,15 +455,16 @@ export async function onRequestPost(context) {
       await env.MASTERHUB_STUDENTS.put(cacheKey, JSON.stringify(updated));
       results[name] = {
         ok: true,
-        provider: extracted.provider,
+        provider: extracted ? extracted.provider : 'skipped_manual',
         nb_cours: stats.nb_cours,
         date_debut: stats.date_debut,
         date_fin: stats.date_fin,
         progression: stats.progression_pct,
-        derniere_seance_date: extracted.parsed?.date,
-        derniere_seance_titre: extracted.parsed?.titre,
+        derniere_seance_date: updated.derniere_seance?.date || null,
+        derniere_seance_titre: updated.derniere_seance?.titre || null,
+        manual_seance: keepManualSeance,
       };
-      console.log(`[sync.js] eleve=${name} step=done provider=${extracted.provider} duration=${Date.now()-startMs}ms override=${stats.override_active.date_debut || stats.override_active.date_fin ? 'yes' : 'no'}`);
+      console.log(`[sync.js] eleve=${name} step=done provider=${extracted ? extracted.provider : 'skipped_manual'} duration=${Date.now()-startMs}ms override=${stats.override_active.date_debut || stats.override_active.date_fin ? 'yes' : 'no'}`);
 
     } catch (e) {
       results[name] = { ok: false, error: e.message };

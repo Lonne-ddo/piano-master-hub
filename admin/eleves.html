@@ -473,6 +473,99 @@
       letter-spacing: 0;
       font-weight: 500;
     }
+    .ds-quick-btn {
+      margin-left: 8px;
+      font-size: 11px;
+      padding: 4px 9px;
+      border-radius: 6px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .15s;
+    }
+    .ds-quick-btn:hover { background: var(--v-dim); color: var(--v); border-color: var(--v); }
+    .ds-manual-banner {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin: 6px 0 10px;
+    }
+    .ds-manual-badge {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: rgba(251,146,60,0.12);
+      color: #FB923C;
+      border: 1px solid rgba(251,146,60,0.35);
+      cursor: help;
+    }
+    .ds-resync-btn {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text3);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .15s;
+    }
+    .ds-resync-btn:hover { color: var(--v); border-color: var(--v); }
+
+    /* ── Modal Mise à jour rapide ──────────────────────────── */
+    .quick-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .quick-modal {
+      width: 100%; max-width: 540px;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      display: flex; flex-direction: column; gap: 14px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+    }
+    .quick-modal h2 {
+      font-size: 16px; font-weight: 700; color: var(--text1); margin: 0;
+    }
+    .quick-modal .quick-sub {
+      font-size: 12px; color: var(--text3); margin-top: -8px;
+    }
+    .quick-field { display: flex; flex-direction: column; gap: 4px; }
+    .quick-field label {
+      font-size: 12px; font-weight: 600; color: var(--text2); letter-spacing: .04em;
+    }
+    .quick-field input,
+    .quick-field textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--bg2);
+      color: var(--text1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .quick-field input:focus,
+    .quick-field textarea:focus { border-color: var(--v); }
+    .quick-field textarea { resize: vertical; min-height: 80px; }
+    .quick-field .quick-hint {
+      font-size: 11px; color: var(--text3);
+    }
+    .quick-actions {
+      display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;
+    }
+    .quick-error {
+      min-height: 18px; font-size: 12px; color: var(--red); line-height: 1.4;
+    }
     .ds-title {
       font-size: 18px;
       font-weight: 700;
@@ -821,6 +914,40 @@
   </div>
 </div>
 
+<!-- ═══ MODAL : Mise à jour rapide (post-séance) ═══════════════ -->
+<div class="quick-modal-overlay" id="quickUpdateOverlay" style="display:none">
+  <div class="quick-modal">
+    <h2>Mise &agrave; jour rapide</h2>
+    <div class="quick-sub" id="quickUpdateSub">&Eacute;dite directement la derni&egrave;re s&eacute;ance affich&eacute;e &agrave; l'&eacute;l&egrave;ve, sans passer par le Google Doc.</div>
+    <form id="quickUpdateForm" autocomplete="off">
+      <div class="quick-field">
+        <label for="quickDate">Date de la s&eacute;ance *</label>
+        <input type="date" id="quickDate" required />
+      </div>
+      <div class="quick-field">
+        <label for="quickTitre">Titre court * <span class="quick-hint">(1-3 mots, ex : "accords enrichis")</span></label>
+        <input type="text" id="quickTitre" maxlength="80" required placeholder="ex : voicings ii-V-I" />
+      </div>
+      <div class="quick-field">
+        <label for="quickDevoirs">Devoirs prochaine s&eacute;ance <span class="quick-hint">(1 par ligne)</span></label>
+        <textarea id="quickDevoirs" rows="4" placeholder="Travailler Cmaj7 main droite&#10;R&eacute;p&eacute;ter cadence ii-V-I en Do&#10;..."></textarea>
+      </div>
+      <div class="quick-field">
+        <label for="quickResume">R&eacute;sum&eacute; du cours <span class="quick-hint">(1 par ligne)</span></label>
+        <textarea id="quickResume" rows="5" placeholder="Notion d'accords enrichis (ajouts 9, 11, 13)&#10;Voicings &agrave; 4 sons en main gauche&#10;..."></textarea>
+      </div>
+      <div class="quick-hint" style="font-style:italic;">
+        Astuce : pour incr&eacute;menter le compteur de cours (ex. "5 sur 8"), ajoute aussi la s&eacute;ance dans le Google Doc avec le titre <code>#&nbsp;JJ/MM</code>.
+      </div>
+      <div class="quick-error" id="quickUpdateError"></div>
+      <div class="quick-actions">
+        <button type="button" class="hbtn" onclick="closeQuickUpdateModal()">Annuler</button>
+        <button type="submit" class="hbtn primary" id="quickUpdateSubmit">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ═══ SCRIPTS ═══════════════════════════════════════════════ -->
 <script>
 // ─── App logic ─────────────────────────────────────────────────
@@ -1001,7 +1128,14 @@ function renderProfile(s) {
         <div class="card-title">
           📋 Dernière séance
           ${ds?.date ? `<span class="ds-date-pill">${escapeHtml(fmtSessionDate(ds.date))}</span>` : ''}
+          <button type="button" class="ds-quick-btn" onclick="openQuickUpdateModal('${s.id}')" title="Mise à jour rapide (sans Doc)">✏️ Mise à jour rapide</button>
         </div>
+        ${ds?.manualEdit ? `
+          <div class="ds-manual-banner">
+            <span class="ds-manual-badge" title="Cette séance a été éditée manuellement et sera préservée par Sync All.">✋ Édité manuellement</span>
+            <button type="button" class="ds-resync-btn" onclick="resyncSeanceFromDoc('${s.id}')" title="Efface le flag et relance la cascade LLM depuis le Google Doc">↺ Re-sync depuis Doc</button>
+          </div>
+        ` : ''}
         ${ds?.titre ? `<div class="ds-title">${escapeHtml(ds.titre)}</div>` : ''}
         ${(ds?.devoirs && ds.devoirs.length) ? `
           <div class="ds-section devoirs">
@@ -1016,7 +1150,7 @@ function renderProfile(s) {
           </div>
         ` : ''}
         ${!ds || (!ds.devoirs?.length && !ds.resume?.length && !ds.titre)
-          ? '<p class="empty-note">Pas encore de séance synchronisée — clique sur 🔄 Sync All.</p>'
+          ? '<p class="empty-note">Pas encore de séance synchronisée — clique sur 🔄 Sync All ou ✏️ Mise à jour rapide.</p>'
           : ''}
         ${docUrl ? `<a href="${escapeHtml(docUrl)}" target="_blank" rel="noopener" class="ds-doc-btn">📄 Voir le doc complet ↗</a>` : ''}
       </div>
@@ -1392,6 +1526,142 @@ async function resetDateOverride(studentId, field) {
   }
 }
 window.resetDateOverride = resetDateOverride;
+
+// ─── Mise à jour rapide (form post-séance) ───────────────────────
+// Édite directement derniere_seance via PATCH (pose flag manualEdit:true).
+// sync.js et ?sync=true respecteront le flag jusqu'au "Re-sync depuis Doc".
+let quickUpdateActiveId = null;
+
+function openQuickUpdateModal(studentId) {
+  quickUpdateActiveId = studentId;
+  const cached = clientCache[studentId] || {};
+  const ds = cached.derniere_seance || {};
+  const overlay = document.getElementById('quickUpdateOverlay');
+  const sub = document.getElementById('quickUpdateSub');
+  const dateInput = document.getElementById('quickDate');
+  const titreInput = document.getElementById('quickTitre');
+  const devoirsTa = document.getElementById('quickDevoirs');
+  const resumeTa = document.getElementById('quickResume');
+  const errorEl = document.getElementById('quickUpdateError');
+
+  const studentDisplay = (cached.nom || studentId.charAt(0).toUpperCase() + studentId.slice(1));
+  sub.textContent = `Édite directement la dernière séance affichée à ${studentDisplay} dans son espace, sans passer par le Google Doc.`;
+
+  // Pré-remplit avec date today si pas de séance, sinon avec valeurs existantes.
+  // ds.date peut être YYYY-MM-DD (sync.js) ou YYYY-MM-DD-like ; on prend tel quel.
+  const today = new Date();
+  const todayIso = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  dateInput.value = (typeof ds.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ds.date)) ? ds.date : todayIso;
+  titreInput.value = ds.titre || '';
+  devoirsTa.value = Array.isArray(ds.devoirs) ? ds.devoirs.join('\n') : '';
+  resumeTa.value = Array.isArray(ds.resume) ? ds.resume.join('\n') : '';
+  errorEl.textContent = '';
+  overlay.style.display = 'flex';
+  setTimeout(() => titreInput.focus(), 50);
+}
+window.openQuickUpdateModal = openQuickUpdateModal;
+
+function closeQuickUpdateModal() {
+  document.getElementById('quickUpdateOverlay').style.display = 'none';
+  quickUpdateActiveId = null;
+}
+window.closeQuickUpdateModal = closeQuickUpdateModal;
+
+document.getElementById('quickUpdateForm').addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  if (!quickUpdateActiveId) return;
+  const errorEl = document.getElementById('quickUpdateError');
+  const submitBtn = document.getElementById('quickUpdateSubmit');
+  errorEl.textContent = '';
+
+  const date = document.getElementById('quickDate').value.trim();
+  const titre = document.getElementById('quickTitre').value.trim();
+  const devoirsRaw = document.getElementById('quickDevoirs').value;
+  const resumeRaw = document.getElementById('quickResume').value;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { errorEl.textContent = 'Date invalide.'; return; }
+  if (!titre || titre.length > 80) { errorEl.textContent = 'Titre requis (1-80 caractères).'; return; }
+  const devoirs = devoirsRaw.split('\n').map((s) => s.trim()).filter((s) => s.length > 0 && s.length <= 200);
+  const resume = resumeRaw.split('\n').map((s) => s.trim()).filter((s) => s.length > 0 && s.length <= 200);
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Enregistrement…';
+  try {
+    const res = await fetch(`/api/eleves/${quickUpdateActiveId}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ derniere_seance: { date, titre, devoirs, resume } }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload.error || !(payload.ok || payload.success)) {
+      throw new Error(payload.error || `HTTP ${res.status}`);
+    }
+    let fresh = payload.data || null;
+    if (!fresh) {
+      const getRes = await fetch(`/api/eleves/${quickUpdateActiveId}`, { credentials: 'same-origin' });
+      const getData = await getRes.json();
+      if (getRes.ok && !getData.error) fresh = getData;
+    }
+    if (fresh) {
+      clientCache[quickUpdateActiveId] = fresh;
+      const scrollY = window.scrollY;
+      renderProfile(fresh);
+      window.scrollTo(0, scrollY);
+    }
+    closeQuickUpdateModal();
+    showToast('Séance enregistrée ✓');
+  } catch (e) {
+    errorEl.textContent = 'Erreur : ' + (e.message || 'réessaie');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Enregistrer';
+  }
+});
+
+async function resyncSeanceFromDoc(studentId) {
+  if (!confirm("Remplacer la séance éditée manuellement par celle extraite du Google Doc ?\n\nCela va lancer Sync All (5-15s) et écraser tes modifications manuelles.")) return;
+  showToast('Re-sync en cours…');
+  try {
+    // 1. Unflag le manualEdit
+    const r1 = await fetch(`/api/eleves/${studentId}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ derniere_seance_unflag: true }),
+    });
+    if (!r1.ok) throw new Error('unflag failed (HTTP ' + r1.status + ')');
+    // 2. Lance Sync All (resync TOUS — l'API n'a pas de single-eleve sync POST)
+    const r2 = await fetch('/api/eleves/sync', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const j2 = await r2.json().catch(() => ({}));
+    if (!r2.ok && r2.status !== 503) throw new Error('sync failed (HTTP ' + r2.status + ')');
+    // 3. Refetch profil pour render à jour
+    const r3 = await fetch(`/api/eleves/${studentId}`, { credentials: 'same-origin' });
+    const fresh = await r3.json();
+    if (r3.ok && !fresh.error) {
+      clientCache[studentId] = fresh;
+      const scrollY = window.scrollY;
+      renderProfile(fresh);
+      window.scrollTo(0, scrollY);
+    }
+    showToast('Re-sync terminé ✓');
+  } catch (e) {
+    showToast('Erreur : ' + (e.message || 'réessaie'));
+  }
+}
+window.resyncSeanceFromDoc = resyncSeanceFromDoc;
+
+// Esc ferme la modal mise à jour rapide
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    const overlay = document.getElementById('quickUpdateOverlay');
+    if (overlay && overlay.style.display !== 'none') closeQuickUpdateModal();
+  }
+});
 
 function toggleTheory(el, studentId, index) {
   const order = ['todo', 'in-progress', 'done'];
