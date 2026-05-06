@@ -270,6 +270,15 @@
       border: 1px solid var(--border);
     }
     .sep-assigned.assigned { background: var(--v-dim); color: var(--v); border-color: rgba(139,111,232,0.35); }
+    .sep-incomplete {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: rgba(251,146,60,0.12);
+      color: #FB923C;
+      border: 1px solid rgba(251,146,60,0.35);
+      cursor: help;
+    }
 
     .sep-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     .sep-btn {
@@ -938,11 +947,16 @@ function renderList() {
         }).join(', ')
       : 'Non assigné';
     const assignedClass = assigned.length ? 'sep-assigned assigned' : 'sep-assigned';
+    const stemsCount = Array.isArray(s.stems) ? s.stems.length : 0;
+    const incompleteBadge = stemsCount > 0 && stemsCount < 6
+      ? '<span class="sep-incomplete" title="Séparation legacy : Piano et Guitare manquants">' + stemsCount + ' pistes</span>'
+      : '';
     return (
       '<div class="sep-card" data-id="' + escapeAttr(s.id) + '">' +
         '<div class="sep-card-head">' +
           '<span class="sep-title" title="Cliquer pour renommer">' + escapeHtml(s.title) + '</span>' +
           '<span class="sep-meta">' + escapeHtml(date) + '</span>' +
+          incompleteBadge +
           '<span class="' + assignedClass + '">' + escapeHtml(assignedLabel) + '</span>' +
           '<div class="sep-actions">' +
             '<button class="sep-btn" data-act="toggle">▶ Écouter</button>' +
