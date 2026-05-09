@@ -10,6 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="MH Admin" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/css/analyse-player.css" />
   <style>
     :root {
       --v: #8B6FE8;
@@ -395,8 +396,8 @@
 <div class="modal-overlay" id="preview-overlay">
   <div class="modal-box preview">
     <div class="modal-title" id="preview-title">Aperçu</div>
-    <video id="preview-video" class="preview-video" controls preload="metadata"></video>
-    <div class="preview-note">EQ 3 bandes + contrôle vitesse arriveront en commit 4 (player partagé admin/élève).</div>
+    <video id="preview-video" class="preview-video" controls preload="metadata" playsinline></video>
+    <div id="preview-controls"></div>
     <div class="modal-actions">
       <button type="button" id="preview-close">Fermer</button>
     </div>
@@ -415,6 +416,7 @@
   </div>
 </div>
 
+<script src="/assets/js/analyse-player.js"></script>
 <script>
 'use strict';
 
@@ -619,10 +621,14 @@ function openPreview(id) {
   document.getElementById('preview-title').textContent = v.title || 'Aperçu';
   const video = document.getElementById('preview-video');
   video.src = '/api/analyse/' + encodeURIComponent(id) + '/stream';
+  // Attach EQ + speed controls (admin preview = même expérience que l'élève)
+  const ctrl = document.getElementById('preview-controls');
+  if (window.AnalysePlayer) window.AnalysePlayer.attach(video, ctrl);
   document.getElementById('preview-overlay').classList.add('show');
 }
 function closePreview() {
   const video = document.getElementById('preview-video');
+  if (window.AnalysePlayer) window.AnalysePlayer.detach(video);
   try { video.pause(); } catch {}
   video.removeAttribute('src');
   video.load();

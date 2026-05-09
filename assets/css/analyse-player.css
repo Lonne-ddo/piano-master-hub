@@ -1,0 +1,182 @@
+/* ─── Analyse Player — controls EQ + vitesse ─────────────────────── */
+
+.ap-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  font-family: inherit;
+}
+
+.ap-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ap-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── EQ : 3 sliders verticaux côte à côte ── */
+.ap-eq-bands {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  padding: 6px 0 4px;
+}
+
+.ap-band {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 0;
+  max-width: 96px;
+}
+
+.ap-band-value {
+  font-size: 11px;
+  font-family: 'DM Mono', ui-monospace, monospace;
+  color: rgba(255, 255, 255, 0.7);
+  font-feature-settings: "tnum";
+  min-height: 14px;
+  transition: color 0.15s;
+}
+.ap-band.boosted .ap-band-value { color: #8B6FE8; }
+.ap-band.cut .ap-band-value { color: #f0b429; }
+
+.ap-band-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Slider vertical : writing-mode pour les browsers modernes,
+   fallback -webkit-appearance:slider-vertical pour Safari ancien. */
+.ap-band-slider {
+  width: 28px;
+  height: 110px;
+  writing-mode: vertical-lr;
+  direction: rtl; /* min en bas, max en haut, le standard pour EQ */
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  background: transparent;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  outline: none;
+}
+/* Track + thumb pour Webkit (Safari/Chrome) */
+.ap-band-slider::-webkit-slider-runnable-track {
+  width: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+.ap-band-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #8B6FE8;
+  border: 2px solid #09090f;
+  cursor: grab;
+  margin-left: -7px; /* recentre sur le track 4px */
+  transition: transform 0.1s;
+}
+.ap-band-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+.ap-band-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+}
+/* Firefox */
+.ap-band-slider::-moz-range-track {
+  width: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+.ap-band-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #8B6FE8;
+  border: 2px solid #09090f;
+  cursor: grab;
+}
+
+/* ── Présets ── */
+.ap-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.ap-preset {
+  font-size: 11px;
+  padding: 6px 11px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+.ap-preset:hover {
+  background: rgba(139, 111, 232, 0.12);
+  color: #8B6FE8;
+  border-color: rgba(139, 111, 232, 0.4);
+}
+
+/* ── Vitesse : 4 boutons toggle ── */
+.ap-speed-row {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.ap-speed-btn {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-family: inherit;
+  font-feature-settings: "tnum";
+  min-width: 50px;
+  transition: all 0.12s;
+}
+.ap-speed-btn:hover {
+  background: rgba(139, 111, 232, 0.12);
+  color: #8B6FE8;
+  border-color: rgba(139, 111, 232, 0.4);
+}
+.ap-speed-btn.active {
+  background: rgba(139, 111, 232, 0.2);
+  color: #ffffff;
+  border-color: #8B6FE8;
+}
+
+/* ── Mobile : compact + slider plus court ── */
+@media (max-width: 480px) {
+  .ap-controls { padding: 12px; gap: 10px; }
+  .ap-eq-bands { gap: 12px; }
+  .ap-band-slider { height: 90px; }
+  .ap-band { max-width: 80px; }
+  .ap-preset, .ap-speed-btn { font-size: 11px; padding: 5px 9px; }
+  .ap-speed-btn { min-width: 44px; }
+}

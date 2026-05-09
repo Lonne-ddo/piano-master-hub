@@ -9,6 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="description" content="Master Hub — Vidéos d'analyse à rejouer avec EQ et vitesse.">
     <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+">
+    <link rel="stylesheet" href="/assets/css/analyse-player.css">
     <style>
         :root {
             --bg: #0f0f14;
@@ -264,11 +265,12 @@
                 <button id="player-close" class="player-close" aria-label="Fermer">&times;</button>
             </div>
             <video id="player-video" class="player-video" controls preload="metadata" playsinline></video>
-            <div class="player-note">EQ 3 bandes &amp; contrôle de vitesse arriveront prochainement.</div>
+            <div id="player-controls"></div>
         </div>
     </div>
 
     <script src="/assets/js/eleve-guard.js"></script>
+    <script src="/assets/js/analyse-player.js"></script>
     <script>
     'use strict';
 
@@ -335,8 +337,11 @@
         var overlay = document.getElementById('player-overlay');
         var titleEl = document.getElementById('player-title');
         var videoEl = document.getElementById('player-video');
+        var ctrlEl = document.getElementById('player-controls');
         titleEl.textContent = video.title || 'Vidéo';
         videoEl.src = video.streamUrl || ('/api/analyse/' + encodeURIComponent(video.id) + '/stream');
+        // Attach EQ + speed (autoplay policy : AudioContext s'init au 1er play)
+        if (window.AnalysePlayer) window.AnalysePlayer.attach(videoEl, ctrlEl);
         overlay.classList.add('show');
         // Tente la lecture (l'autoplay peut être bloqué par le navigateur sur certains contextes)
         try { videoEl.play().catch(function () {}); } catch (e) {}
@@ -345,6 +350,7 @@
     function closePlayer() {
         var overlay = document.getElementById('player-overlay');
         var videoEl = document.getElementById('player-video');
+        if (window.AnalysePlayer) window.AnalysePlayer.detach(videoEl);
         try { videoEl.pause(); } catch (e) {}
         videoEl.removeAttribute('src');
         videoEl.load();
