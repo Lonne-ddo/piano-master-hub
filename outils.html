@@ -105,6 +105,12 @@
             }
         }
 
+        @media (min-width: 900px) {
+            .tools-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
         .tool-card {
             display: flex;
             flex-direction: column;
@@ -263,6 +269,14 @@
             title: "Dictionnaire d'accords",
             sub: "22 types · renversements · clavier interactif",
             href: function(slug) { return "/accords?eleve=" + encodeURIComponent(slug); },
+            active: true
+        },
+        {
+            id: "analyse",
+            icon: "🎬",
+            title: "Analyse",
+            sub: "Vidéos à rejouer avec EQ et vitesse",
+            href: function(slug) { return "/analyse?eleve=" + encodeURIComponent(slug); },
             active: true
         }
         // Note : Bibliothèque (id 'bibli') retirée de la liste des outils
