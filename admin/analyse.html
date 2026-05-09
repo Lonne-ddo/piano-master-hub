@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Master Hub Admin — Analyse</title>
+  <meta name="theme-color" content="#0f0f14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MH Admin" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --v: #8B6FE8;
+      --v-dim: rgba(139,111,232,0.14);
+      --v-soft: #6b54c4;
+      --bg0: #09090f;
+      --bg1: #0f0e18;
+      --bg2: #161524;
+      --bg3: #1e1c30;
+      --text1: #eeeaf8;
+      --text2: #9d9ab5;
+      --text3: #5a5870;
+      --border: #25233a;
+      --green: #5ecb8b;
+      --amber: #f0b429;
+      --red: #e05c6b;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg0);
+      color: var(--text1);
+      min-height: 100vh; min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app { max-width: 920px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    .admin-banner {
+      background: var(--v-dim);
+      border: 1px solid rgba(139,111,232,0.35);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 12px;
+      color: var(--v);
+      letter-spacing: .04em;
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .admin-banner .sep { opacity: .4; }
+    .admin-banner a { color: var(--text2); text-decoration: none; transition: color .15s; }
+    .admin-banner a:hover { color: var(--v); }
+
+    .ph { margin-bottom: 18px; }
+    .ph-title {
+      font-size: 22px; font-weight: 700; color: var(--text1);
+      letter-spacing: -.01em;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10.5px; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 20px;
+      background: var(--v-dim); color: var(--v);
+    }
+    .ph-desc { font-size: 13.5px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
+
+    .section { margin-top: 28px; }
+    .section-title {
+      font-size: 14px; font-weight: 700;
+      letter-spacing: .07em; text-transform: uppercase;
+      color: var(--text2);
+      font-family: 'DM Mono', monospace;
+      margin-bottom: 14px;
+    }
+
+    /* ── Upload block ───────────────────────────────────────── */
+    .upload-card {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .upload-row {
+      display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    }
+    .upload-row label {
+      font-size: 11px;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+    }
+    .title-input {
+      flex: 1 1 240px;
+      min-width: 0;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text1);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .title-input:focus { border-color: var(--v); }
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 30px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .15s;
+      background: var(--bg2);
+    }
+    .dropzone:hover { border-color: var(--v); background: var(--v-dim); }
+    .dropzone.dragover {
+      border-color: var(--v);
+      background: var(--v-dim);
+      transform: scale(1.01);
+    }
+    .dropzone.disabled {
+      opacity: .5; pointer-events: none;
+    }
+    .dropzone-title {
+      font-size: 14px; font-weight: 600; color: var(--text1);
+      margin-bottom: 4px;
+    }
+    .dropzone-sub { font-size: 12px; color: var(--text3); }
+    .dropzone input[type=file] { display: none; }
+
+    .upload-progress {
+      display: none;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .upload-progress.active { display: block; }
+    .upload-progress-label {
+      font-size: 12px;
+      color: var(--text2);
+      font-family: 'DM Mono', monospace;
+      margin-bottom: 8px;
+      display: flex; justify-content: space-between; gap: 8px;
+    }
+    .upload-progress-bar {
+      width: 100%; height: 6px; border-radius: 4px; background: var(--bg3);
+      overflow: hidden;
+    }
+    .upload-progress-fill {
+      height: 100%; background: var(--v); width: 0%;
+      transition: width .15s;
+    }
+    .upload-progress.error .upload-progress-fill { background: var(--red); }
+
+    /* ── Vidéos cards ────────────────────────────────────────── */
+    .ana-card {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+    }
+    .ana-card-head {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .ana-title {
+      font-size: 14.5px; font-weight: 700; color: var(--text1);
+      flex: 1 1 auto; min-width: 0;
+      cursor: text;
+      transition: opacity .15s ease;
+    }
+    .ana-title:hover {
+      opacity: .8;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-decoration-color: color-mix(in srgb, var(--v) 40%, transparent);
+      text-underline-offset: 3px;
+    }
+    .ana-title-edit {
+      font-size: 14.5px; font-weight: 700; color: var(--text1);
+      flex: 1 1 auto; min-width: 0;
+      font-family: inherit;
+      background: transparent;
+      border: 1px solid rgba(139,111,232,0.3);
+      border-radius: 6px;
+      padding: 1px 6px; margin: -2px -7px;
+      outline: none;
+      transition: border-color .15s, opacity .15s;
+    }
+    .ana-title-edit:focus { border-color: var(--v); }
+    .ana-title-edit:disabled { opacity: .6; cursor: progress; }
+
+    .ana-meta {
+      font-size: 11px; color: var(--text3);
+      font-family: 'DM Mono', monospace; letter-spacing: .03em;
+    }
+    .ana-assigned {
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 20px;
+      background: var(--bg2);
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+    .ana-assigned.assigned {
+      background: var(--v-dim); color: var(--v);
+      border-color: rgba(139,111,232,0.35);
+    }
+    .ana-actions {
+      display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+    }
+    .ana-btn {
+      font-size: 12px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .15s;
+    }
+    .ana-btn:hover {
+      background: var(--v-dim); color: var(--v); border-color: var(--v);
+    }
+    .ana-btn.danger:hover {
+      background: rgba(224,92,107,0.15);
+      color: var(--red);
+      border-color: var(--red);
+    }
+
+    .list-empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text3);
+      font-size: 13px;
+      background: var(--bg1);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+    }
+
+    /* ── Modal preview / assign ──────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.78);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      width: 100%;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px;
+      display: flex; flex-direction: column; gap: 14px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+    }
+    .modal-box.preview { max-width: 720px; }
+    .modal-box.assign  { max-width: 420px; }
+    .modal-title {
+      font-size: 16px; font-weight: 700; color: var(--text1);
+    }
+    .modal-actions {
+      display: flex; gap: 8px; justify-content: flex-end;
+    }
+    .modal-actions button {
+      font-size: 13px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg2);
+      color: var(--text2);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .modal-actions button.primary {
+      background: var(--v); color: white; border-color: var(--v);
+    }
+    .modal-actions button:hover {
+      background: var(--v-dim); color: var(--v); border-color: var(--v);
+    }
+    .modal-actions button.primary:hover { background: var(--v-soft); color: white; }
+
+    .checkbox-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px; border-radius: 8px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .checkbox-row:hover { background: var(--bg2); }
+    .checkbox-row input[type=checkbox] {
+      width: 18px; height: 18px; accent-color: var(--v);
+      cursor: pointer;
+    }
+
+    .preview-video {
+      width: 100%;
+      background: black;
+      border-radius: 8px;
+      display: block;
+      max-height: 60vh;
+    }
+    .preview-note {
+      font-size: 11.5px;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      letter-spacing: .03em;
+    }
+
+    /* ── Toast ───────────────────────────────────────────────── */
+    .ana-toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--bg2); color: var(--text1);
+      border: 1px solid var(--border);
+      padding: 10px 18px; border-radius: 10px;
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      z-index: 9999;
+      opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .ana-toast.show { opacity: 1; }
+    .ana-toast.success { border-color: rgba(94,203,139,0.45); color: var(--green); }
+    .ana-toast.error { border-color: rgba(224,92,107,0.55); color: var(--red); }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <div class="admin-banner">
+    <span>👤 Admin</span>
+    <span class="sep">·</span>
+    <a href="/admin/">← Outils</a>
+  </div>
+
+  <div class="ph">
+    <div class="ph-title">
+      <span>🎬 Analyse</span>
+      <span class="badge">MP4 · WEBM · MOV</span>
+    </div>
+    <div class="ph-desc">
+      Upload des vidéos d'analyse pédagogique. Les élèves les rejouent avec EQ 3 bandes et contrôle de vitesse.
+    </div>
+  </div>
+
+  <!-- ── UPLOAD ──────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Upload</div>
+    <div class="upload-card">
+      <div class="upload-row">
+        <label for="vid-title">Titre</label>
+        <input id="vid-title" type="text" class="title-input" maxlength="200" placeholder="Ex : Analyse motif gauche — Hallelujah" />
+      </div>
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Sélectionner ou glisser une vidéo">
+        <div class="dropzone-title">📁 Glisse une vidéo ici ou clique pour sélectionner</div>
+        <div class="dropzone-sub">Max 100 Mo · jusqu'à 30 min</div>
+        <input id="vid-file" type="file" accept="video/mp4,video/webm,video/quicktime" />
+      </div>
+      <div id="upload-progress" class="upload-progress">
+        <div class="upload-progress-label">
+          <span id="upload-progress-name">…</span>
+          <span id="upload-progress-pct">0%</span>
+        </div>
+        <div class="upload-progress-bar">
+          <div id="upload-progress-fill" class="upload-progress-fill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LISTE ───────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Mes vidéos</div>
+    <div id="list-content">
+      <div class="list-empty">Chargement…</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ─── Modal preview ─── -->
+<div class="modal-overlay" id="preview-overlay">
+  <div class="modal-box preview">
+    <div class="modal-title" id="preview-title">Aperçu</div>
+    <video id="preview-video" class="preview-video" controls preload="metadata"></video>
+    <div class="preview-note">EQ 3 bandes + contrôle vitesse arriveront en commit 4 (player partagé admin/élève).</div>
+    <div class="modal-actions">
+      <button type="button" id="preview-close">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Modal assign ─── -->
+<div class="modal-overlay" id="assign-overlay">
+  <div class="modal-box assign">
+    <div class="modal-title" id="assign-title">Assigner à des élèves</div>
+    <div id="assign-list"></div>
+    <div class="modal-actions">
+      <button type="button" id="assign-cancel">Annuler</button>
+      <button type="button" class="primary" id="assign-save">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ─── Auth garde ──────────────────────────────────────────────
+fetch('/api/admin/check', { credentials: 'same-origin' })
+  .then((r) => (r.ok ? r.json() : null))
+  .then((j) => {
+    if (!j || !j.ok) {
+      window.location.replace('/admin/login.html?next=' + encodeURIComponent('/admin/analyse.html'));
+    }
+  })
+  .catch(() => {
+    window.location.replace('/admin/login.html?next=' + encodeURIComponent('/admin/analyse.html'));
+  });
+
+// ─── Constantes ──────────────────────────────────────────────
+const MAX_SIZE_BYTES = 100 * 1024 * 1024; // 100 Mo
+const MAX_DURATION_S = 30 * 60;
+const ALLOWED_MIME = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
+
+let videosCache = [];
+let elevesCache = [];
+let assignTargetId = null;
+
+// ─── Helpers ─────────────────────────────────────────────────
+function escapeHtml(s) {
+  if (s == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+function escapeAttr(s) { return String(s == null ? '' : s).replace(/"/g, '&quot;'); }
+function fmtDuration(sec) {
+  if (!sec || sec <= 0) return '—';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return m + ':' + String(s).padStart(2, '0');
+}
+function fmtSize(bytes) {
+  if (!bytes) return '—';
+  const mo = bytes / (1024 * 1024);
+  return mo.toFixed(mo < 10 ? 1 : 0) + ' Mo';
+}
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = ['jan','fév','mars','avr','mai','juin','juil','août','sept','oct','nov','déc'][d.getMonth()];
+  return dd + ' ' + mm;
+}
+
+function toast(msg, type = 'info') {
+  let t = document.querySelector('.ana-toast');
+  if (!t) { t = document.createElement('div'); document.body.appendChild(t); }
+  t.className = 'ana-toast' + (type === 'success' || type === 'error' ? ' ' + type : '');
+  t.textContent = msg;
+  requestAnimationFrame(() => t.classList.add('show'));
+  clearTimeout(toast._tid);
+  toast._tid = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+// ─── Liste élèves (pour Assigner) ────────────────────────────
+async function loadEleves() {
+  try {
+    const r = await fetch('/api/eleves', { credentials: 'same-origin' });
+    if (!r.ok) return;
+    const slugs = await r.json();
+    if (Array.isArray(slugs)) {
+      elevesCache = slugs.map((s) => ({
+        slug: s,
+        display: s.charAt(0).toUpperCase() + s.slice(1),
+      }));
+    }
+  } catch { /* fallback vide — ok */ }
+}
+
+// ─── Liste vidéos ────────────────────────────────────────────
+async function refreshList() {
+  const el = document.getElementById('list-content');
+  try {
+    const r = await fetch('/api/analyse', { credentials: 'same-origin' });
+    if (!r.ok) {
+      el.innerHTML = '<div class="list-empty">Impossible de charger la liste.</div>';
+      return;
+    }
+    const j = await r.json();
+    videosCache = Array.isArray(j.items) ? j.items : [];
+    renderList();
+  } catch {
+    el.innerHTML = '<div class="list-empty">Erreur réseau.</div>';
+  }
+}
+
+function renderList() {
+  const el = document.getElementById('list-content');
+  if (!videosCache.length) {
+    el.innerHTML = '<div class="list-empty">Aucune vidéo. Upload-en une ci-dessus.</div>';
+    return;
+  }
+  el.innerHTML = videosCache.map((v) => {
+    const assigned = Array.isArray(v.assignedTo) ? v.assignedTo : [];
+    const assignedLabel = assigned.length
+      ? assigned.map((slug) => {
+          const e = elevesCache.find((x) => x.slug === slug);
+          return e ? e.display : slug;
+        }).join(', ')
+      : 'Non assigné';
+    const assignedClass = assigned.length ? 'ana-assigned assigned' : 'ana-assigned';
+    return (
+      '<div class="ana-card" data-id="' + escapeAttr(v.id) + '">' +
+        '<div class="ana-card-head">' +
+          '<span class="ana-title" title="Cliquer pour renommer">' + escapeHtml(v.title) + '</span>' +
+          '<span class="ana-meta">' + escapeHtml(fmtDuration(v.durationSeconds)) + ' · ' + escapeHtml(fmtSize(v.sizeBytes)) + ' · ' + escapeHtml(fmtDate(v.uploadedAt)) + '</span>' +
+          '<span class="' + assignedClass + '">' + escapeHtml(assignedLabel) + '</span>' +
+          '<div class="ana-actions">' +
+            '<button class="ana-btn" data-act="preview">▶ Aperçu</button>' +
+            '<button class="ana-btn" data-act="assign">👥 Assigner</button>' +
+            '<button class="ana-btn danger" data-act="delete">🗑</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
+
+  el.querySelectorAll('.ana-card').forEach((card) => {
+    const id = card.getAttribute('data-id');
+    card.querySelectorAll('button[data-act]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const act = btn.getAttribute('data-act');
+        if (act === 'preview') openPreview(id);
+        else if (act === 'assign') openAssign(id);
+        else if (act === 'delete') deleteVideo(id);
+      });
+    });
+    const titleEl = card.querySelector('.ana-title');
+    if (titleEl) titleEl.addEventListener('click', () => startRename(card, id));
+  });
+}
+
+// ─── Rename inline ───────────────────────────────────────────
+function startRename(card, id) {
+  const span = card.querySelector('.ana-title');
+  if (!span || card.querySelector('.ana-title-edit')) return;
+  const oldTitle = span.textContent;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'ana-title-edit';
+  input.value = oldTitle;
+  input.maxLength = 200;
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let done = false;
+  function restore(title) {
+    if (done) return;
+    done = true;
+    const s = document.createElement('span');
+    s.className = 'ana-title';
+    s.title = 'Cliquer pour renommer';
+    s.textContent = title;
+    if (input.parentNode) input.replaceWith(s);
+    s.addEventListener('click', () => startRename(card, id));
+  }
+  async function commit() {
+    if (done || input.disabled) return;
+    const newTitle = input.value.replace(/[\x00-\x1F\x7F]/g, '').trim();
+    if (!newTitle || newTitle === oldTitle) { restore(oldTitle); return; }
+    if (newTitle.length > 200) { restore(oldTitle); toast('Titre trop long (200 max).', 'error'); return; }
+    input.disabled = true;
+    try {
+      const r = await fetch('/api/analyse/' + encodeURIComponent(id), {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      const idx = videosCache.findIndex((v) => v.id === id);
+      if (idx >= 0) videosCache[idx].title = j.title;
+      restore(j.title);
+      toast('Renommé ✓', 'success');
+    } catch (e) {
+      console.error('[analyse] rename failed', e);
+      restore(oldTitle);
+      toast('Erreur : ' + (e.message || 'rename failed'), 'error');
+    }
+  }
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+    else if (ev.key === 'Escape') { ev.preventDefault(); restore(oldTitle); }
+  });
+  input.addEventListener('blur', commit);
+}
+
+// ─── Preview modal ───────────────────────────────────────────
+function openPreview(id) {
+  const v = videosCache.find((x) => x.id === id);
+  if (!v) return;
+  document.getElementById('preview-title').textContent = v.title || 'Aperçu';
+  const video = document.getElementById('preview-video');
+  video.src = '/api/analyse/' + encodeURIComponent(id) + '/stream';
+  document.getElementById('preview-overlay').classList.add('show');
+}
+function closePreview() {
+  const video = document.getElementById('preview-video');
+  try { video.pause(); } catch {}
+  video.removeAttribute('src');
+  video.load();
+  document.getElementById('preview-overlay').classList.remove('show');
+}
+document.getElementById('preview-close').addEventListener('click', closePreview);
+document.getElementById('preview-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'preview-overlay') closePreview();
+});
+
+// ─── Assign modal ────────────────────────────────────────────
+function openAssign(id) {
+  assignTargetId = id;
+  const v = videosCache.find((x) => x.id === id);
+  const current = (v && Array.isArray(v.assignedTo)) ? v.assignedTo : [];
+  document.getElementById('assign-title').textContent = 'Assigner « ' + (v?.title || '') + ' »';
+  const html = elevesCache.length
+    ? elevesCache.map((e) => (
+        '<label class="checkbox-row">' +
+          '<input type="checkbox" value="' + escapeAttr(e.slug) + '"' + (current.includes(e.slug) ? ' checked' : '') + ' />' +
+          '<span>' + escapeHtml(e.display) + '</span>' +
+        '</label>'
+      )).join('')
+    : '<div class="list-empty">Aucun élève (KV eleves:list vide).</div>';
+  document.getElementById('assign-list').innerHTML = html;
+  document.getElementById('assign-overlay').classList.add('show');
+}
+function closeAssign() {
+  document.getElementById('assign-overlay').classList.remove('show');
+  assignTargetId = null;
+}
+document.getElementById('assign-cancel').addEventListener('click', closeAssign);
+document.getElementById('assign-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'assign-overlay') closeAssign();
+});
+document.getElementById('assign-save').addEventListener('click', async () => {
+  if (!assignTargetId) return;
+  const checked = Array.from(document.querySelectorAll('#assign-list input[type=checkbox]:checked')).map((i) => i.value);
+  try {
+    const r = await fetch('/api/analyse/' + encodeURIComponent(assignTargetId), {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assignedTo: checked }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    const idx = videosCache.findIndex((v) => v.id === assignTargetId);
+    if (idx >= 0) videosCache[idx].assignedTo = j.assignedTo;
+    closeAssign();
+    renderList();
+    toast('Assignation enregistrée ✓', 'success');
+  } catch (e) {
+    toast('Erreur : ' + (e.message || ''), 'error');
+  }
+});
+
+// ─── Delete ──────────────────────────────────────────────────
+async function deleteVideo(id) {
+  const v = videosCache.find((x) => x.id === id);
+  if (!confirm('Supprimer « ' + (v?.title || 'cette vidéo') + ' » ? Action irréversible (KV + R2).')) return;
+  try {
+    const r = await fetch('/api/analyse/' + encodeURIComponent(id), {
+      method: 'DELETE', credentials: 'same-origin',
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    toast('Vidéo supprimée ✓', 'success');
+    await refreshList();
+  } catch (e) {
+    toast('Erreur : ' + (e.message || ''), 'error');
+  }
+}
+
+// ─── Upload (XHR avec progress) ──────────────────────────────
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('vid-file');
+const titleInput = document.getElementById('vid-title');
+const progressBox = document.getElementById('upload-progress');
+const progressFill = document.getElementById('upload-progress-fill');
+const progressPct = document.getElementById('upload-progress-pct');
+const progressName = document.getElementById('upload-progress-name');
+
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+});
+['dragenter', 'dragover'].forEach((ev) =>
+  dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); })
+);
+['dragleave', 'drop'].forEach((ev) =>
+  dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); })
+);
+dropzone.addEventListener('drop', (e) => {
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+    handleFile(e.dataTransfer.files[0]);
+  }
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+});
+
+async function handleFile(file) {
+  const title = titleInput.value.trim();
+  if (!title) {
+    toast('Saisis un titre avant d\'uploader.', 'error');
+    titleInput.focus();
+    fileInput.value = '';
+    return;
+  }
+  if (!ALLOWED_MIME.has(file.type)) {
+    toast('Type non supporté : ' + (file.type || 'inconnu'), 'error');
+    fileInput.value = '';
+    return;
+  }
+  if (file.size > MAX_SIZE_BYTES) {
+    toast('Fichier trop lourd (max 100 Mo)', 'error');
+    fileInput.value = '';
+    return;
+  }
+
+  // Lit la durée via <video> côté client
+  let durationSec = 0;
+  try {
+    durationSec = await readVideoDuration(file);
+  } catch (e) { /* tant pis, on enverra 0 — backend l'accepte */ }
+  if (durationSec > MAX_DURATION_S) {
+    toast('Vidéo trop longue (max 30 min)', 'error');
+    fileInput.value = '';
+    return;
+  }
+
+  uploadFile(file, title, durationSec);
+}
+
+function readVideoDuration(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      const d = Number.isFinite(video.duration) ? video.duration : 0;
+      URL.revokeObjectURL(url);
+      resolve(d);
+    };
+    video.onerror = () => { URL.revokeObjectURL(url); reject(new Error('metadata_failed')); };
+    video.src = url;
+  });
+}
+
+function uploadFile(file, title, durationSec) {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('title', title);
+  fd.append('duration_sec', String(Math.round(durationSec)));
+  fd.append('filename', file.name);
+
+  progressBox.classList.add('active');
+  progressBox.classList.remove('error');
+  progressFill.style.width = '0%';
+  progressPct.textContent = '0%';
+  progressName.textContent = file.name;
+  dropzone.classList.add('disabled');
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/analyse/upload', true);
+  xhr.withCredentials = true;
+  xhr.upload.addEventListener('progress', (e) => {
+    if (!e.lengthComputable) return;
+    const pct = (e.loaded / e.total) * 100;
+    progressFill.style.width = pct.toFixed(1) + '%';
+    progressPct.textContent = pct.toFixed(0) + '%';
+  });
+  xhr.addEventListener('load', () => {
+    dropzone.classList.remove('disabled');
+    fileInput.value = '';
+    let resp;
+    try { resp = JSON.parse(xhr.responseText); }
+    catch { resp = { error: 'invalid_json' }; }
+    if (xhr.status >= 200 && xhr.status < 300 && resp.ok) {
+      progressFill.style.width = '100%';
+      progressPct.textContent = '100%';
+      setTimeout(() => { progressBox.classList.remove('active'); }, 800);
+      titleInput.value = '';
+      toast('Vidéo uploadée ✓', 'success');
+      refreshList();
+    } else {
+      progressBox.classList.add('error');
+      progressPct.textContent = 'Échec';
+      toast('Erreur upload : ' + (resp.error || ('HTTP ' + xhr.status)), 'error');
+    }
+  });
+  xhr.addEventListener('error', () => {
+    dropzone.classList.remove('disabled');
+    progressBox.classList.add('error');
+    progressPct.textContent = 'Erreur réseau';
+    toast('Erreur réseau pendant l\'upload', 'error');
+  });
+  xhr.send(fd);
+}
+
+// ─── Esc ferme les modals ────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (document.getElementById('preview-overlay').classList.contains('show')) closePreview();
+  else if (document.getElementById('assign-overlay').classList.contains('show')) closeAssign();
+});
+
+// ─── Init ────────────────────────────────────────────────────
+(async function init() {
+  await loadEleves();
+  await refreshList();
+})();
+</script>
+</body>
+</html>
