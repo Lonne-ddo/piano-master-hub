@@ -477,18 +477,19 @@ function toast(msg, type = 'info') {
 }
 
 // ─── Liste élèves (pour Assigner) ────────────────────────────
+// /api/eleves retourne { ok: true, eleves: [...], source: 'kv'|'seeded'|'fallback' }
+// Pattern cohérent avec /admin/eleves.html (qui lit aussi j.eleves).
 async function loadEleves() {
   try {
     const r = await fetch('/api/eleves', { credentials: 'same-origin' });
     if (!r.ok) return;
-    const slugs = await r.json();
-    if (Array.isArray(slugs)) {
-      elevesCache = slugs.map((s) => ({
-        slug: s,
-        display: s.charAt(0).toUpperCase() + s.slice(1),
-      }));
-    }
-  } catch { /* fallback vide — ok */ }
+    const j = await r.json();
+    const slugs = (j && j.ok && Array.isArray(j.eleves)) ? j.eleves : [];
+    elevesCache = slugs.map((s) => ({
+      slug: String(s).toLowerCase(),
+      display: String(s).charAt(0).toUpperCase() + String(s).slice(1),
+    }));
+  } catch { /* fallback vide — ok, modal Assign affichera l'empty state */ }
 }
 
 // ─── Liste vidéos ────────────────────────────────────────────

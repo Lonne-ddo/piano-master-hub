@@ -51,13 +51,20 @@ export function jsonResponse(data, status = 200) {
 }
 
 // Charge la liste des slugs valides depuis MASTERHUB_STUDENTS.eleves:list.
-// Fallback à un set vide → assignment 1 slug refusé silencieusement (PATCH retourne 400).
+// Pattern cohérent avec /api/eleves GET (qui seed la clé au bootstrap) et
+// les autres handlers (sync.js, [id].js, [slug]/public.js). Fallback sur
+// DEFAULT_ELEVES si la clé n'a pas encore été seedée ou si KV down.
+const DEFAULT_ELEVES = ['japhet', 'messon', 'dexter', 'tara'];
+
 export async function loadValidSlugs(env) {
-  if (!env.MASTERHUB_STUDENTS) return [];
+  if (!env.MASTERHUB_STUDENTS) return DEFAULT_ELEVES.slice();
   try {
     const list = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
-    return Array.isArray(list) ? list : [];
+    if (Array.isArray(list) && list.length) {
+      return list.map((s) => String(s).toLowerCase()).filter(Boolean);
+    }
+    return DEFAULT_ELEVES.slice();
   } catch {
-    return [];
+    return DEFAULT_ELEVES.slice();
   }
 }
