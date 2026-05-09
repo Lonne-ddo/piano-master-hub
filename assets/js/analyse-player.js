@@ -1,11 +1,13 @@
-// ─── Analyse Player — EQ 3 bandes + vitesse + présets ───────────────
-// Attache un panneau de contrôles (3 sliders verticaux Bass/Mid/Treble,
-// 3 boutons preset, 4 boutons vitesse) à un <video> existant. Pipeline :
+// ─── Analyse Player — EQ 3 bandes + volume + vitesse + présets ──────
+// Attache un panneau de contrôles (slider Volume horizontal,
+// 3 sliders verticaux Bass/Mid/Treble, 3 boutons preset EQ, 4 boutons
+// vitesse) à un <video> existant. Pipeline :
 //
 //   <video> → MediaElementAudioSourceNode
 //           → BiquadFilter lowshelf 200Hz   (Bass)
 //           → BiquadFilter peaking 1000Hz Q=1 (Mid)
 //           → BiquadFilter highshelf 4000Hz (Treble)
+//           → GainNode                        (Volume × 0..2)
 //           → AudioContext.destination
 //
 // API :
@@ -41,6 +43,11 @@
     root.innerHTML = [
       '<div class="ap-section ap-eq">',
         '<div class="ap-section-title">EQ</div>',
+        '<div class="ap-volume">',
+          '<span class="ap-volume-label">VOLUME</span>',
+          '<input type="range" class="ap-volume-slider" min="0" max="2" step="0.05" value="1" data-role="volume-slider" aria-label="Volume" />',
+          '<span class="ap-volume-value" data-role="volume-value">1.0×</span>',
+        '</div>',
         '<div class="ap-eq-bands">',
           buildBand('bass', 'Bass'),
           buildBand('mid', 'Mid'),
@@ -49,7 +56,7 @@
         '<div class="ap-presets">',
           '<button type="button" class="ap-preset" data-preset="vocal" title="Vocal +mid">Vocal boost</button>',
           '<button type="button" class="ap-preset" data-preset="bass"  title="Bass +6 dB">Bass boost</button>',
-          '<button type="button" class="ap-preset" data-preset="reset" title="Tout à 0">Reset</button>',
+          '<button type="button" class="ap-preset" data-preset="reset" title="EQ à 0 dB (volume préservé)">Reset</button>',
         '</div>',
       '</div>',
       '<div class="ap-section ap-speed">',
@@ -99,15 +106,19 @@
       state.treble.type = 'highshelf';
       state.treble.frequency.value = 4000;
 
+      state.gain = state.ctx.createGain();
+
       state.source.connect(state.bass);
       state.bass.connect(state.mid);
       state.mid.connect(state.treble);
-      state.treble.connect(state.ctx.destination);
+      state.treble.connect(state.gain);
+      state.gain.connect(state.ctx.destination);
 
       // Applique gains courants (au cas où l'admin a déjà tweaké les sliders avant le play)
       state.bass.gain.value = state.gains.bass;
       state.mid.gain.value = state.gains.mid;
       state.treble.gain.value = state.gains.treble;
+      state.gain.gain.value = state.volume;
     } catch (e) {
       console.warn('[analyse-player] Web Audio init failed:', e && e.message);
       state.ctx = null;
@@ -138,9 +149,19 @@
   function applyPreset(state, presetId) {
     var p = PRESETS[presetId];
     if (!p) return;
+    // Note : presets EQ uniquement, n'altèrent jamais state.volume.
     setGain(state, 'bass', p.bass);
     setGain(state, 'mid', p.mid);
     setGain(state, 'treble', p.treble);
+  }
+
+  function setVolume(state, value) {
+    state.volume = value;
+    if (state.gain) state.gain.gain.value = value;
+    var slider = state.controlsEl.querySelector('[data-role="volume-slider"]');
+    var valueEl = state.controlsEl.querySelector('[data-role="volume-value"]');
+    if (slider && Number(slider.value) !== value) slider.value = String(value);
+    if (valueEl) valueEl.textContent = value.toFixed(2).replace(/0$/, '') + '×';
   }
 
   function setSpeed(state, value) {
@@ -175,6 +196,16 @@
       });
     });
 
+    // Slider Volume : input live → gain.value, double-clic → reset à 1.
+    // Pas de snap (volume continu), pas affecté par les presets EQ.
+    var volSlider = state.controlsEl.querySelector('[data-role="volume-slider"]');
+    if (volSlider) {
+      volSlider.addEventListener('input', function () {
+        setVolume(state, Number(volSlider.value));
+      });
+      volSlider.addEventListener('dblclick', function () { setVolume(state, 1); });
+    }
+
     // Boutons vitesse
     state.controlsEl.querySelectorAll('.ap-speed-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -200,8 +231,9 @@
       videoEl: videoEl,
       controlsEl: null,
       ctx: null, source: null,
-      bass: null, mid: null, treble: null,
+      bass: null, mid: null, treble: null, gain: null,
       gains: { bass: 0, mid: 0, treble: 0 },
+      volume: 1,
       speed: 1,
       _onPlay: null,
     };
@@ -229,6 +261,7 @@
     try { state.bass && state.bass.disconnect(); } catch (e) {}
     try { state.mid && state.mid.disconnect(); } catch (e) {}
     try { state.treble && state.treble.disconnect(); } catch (e) {}
+    try { state.gain && state.gain.disconnect(); } catch (e) {}
     if (state.ctx && state.ctx.state !== 'closed') {
       try { state.ctx.close(); } catch (e) {}
     }

@@ -25,6 +25,67 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
+/* ── Volume : slider horizontal au-dessus des bandes EQ ── */
+.ap-volume {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 6px;
+}
+.ap-volume-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  flex-shrink: 0;
+  width: 50px;
+}
+.ap-volume-slider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+}
+.ap-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #8B6FE8;
+  border: 2px solid #09090f;
+  cursor: grab;
+  transition: transform 0.1s;
+}
+.ap-volume-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.ap-volume-slider::-webkit-slider-thumb:active { cursor: grabbing; }
+.ap-volume-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #8B6FE8;
+  border: 2px solid #09090f;
+  cursor: grab;
+}
+.ap-volume-value {
+  font-size: 11px;
+  font-family: 'DM Mono', ui-monospace, monospace;
+  color: rgba(255, 255, 255, 0.7);
+  font-feature-settings: "tnum";
+  min-width: 44px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
 /* ── EQ : 3 sliders verticaux côte à côte ── */
 .ap-eq-bands {
   display: flex;
