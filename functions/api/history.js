@@ -5,13 +5,15 @@ import { requireAdminPassword } from './_lib/session.js'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
 // Limites de validation (anti-DOS / anti-pollution KV)
 const KEY_RE = /^[a-zA-Z0-9:_\-.]{1,100}$/
-const MAX_VALUE_BYTES = 50 * 1024 // 50 KB par entrée (largement assez pour métadonnées + transcript court)
+// CF KV value limit = 25 MiB. 1 MB par record = headroom large pour les
+// transcriptions multi-parts longues (1h30+ avec transcript brut + sections).
+const MAX_VALUE_BYTES = 1 * 1024 * 1024 // 1 MB
 
 // ── GET /api/history ─ Lister les 20 dernières entrées ───────
 async function handleGet(env) {
@@ -70,6 +72,65 @@ async function handlePost(request, env) {
   return Response.json({ success: true }, { headers: CORS_HEADERS })
 }
 
+// ── PATCH /api/history ─ Update partiel d'une entrée existante ───
+// Body : { key, data: {...partialFields} }
+// Read-modify-write côté serveur : on lit le record actuel, on merge les
+// champs reçus par-dessus, on ré-écrit. Évite de retransférer le record
+// complet (transcript brut + meta) à chaque édit titre/section.
+async function handlePatch(request, env) {
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return Response.json({ error: 'invalid_json' }, { status: 400, headers: CORS_HEADERS })
+  }
+
+  const { key, data: partial } = body || {}
+  if (!key || typeof key !== 'string' || !KEY_RE.test(key)) {
+    return Response.json({ error: 'invalid_key' }, { status: 400, headers: CORS_HEADERS })
+  }
+  if (!partial || typeof partial !== 'object' || Array.isArray(partial)) {
+    return Response.json({ error: 'invalid_data', detail: 'must be a partial object' }, { status: 400, headers: CORS_HEADERS })
+  }
+
+  let existingRaw
+  try {
+    existingRaw = await env.MASTERHUB_HISTORY.get(key)
+  } catch (e) {
+    return Response.json({ error: 'kv_get_failed', detail: e?.message || '' }, { status: 500, headers: CORS_HEADERS })
+  }
+  if (!existingRaw) {
+    return Response.json({ error: 'not_found', detail: 'no record for that key, use POST to create' }, { status: 404, headers: CORS_HEADERS })
+  }
+
+  let existing
+  try {
+    existing = JSON.parse(existingRaw)
+  } catch {
+    return Response.json({ error: 'corrupted_record' }, { status: 500, headers: CORS_HEADERS })
+  }
+
+  const merged = { ...existing, ...partial }
+  let serialized
+  try {
+    serialized = JSON.stringify(merged)
+  } catch {
+    return Response.json({ error: 'invalid_data', detail: 'cannot stringify' }, { status: 400, headers: CORS_HEADERS })
+  }
+  if (serialized.length > MAX_VALUE_BYTES) {
+    return Response.json({ error: 'payload_too_large', detail: `max ${MAX_VALUE_BYTES} bytes after merge` }, { status: 413, headers: CORS_HEADERS })
+  }
+
+  try {
+    await env.MASTERHUB_HISTORY.put(key, serialized)
+  } catch (e) {
+    console.error('[history] PATCH KV put failed:', e?.message || e, 'key:', key)
+    return Response.json({ error: 'kv_put_failed' }, { status: 500, headers: CORS_HEADERS })
+  }
+
+  return Response.json({ success: true }, { headers: CORS_HEADERS })
+}
+
 // ── DELETE /api/history?key= ─ Supprimer une entrée ──────────
 async function handleDelete(request, env) {
   const url = new URL(request.url)
@@ -104,6 +165,7 @@ export async function onRequest(context) {
 
   if (method === 'GET')    return handleGet(env)
   if (method === 'POST')   return handlePost(request, env)
+  if (method === 'PATCH')  return handlePatch(request, env)
   if (method === 'DELETE') return handleDelete(request, env)
 
   return Response.json({ error: 'Méthode non supportée' }, { status: 405, headers: CORS_HEADERS })

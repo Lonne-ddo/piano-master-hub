@@ -1767,7 +1767,7 @@ function showSaveToast(state, detail) {
   showSaveToast._tid = setTimeout(() => t.classList.remove('show'), duration)
 }
 
-// POST /api/history avec retry 1× (M1 défensif).
+// POST /api/history avec retry 1× (M1 défensif). Création initiale.
 async function postHistoryWithRetry(key, payload) {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -1781,7 +1781,31 @@ async function postHistoryWithRetry(key, payload) {
       return true
     } catch (e) {
       if (attempt === 0) {
-        // Premier fail : delay 1.5s puis retry
+        await new Promise(r => setTimeout(r, 1500))
+        continue
+      }
+      throw e
+    }
+  }
+}
+
+// PATCH /api/history partial update — n'envoie QUE les champs modifiés
+// (title, summary, raw). Le serveur fait read-modify-write et conserve
+// transcript brut + meta inchangés. Évite HTTP 413 sur les vieux records
+// longs (transcript multi-parts 1h45 → 80-150KB).
+async function patchHistoryWithRetry(key, partial) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch('/api/history', {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, data: partial })
+      })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      return true
+    } catch (e) {
+      if (attempt === 0) {
         await new Promise(r => setTimeout(r, 1500))
         continue
       }
@@ -1930,24 +1954,20 @@ function currentPayload() {
 
 async function persistCurrent() {
   if (!currentHistoryKey) return
-  const summary = currentPayload()
-  const title = document.getElementById('res-title').value.trim()
-  const payload = {
-    date: new Date().toISOString(),
-    filename: resultName,
-    title,
-    summary,
-    raw: resultRaw,
-  }
-  if (renderMeta) {
-    if (typeof renderMeta.partsCount === 'number') payload.partsCount = renderMeta.partsCount
-    if (Array.isArray(renderMeta.partsNames))       payload.partsNames = renderMeta.partsNames
-    if (typeof renderMeta.totalDurationSec === 'number') payload.totalDurationSec = renderMeta.totalDurationSec
-    if (typeof renderMeta.transcript === 'string')  payload.transcript = renderMeta.transcript
+  // PATCH partial : on n'envoie QUE les 3 champs qui peuvent changer après
+  // création (title, summary, raw). Le transcript brut + meta (partsCount,
+  // partsNames, totalDurationSec, filename, date initiale) sont posés une
+  // fois lors du POST initial et restent inchangés côté serveur.
+  // → Payload réseau ~5-50 KB au lieu de 200KB-1MB sur les longs records.
+  const partial = {
+    title:   document.getElementById('res-title').value.trim(),
+    summary: currentPayload(),
+    raw:     resultRaw,
+    lastEditedAt: new Date().toISOString(),
   }
   showSaveToast('saving')
   try {
-    await postHistoryWithRetry(currentHistoryKey, payload)
+    await patchHistoryWithRetry(currentHistoryKey, partial)
     showSaveToast('saved')
     loadHistory()
   } catch(e) {
