@@ -79,6 +79,8 @@
     this.onWaveformsCalculated = opts.onWaveformsCalculated || null;
 
     this.audioCtx = null;
+    this.masterGain = null;   // GainNode global, inséré entre trackGain et destination
+    this.masterVolume = 0.8;  // slider linéaire 0..1, gain.value = masterVolume² (pseudo-log)
     this.audioEls = {};       // stem → HTMLAudioElement
     this.gainNodes = {};      // stem → GainNode
     this.canvases = {};       // stem → HTMLCanvasElement
@@ -240,6 +242,39 @@
     transport.appendChild(playBtn);
     transport.appendChild(timeEl);
     transport.appendChild(seekBar);
+
+    // ── Master volume : group sticky en bout de la transport bar ──
+    // Desktop : reste sur la même ligne après seek (flex-shrink: 0).
+    // Mobile (<600px) : wrap → 2e ligne full-width (flex-basis: 100%).
+    const masterVolGroup = document.createElement('div');
+    masterVolGroup.className = 'mtp-master-vol-group';
+    const masterVolSlider = document.createElement('input');
+    masterVolSlider.type = 'range';
+    masterVolSlider.className = 'mtp-master-vol-slider';
+    masterVolSlider.min = '0';
+    masterVolSlider.max = '1';
+    masterVolSlider.step = '0.01';
+    masterVolSlider.value = String(self.masterVolume);
+    masterVolSlider.title = 'Volume global (double-clic pour reset)';
+    masterVolSlider.setAttribute('aria-label', 'Volume global');
+    const masterVolValue = document.createElement('div');
+    masterVolValue.className = 'mtp-master-vol-value';
+    masterVolValue.textContent = Math.round(self.masterVolume * 100) + '%';
+    function applyMasterVolume(v) {
+      self.masterVolume = v;
+      if (self.masterGain) self.masterGain.gain.value = Math.pow(v, 2);
+      masterVolValue.textContent = Math.round(v * 100) + '%';
+    }
+    masterVolSlider.addEventListener('input', function () {
+      applyMasterVolume(Number(masterVolSlider.value));
+    });
+    masterVolSlider.addEventListener('dblclick', function () {
+      masterVolSlider.value = '0.8';
+      applyMasterVolume(0.8);
+    });
+    masterVolGroup.appendChild(masterVolSlider);
+    masterVolGroup.appendChild(masterVolValue);
+    transport.appendChild(masterVolGroup);
 
     root.appendChild(header);
     root.appendChild(tracksWrap);
@@ -409,6 +444,13 @@
     }
     this.audioCtx = new Ctx();
 
+    // masterGain inséré entre tous les trackGain et la destination, créé AVANT
+    // la boucle des tracks pour qu'ils s'y connectent dès leur init.
+    // Courbe pseudo-log : gain.value = volume² → perception linéaire à l'oreille.
+    this.masterGain = this.audioCtx.createGain();
+    this.masterGain.gain.value = Math.pow(this.masterVolume, 2);
+    this.masterGain.connect(this.audioCtx.destination);
+
     // Container off-screen pour les <audio>. MediaElementAudioSource exige
     // que les éléments soient dans le DOM — on les laisse ici jusqu'à destroy.
     const host = document.createElement('div');
@@ -528,7 +570,8 @@
             const source = self.audioCtx.createMediaElementSource(audio);
             const gain = self.audioCtx.createGain();
             gain.gain.value = 1;
-            source.connect(gain).connect(self.audioCtx.destination);
+            // Chain : <audio> → MediaElementSource → trackGain → masterGain → destination
+            source.connect(gain).connect(self.masterGain);
             self.audioEls[t.id] = audio;
             self.gainNodes[t.id] = gain;
             self.volumes[t.id] = 1;
