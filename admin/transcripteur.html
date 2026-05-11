@@ -338,6 +338,38 @@
     .res-title-input::placeholder { color: var(--text3); }
     .res-title-input:focus { border-color: var(--v); }
 
+    /* ── Toast persistance (M1) ─────────────────────────────────── */
+    .tr-save-toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: 'DM Mono', ui-monospace, monospace;
+      background: var(--bg2);
+      color: var(--text2);
+      border: 1px solid var(--border1);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity .2s, transform .2s;
+      z-index: 9999;
+    }
+    .tr-save-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .tr-save-toast.saving { color: var(--text3); }
+    .tr-save-toast.saved {
+      color: #5ecb8b;
+      border-color: rgba(94,203,139,0.45);
+    }
+    .tr-save-toast.failed {
+      color: #f87171;
+      border-color: rgba(248,113,113,0.5);
+    }
+
     /* ── Per-file progress bars (transcription parallèle) ── */
     .pf-row {
       display: flex;
@@ -1447,21 +1479,12 @@ FORMULATIONS À PRIVILÉGIER :
   ✅ "Continuer le ear training sur Tonedear pour repérer les couleurs des accords."
   ❌ "Tu as demandé de pratiquer..."
 
-- Pour les observations sur l'élève : 3e personne descriptive
-  ✅ "L'élève a confondu Am7 avec un accord de 7e de dominante en cherchant le nom."
-  ✅ "L'élève a montré une amélioration dans la compréhension des règles de construction des accords entre F7 et FMaj7."
-  ❌ "Tu as remarqué que l'élève..."
-
 - Pour les morceaux du répertoire : citation simple
   ✅ "Amazing Grace"
   ❌ "Tu as travaillé Amazing Grace avec l'élève"
 
 PRINCIPE SOUS-JACENT :
 Une phrase du résumé doit pouvoir être lue par l'élève dans son doc de suivi sans aucun ajustement, ET être reconnue par le coach comme ce qui s'est passé en séance. Si une phrase semble bizarre lue à voix haute par l'élève, elle est mal formulée.
-
-DISTINCTION COACH / ÉLÈVE PRÉSERVÉE :
-- Ce qui est ENSEIGNÉ → sections "enseignements", "conseils", "devoirs" (impersonnel ou impératif)
-- Ce que L'ÉLÈVE FAIT/DIT/DEMANDE → section "observations" UNIQUEMENT (3e personne avec "L'élève...")
 
 ────────────────────────────────────────────
 RÈGLE #3 — STRUCTURE ADAPTATIVE
@@ -1471,11 +1494,19 @@ RÈGLE #3 — STRUCTURE ADAPTATIVE
   * "enseignements" (règles théoriques, concepts, démonstrations expliqués par Estelon)
   * "conseils" (recommandations pratiques actionnables, formulées comme des suggestions)
   * "devoirs" (tâches à faire d'ici la prochaine séance, formulation impérative)
-  * "observations" (ce que l'élève fait, dit, demande, ses blocages, ses progrès)
   * "repertoire" (UNIQUEMENT les morceaux travaillés ou cités par leur titre — JAMAIS des concepts théoriques ou des accords)
 - INCLUS UNIQUEMENT les sections où tu as du contenu réel et SPÉCIFIQUE.
 - Une section vide = tu ne l'inclus pas.
 - "objectifs" : à inclure SEULEMENT si Estelon les a annoncés explicitement. Sinon NE PAS l'inclure (ne pas deviner).
+- "observations" : NE PLUS générer cette section (retirée du périmètre).
+
+SCOPE STRICT PAR SECTION (ANTI-REDONDANCE) :
+- "enseignements" : concepts théoriques, techniques, règles, méthodes. Le COURS lui-même. PAS de morceaux. PAS de devoirs. PAS de conseil pratique général.
+- "repertoire" : morceaux/titres spécifiques cités. PAS de notion théorique, PAS d'accord, PAS de gamme.
+- "conseils" : recommandations pratiques de l'enseignant, astuces, heuristiques. PAS de devoir explicite ("pratiquer X" = devoir, pas conseil).
+- "devoirs" : tâches concrètes à faire avant la prochaine séance, verbes d'action à l'impératif. PAS de conseil général ni de notion réexpliquée.
+
+RÈGLE D'AFFECTATION : chaque information n'apparaît QUE dans la section la plus spécifique. Si une info pourrait aller dans deux sections, choisis la plus spécifique (devoirs > conseils > enseignements > repertoire > objectifs).
 
 ────────────────────────────────────────────
 RÈGLE #4 — ZÉRO TRIVIALITÉ (CRITIQUE)
@@ -1506,9 +1537,13 @@ RÈGLE #5 — ZÉRO RÉPÉTITION (CRITIQUE)
 - Ne répète JAMAIS la même idée formulée différemment dans deux sections.
 - Ne répète JAMAIS la même idée plusieurs fois dans une même section.
 - Si une idée pourrait aller dans deux sections, choisis selon la priorité (haut = prioritaire) :
-  devoirs > conseils > enseignements > observations > objectifs > repertoire
+  devoirs > conseils > enseignements > repertoire > objectifs
 - Si Estelon répète une explication à plusieurs moments du cours (pédagogie classique), compresse en UN SEUL item dans la bonne section.
 - VÉRIFICATION FINALE : avant de rendre le JSON, relis tous tes items. Si 2 items expriment la même chose, fusionne ou supprime le moins informatif.
+- DUPLICATIONS TYPIQUES À ÉVITER :
+  * Une notion enseignée NE DOIT PAS réapparaître formulée en devoir (sauf si Estelon a explicitement demandé de la pratiquer — auquel cas seul le devoir reste).
+  * Un conseil pratique NE DOIT PAS réapparaître en enseignement.
+  * Un morceau cité dans le répertoire NE DOIT PAS apparaître aussi sous forme de devoir vague ("travailler ce morceau").
 
 ────────────────────────────────────────────
 RÈGLE #6 — EXHAUSTIVITÉ DANS LES SECTIONS RETENUES
@@ -1526,11 +1561,17 @@ RÈGLE #7 — TERMINOLOGIE EXACTE
 - Si tu vois un marqueur "[— part suivante —]" dans le transcript, ignore-le : c'est une coupure technique, le cours est continu
 
 ────────────────────────────────────────────
-RÈGLE #8 — REPERTOIRE STRICT
+RÈGLE #8 — REPERTOIRE STRICT (ANTI-HALLUCINATION)
 ────────────────────────────────────────────
-La section "repertoire" contient UNIQUEMENT des morceaux par leur titre (ex: Amazing Grace, Can't Help Falling in Love, Abrite-moi).
-JAMAIS d'accords, de concepts, de gammes, de progressions abstraites.
-Si aucun morceau n'a été cité par son titre, NE PAS inclure cette section.
+La section "repertoire" contient UNIQUEMENT des morceaux par leur titre EXPLICITEMENT nommé dans le transcript (ex: Amazing Grace, Can't Help Falling in Love, Abrite-moi).
+- JAMAIS d'accords, de concepts, de gammes, de progressions abstraites.
+- JAMAIS de morceau inféré d'une description vague. Exemples interdits :
+  ❌ "on a travaillé une chanson gospel" → NE PAS lister un morceau
+  ❌ "j'ai joué un morceau récent" → NE PAS lister un morceau
+  ❌ "un standard de jazz" → NE PAS lister un morceau
+- Pour chaque morceau listé, tu DOIS pouvoir citer la phrase d'origine du transcript où le titre apparaît tel quel.
+- Mieux vaut une section VIDE qu'une hallucination. Si aucun titre n'est explicitement cité, NE PAS inclure la section "repertoire".
+- Si le titre est partiellement reconnaissable mais incertain (mauvaise audio, prononciation floue), NE PAS inclure plutôt qu'inventer.
 
 ────────────────────────────────────────────
 FORMAT JSON STRICT — AUCUN TEXTE HORS JSON
@@ -1551,7 +1592,7 @@ FORMAT JSON STRICT — AUCUN TEXTE HORS JSON
 }
 
 L'ordre des sections dans l'array EST l'ordre d'affichage. Ordre suggéré :
-objectifs → enseignements → repertoire → conseils → devoirs → observations
+objectifs → enseignements → repertoire → conseils → devoirs
 (adapte selon le cours)
 
 Mapping key → title + émoji :
@@ -1560,7 +1601,8 @@ Mapping key → title + émoji :
 - repertoire → "🎵 Répertoire abordé"
 - conseils → "💡 Conseils donnés"
 - devoirs → "✅ Devoirs / À travailler"
-- observations → "👤 Observations sur l'élève"`,
+
+⚠️ Ne PAS générer de section "observations" (retirée du périmètre — toute observation sur l'élève doit être omise ou reformulée comme conseil/devoir/enseignement selon ce qui est pertinent).`,
         messages: [{
           role: 'user',
           content: `Voici la transcription de la séance :\n\n${fullTranscript}`
@@ -1602,18 +1644,22 @@ Mapping key → title + émoji :
 // ── Normalisation des formats de summary vers un tableau de sections ──
 // Supporte : nouveau format { sections: [{key,title,items}] }
 //          : v2 5-fixes { objectifs, enseignements, conseils, devoirs, observations }
+// Filter out 'observations' : section retirée du périmètre (M2). Les anciens
+// historiques qui en contiennent encore sont silencieusement nettoyés au rendu.
 function summaryToSections(summary) {
   if (!summary) return []
   if (Array.isArray(summary.sections)) {
-    return summary.sections.filter(s => s && Array.isArray(s.items) && s.items.length > 0)
+    return summary.sections.filter(s =>
+      s && Array.isArray(s.items) && s.items.length > 0 && s.key !== 'observations'
+    )
   }
-  // Format v2 : 5 sections fixes → convertir
+  // Format v2 legacy : 5 sections fixes → convertir (sans observations)
   const map = [
     { key: 'objectifs',     title: '🎯 Objectifs de la séance' },
     { key: 'enseignements', title: '📚 Points enseignés' },
     { key: 'conseils',      title: '💡 Conseils donnés' },
     { key: 'devoirs',       title: '✅ Devoirs / À travailler' },
-    { key: 'observations',  title: '👤 Observations sur l\'élève' },
+    // observations volontairement omise (cf M2)
   ]
   const sections = []
   for (const { key, title } of map) {
@@ -1701,33 +1747,76 @@ function renderResults(raw, filename, meta, titlePrefill) {
   saveToHistory(resultName, data, resultRaw, renderMeta)
 }
 
+// ── Toast discret persistance (M1) ───────────────────────────────
+// État global pour éviter de spammer le toast pendant l'auto-save debounced.
+function showSaveToast(state, detail) {
+  let t = document.querySelector('.tr-save-toast')
+  if (!t) {
+    t = document.createElement('div')
+    t.className = 'tr-save-toast'
+    document.body.appendChild(t)
+  }
+  t.className = 'tr-save-toast ' + state // saving | saved | failed
+  if (state === 'saving')      t.textContent = 'Sauvegarde…'
+  else if (state === 'saved')  t.textContent = 'Sauvegardé ✓'
+  else if (state === 'failed') t.textContent = '❌ Sauvegarde échouée' + (detail ? ' — ' + detail : '')
+  requestAnimationFrame(() => t.classList.add('show'))
+  clearTimeout(showSaveToast._tid)
+  // Disparaît après 2s (saved) ou 4s (failed pour laisser lire le détail)
+  const duration = state === 'failed' ? 4000 : 2000
+  showSaveToast._tid = setTimeout(() => t.classList.remove('show'), duration)
+}
+
+// POST /api/history avec retry 1× (M1 défensif).
+async function postHistoryWithRetry(key, payload) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch('/api/history', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, data: payload })
+      })
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      return true
+    } catch (e) {
+      if (attempt === 0) {
+        // Premier fail : delay 1.5s puis retry
+        await new Promise(r => setTimeout(r, 1500))
+        continue
+      }
+      throw e
+    }
+  }
+}
+
 // ── Historique ────────────────────────────────────────────────
 async function saveToHistory(filename, summary, raw, meta) {
+  const key = 'history:' + Date.now()
+  currentHistoryKey = key
+  const title = document.getElementById('res-title').value.trim()
+  const payload = {
+    date: new Date().toISOString(),
+    filename,
+    title,
+    summary,
+    raw,
+  }
+  if (meta) {
+    if (typeof meta.partsCount === 'number') payload.partsCount = meta.partsCount
+    if (Array.isArray(meta.partsNames))       payload.partsNames = meta.partsNames
+    if (typeof meta.totalDurationSec === 'number') payload.totalDurationSec = meta.totalDurationSec
+    if (typeof meta.transcript === 'string')  payload.transcript = meta.transcript
+  }
+  showSaveToast('saving')
   try {
-    const key = 'history:' + Date.now()
-    currentHistoryKey = key
-    const title = document.getElementById('res-title').value.trim()
-    const payload = {
-      date: new Date().toISOString(),
-      filename,
-      title,
-      summary,
-      raw,
-    }
-    if (meta) {
-      if (typeof meta.partsCount === 'number') payload.partsCount = meta.partsCount
-      if (Array.isArray(meta.partsNames))       payload.partsNames = meta.partsNames
-      if (typeof meta.totalDurationSec === 'number') payload.totalDurationSec = meta.totalDurationSec
-      if (typeof meta.transcript === 'string')  payload.transcript = meta.transcript
-    }
-    await fetch('/api/history', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key, data: payload })
-    })
+    await postHistoryWithRetry(key, payload)
+    showSaveToast('saved')
     loadHistory()
-  } catch(e) { console.warn('Historique non sauvegardé:', e) }
+  } catch(e) {
+    console.warn('Historique non sauvegardé:', e)
+    showSaveToast('failed', e && e.message)
+  }
 }
 
 async function loadHistory() {
@@ -1856,15 +1945,15 @@ async function persistCurrent() {
     if (typeof renderMeta.totalDurationSec === 'number') payload.totalDurationSec = renderMeta.totalDurationSec
     if (typeof renderMeta.transcript === 'string')  payload.transcript = renderMeta.transcript
   }
+  showSaveToast('saving')
   try {
-    await fetch('/api/history', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: currentHistoryKey, data: payload })
-    })
+    await postHistoryWithRetry(currentHistoryKey, payload)
+    showSaveToast('saved')
     loadHistory()
-  } catch(e) { console.warn('Auto-save échoué:', e) }
+  } catch(e) {
+    console.warn('Auto-save échoué:', e)
+    showSaveToast('failed', e && e.message)
+  }
 }
 
 function onTitleEdit() {
