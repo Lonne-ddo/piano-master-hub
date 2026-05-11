@@ -1,6 +1,6 @@
 // ─── /api/analyse/:id ────────────────────────────────────────────
 // PATCH  → rename ou réassigner (admin only)
-// DELETE → supprime KV + R2 (admin only)
+// DELETE → supprime KV + R2 (original + stems si multitrack, admin only)
 
 import { requireAdminPassword } from '../_lib/session.js';
 import { isValidId, loadValidSlugs, CORS, jsonResponse } from './_helpers.js';
@@ -46,8 +46,6 @@ export async function onRequestPatch({ params, request, env }) {
   }
 
   // ── assignedTo ──
-  // Accepte string (singleton converti en array) ou array.
-  // null/[] → vide la liste.
   if (body.assignedTo !== undefined) {
     let raw;
     if (body.assignedTo === null) raw = [];
@@ -92,13 +90,22 @@ export async function onRequestDelete({ params, request, env }) {
   const record = await loadRecord(env, id);
   if (!record) return jsonResponse({ error: 'not_found' }, 404);
 
-  // 1) Delete R2 (best-effort, on continue si fail pour ne pas bloquer le KV cleanup)
-  if (record.r2Key) {
-    try { await env.ANALYSE_R2.delete(record.r2Key); }
-    catch (e) { console.warn('[analyse] R2 delete failed', e?.message || e); }
+  // 1) Delete R2 original (best-effort)
+  if (record.r2KeyOriginal) {
+    try { await env.ANALYSE_R2.delete(record.r2KeyOriginal); }
+    catch (e) { console.warn('[analyse] R2 original delete failed', e?.message || e); }
   }
 
-  // 2) Delete KV
+  // 2) Delete R2 stems si multitrack (best-effort, parallèle)
+  if (record.r2KeysStems && typeof record.r2KeysStems === 'object') {
+    await Promise.all(Object.values(record.r2KeysStems).map(async (key) => {
+      if (typeof key !== 'string') return;
+      try { await env.ANALYSE_R2.delete(key); }
+      catch (e) { console.warn('[analyse] R2 stem delete failed', key, e?.message || e); }
+    }));
+  }
+
+  // 3) Delete KV
   try {
     await env.MASTERHUB_ANALYSE.delete(`analyse:${id}`);
   } catch (e) {

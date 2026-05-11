@@ -1,18 +1,22 @@
 // ─── POST /api/analyse/upload ────────────────────────────────────
-// Upload admin d'une vidéo pédagogique d'analyse.
-// Multipart : 1 file + 1 title + (optionnel) duration_sec.
+// Upload admin d'un fichier audio (mp3/wav/m4a/flac).
+//
+// Multipart : 1 file + 1 title + (optionnel) duration_sec + pianoSolo (bool).
 //
 // Pipeline :
-//   1. Auth admin (mh_admin_pw)
-//   2. Validation MIME (video/mp4|webm|quicktime), taille (≤100MB), durée (≤30min)
-//   3. R2 put : analyse/<id>/<slug-titre>.<ext>
-//   4. KV write : analyse:<id> avec record canonique
-//   5. Retour { id, title, r2Key, durationSeconds }
+//   1. Auth admin + validation MIME audio + size + duration
+//   2. R2.put analyse/<id>/original.<ext>
+//   3a. Si pianoSolo=true → save KV type='single' status='success' → 201
+//   3b. Sinon → check cap mensuel → trigger Replicate → save KV type='multitrack'
+//       status='pending' avec replicateId → 201 { id, predictionId }
+//       Le client doit ensuite poller /api/analyse?action=status&id=<>&predictionId=<>
+//       qui finalise les stems R2 + update KV à 'success' quand Replicate termine.
 
 import { requireAdminPassword } from '../_lib/session.js';
 import {
   MIME_TYPES_ALLOWED, EXTENSION_BY_MIME, MAX_SIZE_BYTES, MAX_DURATION_S,
-  genId, slugify, CORS, jsonResponse,
+  MONTHLY_CAP, REPLICATE_VERSION, DEMUCS_MODEL, COST_EUR_PER_RUN,
+  genId, slugify, CORS, jsonResponse, countMonthlyMultitrack,
 } from './_helpers.js';
 
 export async function onRequestOptions() {
@@ -60,8 +64,6 @@ export async function onRequestPost({ request, env }) {
     }, 413);
   }
 
-  // duration_sec passé en field depuis le client (lecture <video>.duration côté front).
-  // 0 ou absent → on enregistre 0 ; le front gère le rendu fallback.
   const durationRaw = Number(formData.get('duration_sec') || 0);
   const durationSeconds = Number.isFinite(durationRaw) && durationRaw > 0
     ? Math.round(durationRaw)
@@ -73,43 +75,129 @@ export async function onRequestPost({ request, env }) {
     }, 422);
   }
 
+  // Flag pianoSolo : "true"|"1" (form-encoded) → bypass Demucs
+  const pianoSoloRaw = formData.get('pianoSolo');
+  const pianoSolo = pianoSoloRaw === 'true' || pianoSoloRaw === '1' || pianoSoloRaw === true;
+
+  // ── Cap mensuel multitrack ──
+  if (!pianoSolo) {
+    const used = await countMonthlyMultitrack(env);
+    if (used >= MONTHLY_CAP) {
+      return jsonResponse({
+        error: 'monthly_cap_reached',
+        cap: MONTHLY_CAP, count: used,
+      }, 429);
+    }
+  }
+
+  // ── R2 put original ──
   const id = genId();
-  const ext = EXTENSION_BY_MIME[mimeType];
-  const slug = slugify(titleRaw) || 'video';
-  const r2Key = `analyse/${id}/${slug}.${ext}`;
+  const ext = EXTENSION_BY_MIME[mimeType] || 'bin';
+  const r2KeyOriginal = `analyse/${id}/original.${ext}`;
   const originalFilename = String(formData.get('filename') || (file.name || '')).slice(0, 200);
 
-  // Stream → R2 (file.stream() ou file directement, l'API CF accepte les Blob)
   try {
-    await env.ANALYSE_R2.put(r2Key, file.stream(), {
+    await env.ANALYSE_R2.put(r2KeyOriginal, file.stream(), {
       httpMetadata: { contentType: mimeType },
     });
   } catch (e) {
     return jsonResponse({ error: 'r2_put_failed', detail: e?.message || '' }, 500);
   }
 
-  const record = {
+  // ── Construction du record commun ──
+  const baseRecord = {
     id,
     title: titleRaw,
+    type: pianoSolo ? 'single' : 'multitrack',
     originalFilename,
-    r2Key,
+    r2KeyOriginal,
+    r2KeysStems: null,
     mimeType,
     sizeBytes,
     durationSeconds,
     assignedTo: [],
     uploadedAt: Date.now(),
     uploadedBy: 'admin',
+    status: pianoSolo ? 'success' : 'pending',
   };
 
+  // ── Mode single : direct save, pas de Replicate ──
+  if (pianoSolo) {
+    try {
+      await env.MASTERHUB_ANALYSE.put(`analyse:${id}`, JSON.stringify(baseRecord));
+    } catch (e) {
+      try { await env.ANALYSE_R2.delete(r2KeyOriginal); } catch {}
+      return jsonResponse({ error: 'kv_put_failed', detail: e?.message || '' }, 500);
+    }
+    return jsonResponse({
+      ok: true, id, type: 'single',
+      title: baseRecord.title, r2KeyOriginal, durationSeconds, sizeBytes,
+    }, 201);
+  }
+
+  // ── Mode multitrack : trigger Replicate htdemucs_6s ──
+  if (!env.REPLICATE_API_TOKEN) {
+    try { await env.ANALYSE_R2.delete(r2KeyOriginal); } catch {}
+    return jsonResponse({ error: 'replicate_token_missing' }, 502);
+  }
+
+  // Replicate accepte une URL https publique OU un dataURL. On lui passe une
+  // URL signée temporaire... ou plus simplement, on génère un dataURL depuis
+  // le fichier que l'admin a uploadé. Pour rester compatible avec l'ancien
+  // pattern /api/stems (qui passait audio en dataURL), on encode ici.
+  // Coût : 1 passage en mémoire (jusqu'à 100MB).
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  const dataURL = `data:${mimeType};base64,${btoa(bin)}`;
+
+  let replicateResp, replicateData;
   try {
-    await env.MASTERHUB_ANALYSE.put(`analyse:${id}`, JSON.stringify(record));
+    replicateResp = await fetch('https://api.replicate.com/v1/predictions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${env.REPLICATE_API_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        version: REPLICATE_VERSION,
+        input: {
+          audio: dataURL,
+          model: DEMUCS_MODEL,
+          output_format: 'mp3',
+          mp3_bitrate: 320,
+        },
+      }),
+    });
+    replicateData = await replicateResp.json();
   } catch (e) {
-    // KV échoue après R2 success → R2 cleanup best-effort pour éviter orphelin
-    try { await env.ANALYSE_R2.delete(r2Key); } catch {}
+    try { await env.ANALYSE_R2.delete(r2KeyOriginal); } catch {}
+    return jsonResponse({ error: 'replicate_unreachable', detail: e?.message || '' }, 502);
+  }
+
+  if (!replicateResp.ok) {
+    try { await env.ANALYSE_R2.delete(r2KeyOriginal); } catch {}
+    return jsonResponse({
+      error: 'replicate_error',
+      detail: replicateData?.detail || replicateData,
+    }, 502);
+  }
+
+  // Save KV pending avec replicateId pour le polling client
+  baseRecord.replicateId = replicateData.id;
+  baseRecord.costEUR = COST_EUR_PER_RUN; // optimiste, sera décompté en cas de fail
+  try {
+    await env.MASTERHUB_ANALYSE.put(`analyse:${id}`, JSON.stringify(baseRecord));
+  } catch (e) {
+    try { await env.ANALYSE_R2.delete(r2KeyOriginal); } catch {}
     return jsonResponse({ error: 'kv_put_failed', detail: e?.message || '' }, 500);
   }
 
   return jsonResponse({
-    ok: true, id, title: record.title, r2Key, durationSeconds, sizeBytes,
+    ok: true, id, type: 'multitrack',
+    title: baseRecord.title, r2KeyOriginal, durationSeconds, sizeBytes,
+    predictionId: replicateData.id,
+    status: 'pending',
   }, 201);
 }

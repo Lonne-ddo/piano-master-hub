@@ -1,16 +1,12 @@
-// ─── GET /api/analyse/:id/stream ─────────────────────────────────
-// Sert l'audio R2 original (r2KeyOriginal) avec support Range.
+// ─── GET /api/analyse/:id/stream/:track ──────────────────────────
+// Stream une stem multitrack (vocals | drums | bass | piano | guitar | other).
 // Auth : admin OU élève assigné (assignedTo.includes(slug)).
+// 404 si type='single' ou track absent du record.r2KeysStems.
 //
-// Pour les stems multitrack, voir /api/analyse/:id/stream/:track.
-//
-// Response :
-//   - 200 (full body) si pas de header Range
-//   - 206 Partial Content si Range parsable, avec Content-Range
-//   - 416 Range Not Satisfiable si Range out-of-bounds
+// Support Range (HTTP 206) pour seek fluide.
 
-import { requireAdminPassword, getSessionFromRequest } from '../../_lib/session.js';
-import { isValidId, CORS } from '../_helpers.js';
+import { requireAdminPassword, getSessionFromRequest } from '../../../_lib/session.js';
+import { isValidId, STEM_KEYS, CORS } from '../../_helpers.js';
 
 const STREAM_CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -35,12 +31,16 @@ export async function onRequestGet({ params, request, env }) {
   if (!env.ANALYSE_R2) return errorResponse('r2_not_bound', 500);
 
   const id = String(params?.id || '');
+  const track = String(params?.track || '').toLowerCase();
   if (!isValidId(id)) return errorResponse('bad_id', 400);
+  if (!STEM_KEYS.includes(track)) return errorResponse('bad_track', 400);
 
   const record = await env.MASTERHUB_ANALYSE.get(`analyse:${id}`, { type: 'json' });
-  // r2KeyOriginal (nouveau schéma) avec fallback r2Key (legacy migration douce).
-  const r2KeyOrig = record?.r2KeyOriginal || record?.r2Key;
-  if (!record || !r2KeyOrig) return errorResponse('not_found', 404);
+  if (!record) return errorResponse('not_found', 404);
+  if (record.type !== 'multitrack') return errorResponse('not_multitrack', 404);
+
+  const r2Key = record.r2KeysStems?.[track];
+  if (!r2Key) return errorResponse('track_not_found', 404);
 
   // ── Auth : admin OU élève assigné ──
   const isAdmin = await requireAdminPassword(request, env);
@@ -53,57 +53,51 @@ export async function onRequestGet({ params, request, env }) {
 
   // ── Range parsing ──
   const rangeHeader = request.headers.get('Range');
-  let r2Object;
-
-  const total = record.sizeBytes || 0;
   const baseHeaders = {
     ...STREAM_CORS,
-    'Content-Type': record.mimeType || 'audio/mpeg',
+    'Content-Type': 'audio/mpeg',
     'Accept-Ranges': 'bytes',
     'Cache-Control': 'private, max-age=3600',
   };
 
   if (rangeHeader) {
-    // Parse "bytes=START-END" (END optionnel)
     const m = rangeHeader.match(/^bytes=(\d+)-(\d*)$/);
     if (!m) {
       return new Response(null, {
         status: 416,
-        headers: { ...baseHeaders, 'Content-Range': `bytes */${total}` },
+        headers: { ...baseHeaders, 'Content-Range': 'bytes */*' },
       });
     }
     const start = parseInt(m[1], 10);
-    const end = m[2] ? parseInt(m[2], 10) : (total > 0 ? total - 1 : 0);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || (total > 0 && start >= total) || end < start) {
-      return new Response(null, {
-        status: 416,
-        headers: { ...baseHeaders, 'Content-Range': `bytes */${total}` },
-      });
-    }
-    const length = end - start + 1;
+    const endSpecified = m[2] !== '';
+    const endParsed = endSpecified ? parseInt(m[2], 10) : null;
+    const length = endParsed !== null ? Math.max(0, endParsed - start + 1) : undefined;
 
+    let r2Object;
     try {
-      r2Object = await env.ANALYSE_R2.get(r2KeyOrig, {
-        range: { offset: start, length },
+      r2Object = await env.ANALYSE_R2.get(r2Key, {
+        range: length !== undefined ? { offset: start, length } : { offset: start },
       });
     } catch (e) {
       return errorResponse('r2_get_failed', 500);
     }
     if (!r2Object) return errorResponse('r2_object_missing', 404);
 
+    const totalSize = r2Object.size;
+    const realEnd = endParsed !== null ? Math.min(endParsed, totalSize - 1) : totalSize - 1;
     return new Response(r2Object.body, {
       status: 206,
       headers: {
         ...baseHeaders,
-        'Content-Length': String(length),
-        'Content-Range': `bytes ${start}-${end}/${total || '*'}`,
+        'Content-Length': String(realEnd - start + 1),
+        'Content-Range': `bytes ${start}-${realEnd}/${totalSize}`,
       },
     });
   }
 
-  // Pas de Range → full body
+  let r2Object;
   try {
-    r2Object = await env.ANALYSE_R2.get(r2KeyOrig);
+    r2Object = await env.ANALYSE_R2.get(r2Key);
   } catch (e) {
     return errorResponse('r2_get_failed', 500);
   }
@@ -113,7 +107,7 @@ export async function onRequestGet({ params, request, env }) {
     status: 200,
     headers: {
       ...baseHeaders,
-      'Content-Length': String(total || r2Object.size || 0),
+      'Content-Length': String(r2Object.size || 0),
     },
   });
 }

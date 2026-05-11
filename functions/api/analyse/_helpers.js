@@ -1,18 +1,70 @@
 // ─── Helpers partagés pour /api/analyse/* ────────────────────────
-// Constantes, validation ID, slugify, mime types whitelist.
+// Constantes, validation ID, slugify, mime types audio whitelist, pipeline
+// Replicate htdemucs_6s (réutilise la config de l'ancien /api/stems).
 
-export const MIME_TYPES_ALLOWED = ['video/mp4', 'video/webm', 'video/quicktime'];
+// ─── Audio MIME whitelist ────────────────────────────────────────
+// Audio uniquement (D1=a + D5=a : on a retiré le mode vidéo).
+// Variantes acceptées par browser pour le même format (m4a/wav).
+export const MIME_TYPES_ALLOWED = [
+  'audio/mpeg',         // mp3
+  'audio/mp3',          // alias non-standard mais émis par certains clients
+  'audio/wav',          // wav
+  'audio/x-wav',        // wav (Safari)
+  'audio/x-m4a',        // m4a (iOS/macOS)
+  'audio/mp4',          // m4a (AAC)
+  'audio/aac',          // aac brut
+  'audio/flac',         // flac
+  'audio/x-flac',       // flac (alternative)
+];
+
 export const EXTENSION_BY_MIME = {
-  'video/mp4': 'mp4',
-  'video/webm': 'webm',
-  'video/quicktime': 'mov',
+  'audio/mpeg': 'mp3',
+  'audio/mp3': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'audio/x-m4a': 'm4a',
+  'audio/mp4': 'm4a',
+  'audio/aac': 'm4a',
+  'audio/flac': 'flac',
+  'audio/x-flac': 'flac',
 };
 
 // V1 : 100MB (limite CF Pages workers standard, bumper via presigned URL si > en pratique).
 export const MAX_SIZE_BYTES = 100 * 1024 * 1024;
 export const MAX_DURATION_S = 30 * 60; // 30 min
 
-// ID nanoid-like 12 chars, alphabet [A-Za-z0-9_-].
+// ─── Pipeline Replicate (mode multitrack) ────────────────────────
+// Réplique de la config /api/stems.js — séparation Demucs htdemucs_6s.
+export const STEM_KEYS = ['vocals', 'drums', 'bass', 'piano', 'guitar', 'other'];
+export const REPLICATE_VERSION = '5a7041cc9b82e5a558fea6b3d7b12dea89625e89da33f0447bd727c2d0ab9e77';
+export const DEMUCS_MODEL = 'htdemucs_6s';
+export const MONTHLY_CAP = 20;
+export const COST_EUR_PER_RUN = 0.02;
+
+// Normalise l'output Replicate (object ou array legacy) en {stem: url, ...}.
+export function normalizeReplicateOutput(output) {
+  if (!output) return {};
+  if (Array.isArray(output)) {
+    // Ordre legacy htdemucs_6s
+    const order = ['vocals', 'drums', 'bass', 'other', 'piano', 'guitar'];
+    const out = {};
+    output.forEach((url, i) => {
+      if (order[i] && url) out[order[i]] = url;
+    });
+    return out;
+  }
+  if (typeof output === 'object') {
+    const out = {};
+    for (const k of STEM_KEYS) {
+      if (typeof output[k] === 'string') out[k] = output[k];
+    }
+    return out;
+  }
+  return {};
+}
+
+// ─── ID generation + validation ──────────────────────────────────
+// Nouveau format : nanoid 12 chars, alphabet [A-Za-z0-9_-].
 export function genId() {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
   const buf = new Uint8Array(12);
@@ -26,7 +78,15 @@ export function isValidId(id) {
   return typeof id === 'string' && /^[A-Za-z0-9_-]{12}$/.test(id);
 }
 
-// Slugify accents-aware (cohérent avec eleves/index.js + stems download).
+// Legacy stems ID format `<ts>-<predIdShort>` (cf /api/stems). Permet de
+// router automatiquement les anciennes séparations vers /api/stems/...
+// quand on les rencontre dans le merge legacy de /api/eleves/:slug/analyse.
+export function isLegacyStemsId(id) {
+  return typeof id === 'string' && /^\d{10,16}-[A-Za-z0-9]{4,16}$/.test(id);
+}
+
+// ─── Slugify accents-aware ───────────────────────────────────────
+// Cohérent avec eleves/index.js + stems download.
 export function slugify(str) {
   return String(str || '')
     .normalize('NFD')
@@ -37,6 +97,7 @@ export function slugify(str) {
     .replace(/^-+|-+$/g, '');
 }
 
+// ─── CORS + Response helper ──────────────────────────────────────
 export const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
@@ -50,10 +111,42 @@ export function jsonResponse(data, status = 200) {
   });
 }
 
-// Charge la liste des slugs valides depuis MASTERHUB_STUDENTS.eleves:list.
-// Pattern cohérent avec /api/eleves GET (qui seed la clé au bootstrap) et
-// les autres handlers (sync.js, [id].js, [slug]/public.js). Fallback sur
-// DEFAULT_ELEVES si la clé n'a pas encore été seedée ou si KV down.
+// ─── Cap mensuel Replicate (multitrack only) ─────────────────────
+// Compte les success type='multitrack' du mois courant en KV (prefix scan).
+// Single n'est pas comptabilisé (gratuit). Vérifié AVANT call Replicate.
+export async function countMonthlyMultitrack(env) {
+  if (!env.MASTERHUB_ANALYSE) return 0;
+  const now = new Date();
+  const ymPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  let count = 0;
+  let cursor;
+  while (true) {
+    let page;
+    try {
+      page = await env.MASTERHUB_ANALYSE.list({ prefix: 'analyse:', cursor, limit: 1000 });
+    } catch { return count; }
+    const values = await Promise.all(
+      page.keys.map((k) =>
+        env.MASTERHUB_ANALYSE.get(k.name, { type: 'json' }).catch(() => null),
+      ),
+    );
+    for (const v of values) {
+      if (
+        v && v.type === 'multitrack' && v.status === 'success' &&
+        typeof v.uploadedAt === 'number'
+      ) {
+        const d = new Date(v.uploadedAt);
+        const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        if (ym === ymPrefix) count++;
+      }
+    }
+    if (page.list_complete) break;
+    cursor = page.cursor;
+  }
+  return count;
+}
+
+// ─── Liste élèves valides ────────────────────────────────────────
 const DEFAULT_ELEVES = ['japhet', 'messon', 'dexter', 'tara'];
 
 export async function loadValidSlugs(env) {

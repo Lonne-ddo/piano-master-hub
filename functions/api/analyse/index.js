@@ -1,5 +1,6 @@
 // ─── GET /api/analyse ────────────────────────────────────────────
 // Liste tous les records analyse (admin only), tri uploadedAt desc.
+// Mix type='single' + type='multitrack' (status pending/success/failed).
 
 import { requireAdminPassword } from '../_lib/session.js';
 import { CORS, jsonResponse } from './_helpers.js';
@@ -29,16 +30,25 @@ export async function onRequestGet({ request, env }) {
       ),
     );
     for (const v of values) {
-      if (v && v.id && v.r2Key) {
+      if (v && v.id) {
         items.push({
           id: v.id,
           title: v.title || 'Sans titre',
+          type: v.type || 'single',
+          status: v.status || 'success',
           mimeType: v.mimeType || '',
           sizeBytes: v.sizeBytes || 0,
           durationSeconds: v.durationSeconds || 0,
           assignedTo: Array.isArray(v.assignedTo) ? v.assignedTo : [],
           uploadedAt: v.uploadedAt || 0,
           originalFilename: v.originalFilename || '',
+          // multitrack-only fields (présents seulement si applicable)
+          stems: (v.r2KeysStems && typeof v.r2KeysStems === 'object')
+            ? Object.keys(v.r2KeysStems)
+            : [],
+          replicateId: v.replicateId || null,
+          costEUR: v.costEUR || 0,
+          errorCode: v.errorCode || null,
         });
       }
     }
