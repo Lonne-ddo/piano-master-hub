@@ -275,6 +275,119 @@
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
 }
 
+/* ── EQ panel (mode single AnalysePlayer v2) ──────────────── */
+.mtp-eq-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 20px;
+  align-items: center;
+  justify-content: center;
+}
+.mtp-eq-title {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+.mtp-eq-bands {
+  display: flex; justify-content: center; gap: 20px;
+}
+.mtp-eq-band {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 96px;
+}
+.mtp-eq-value {
+  font-size: 11px;
+  font-family: 'DM Mono', ui-monospace, monospace;
+  color: rgba(255, 255, 255, 0.7);
+  font-feature-settings: "tnum";
+  min-height: 14px;
+}
+.mtp-eq-band.boosted .mtp-eq-value { color: #8B6FE8; }
+.mtp-eq-band.cut .mtp-eq-value { color: #f0b429; }
+.mtp-eq-label {
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+}
+.mtp-eq-slider {
+  width: 28px; height: 130px;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  -webkit-appearance: slider-vertical;
+  appearance: slider-vertical;
+  background: transparent;
+  cursor: pointer;
+  margin: 0; padding: 0; outline: none;
+}
+.mtp-eq-slider::-webkit-slider-runnable-track {
+  width: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 2px;
+}
+.mtp-eq-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #8B6FE8; border: 2px solid #09090f;
+  cursor: grab; margin-left: -7px;
+  transition: transform 0.1s;
+}
+.mtp-eq-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.mtp-eq-slider::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #8B6FE8; border: 2px solid #09090f;
+  cursor: grab;
+}
+.mtp-eq-presets {
+  display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+}
+.mtp-eq-preset {
+  font-size: 11px;
+  padding: 7px 13px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+.mtp-eq-preset:hover {
+  background: rgba(139, 111, 232, 0.12);
+  color: #8B6FE8;
+  border-color: rgba(139, 111, 232, 0.4);
+}
+
+/* ── Speed buttons (transport bar) ─────────────────────────── */
+.mtp-speed-group {
+  display: flex; gap: 4px; flex-shrink: 0;
+}
+.mtp-speed-btn {
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-family: inherit;
+  font-feature-settings: "tnum";
+  min-width: 44px;
+  transition: all 0.12s;
+}
+.mtp-speed-btn:hover {
+  background: rgba(139, 111, 232, 0.12);
+  color: #8B6FE8;
+  border-color: rgba(139, 111, 232, 0.4);
+}
+.mtp-speed-btn.active {
+  background: rgba(139, 111, 232, 0.22);
+  color: #ffffff;
+  border-color: #8B6FE8;
+}
+
 /* ── Transport ────────────────────────────────────────────── */
 .mtp-transport {
   flex-shrink: 0;
