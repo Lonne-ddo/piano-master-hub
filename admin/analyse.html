@@ -350,11 +350,13 @@
   <div class="ph">
     <div class="ph-title">
       <span>🎬 Analyse</span>
-      <span class="badge">MP3 · WAV · M4A · FLAC</span>
+      <span class="badge">MP3 · WAV · M4A · FLAC · MP4 · MOV</span>
     </div>
     <div class="ph-desc">
-      Upload audio. Coche "Piano solo" pour les pistes sans séparation (gratuit, instant).
-      Sinon → séparation Demucs htdemucs_6s (≈0.02 € · 1/20 du cap mensuel).
+      Upload audio ou vidéo (l'audio est extrait automatiquement — pratique pour
+      les vidéos TikTok/IG sans extraction préalable). Coche "Piano solo" pour
+      les pistes sans séparation (gratuit, instant). Sinon → séparation Demucs
+      htdemucs_6s (≈0.02 € · 1/20 du cap mensuel).
     </div>
   </div>
 
@@ -370,10 +372,10 @@
         <input type="checkbox" id="vid-piano-solo" style="width:18px;height:18px;accent-color:var(--v);cursor:pointer;" />
         <span style="font-size:13px;color:var(--text2);">Piano solo (pas de séparation Demucs) <em style="color:var(--text3);font-style:normal;">— gratuit, instant</em></span>
       </label>
-      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Sélectionner ou glisser un audio">
-        <div class="dropzone-title">📁 Glisse un audio ici ou clique pour sélectionner</div>
-        <div class="dropzone-sub">MP3 · WAV · M4A · FLAC · Max 100 Mo · jusqu'à 30 min</div>
-        <input id="vid-file" type="file" accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/x-m4a,audio/mp4,audio/aac,audio/flac,audio/x-flac" />
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Sélectionner ou glisser un fichier audio ou vidéo">
+        <div class="dropzone-title">📁 Glisse un fichier ici ou clique pour sélectionner</div>
+        <div class="dropzone-sub">MP3 · WAV · M4A · FLAC · MP4 · MOV · WEBM · Max 100 Mo · jusqu'à 30 min</div>
+        <input id="vid-file" type="file" accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/x-m4a,audio/mp4,audio/aac,audio/flac,audio/x-flac,video/mp4,video/quicktime,video/webm" />
       </div>
       <div id="upload-progress" class="upload-progress">
         <div class="upload-progress-label">
@@ -389,7 +391,7 @@
 
   <!-- ── LISTE ───────────────────────────────────────────── -->
   <div class="section">
-    <div class="section-title">Mes vidéos</div>
+    <div class="section-title">Mes analyses</div>
     <div id="list-content">
       <div class="list-empty">Chargement…</div>
     </div>
@@ -432,10 +434,13 @@ fetch('/api/admin/check', { credentials: 'same-origin' })
 const MAX_SIZE_BYTES = 100 * 1024 * 1024; // 100 Mo
 const MAX_DURATION_S = 30 * 60;
 const ALLOWED_MIME = new Set([
+  // Audio
   'audio/mpeg', 'audio/mp3',
   'audio/wav', 'audio/x-wav',
   'audio/x-m4a', 'audio/mp4', 'audio/aac',
   'audio/flac', 'audio/x-flac',
+  // Vidéo (audio extrait à la lecture/séparation)
+  'video/mp4', 'video/quicktime', 'video/webm',
 ]);
 const STEM_KEYS_ORDER = ['vocals', 'drums', 'bass', 'piano', 'guitar', 'other'];
 const STEM_LABELS_FR = {

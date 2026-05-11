@@ -2,10 +2,13 @@
 // Constantes, validation ID, slugify, mime types audio whitelist, pipeline
 // Replicate htdemucs_6s (réutilise la config de l'ancien /api/stems).
 
-// ─── Audio MIME whitelist ────────────────────────────────────────
-// Audio uniquement (D1=a + D5=a : on a retiré le mode vidéo).
-// Variantes acceptées par browser pour le même format (m4a/wav).
+// ─── MIME whitelist : audio + vidéo (extrait audio only) ─────────
+// Audio direct OU vidéo (TikTok/IG) dont seul l'audio sera utilisé.
+// Le browser élève joue via <audio src="..."> qui ignore le track vidéo.
+// Replicate htdemucs_6s accepte aussi les fichiers vidéo en entrée
+// (extrait l'audio automatiquement).
 export const MIME_TYPES_ALLOWED = [
+  // Audio
   'audio/mpeg',         // mp3
   'audio/mp3',          // alias non-standard mais émis par certains clients
   'audio/wav',          // wav
@@ -15,6 +18,10 @@ export const MIME_TYPES_ALLOWED = [
   'audio/aac',          // aac brut
   'audio/flac',         // flac
   'audio/x-flac',       // flac (alternative)
+  // Vidéo (audio extrait à la lecture / par Demucs)
+  'video/mp4',          // mp4 (TikTok, IG Reels, exports mobile)
+  'video/quicktime',    // mov (iPhone)
+  'video/webm',         // webm (Web exports)
 ];
 
 export const EXTENSION_BY_MIME = {
@@ -27,6 +34,9 @@ export const EXTENSION_BY_MIME = {
   'audio/aac': 'm4a',
   'audio/flac': 'flac',
   'audio/x-flac': 'flac',
+  'video/mp4': 'mp4',
+  'video/quicktime': 'mov',
+  'video/webm': 'webm',
 };
 
 // V1 : 100MB (limite CF Pages workers standard, bumper via presigned URL si > en pratique).
