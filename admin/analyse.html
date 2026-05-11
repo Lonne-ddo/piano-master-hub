@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="MH Admin" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/assets/css/analyse-player.css" />
+  <link rel="stylesheet" href="/assets/css/multitrack.css" />
   <style>
     :root {
       --v: #8B6FE8;
@@ -350,10 +350,11 @@
   <div class="ph">
     <div class="ph-title">
       <span>🎬 Analyse</span>
-      <span class="badge">MP4 · WEBM · MOV</span>
+      <span class="badge">MP3 · WAV · M4A · FLAC</span>
     </div>
     <div class="ph-desc">
-      Upload des vidéos d'analyse pédagogique. Les élèves les rejouent avec EQ 3 bandes et contrôle de vitesse.
+      Upload audio. Coche "Piano solo" pour les pistes sans séparation (gratuit, instant).
+      Sinon → séparation Demucs htdemucs_6s (≈0.02 € · 1/20 du cap mensuel).
     </div>
   </div>
 
@@ -363,12 +364,16 @@
     <div class="upload-card">
       <div class="upload-row">
         <label for="vid-title">Titre</label>
-        <input id="vid-title" type="text" class="title-input" maxlength="200" placeholder="Ex : Analyse motif gauche — Hallelujah" />
+        <input id="vid-title" type="text" class="title-input" maxlength="200" placeholder="Ex : Hallelujah — analyse motif gauche" />
       </div>
-      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Sélectionner ou glisser une vidéo">
-        <div class="dropzone-title">📁 Glisse une vidéo ici ou clique pour sélectionner</div>
-        <div class="dropzone-sub">Max 100 Mo · jusqu'à 30 min</div>
-        <input id="vid-file" type="file" accept="video/mp4,video/webm,video/quicktime" />
+      <label class="upload-row" style="cursor:pointer;">
+        <input type="checkbox" id="vid-piano-solo" style="width:18px;height:18px;accent-color:var(--v);cursor:pointer;" />
+        <span style="font-size:13px;color:var(--text2);">Piano solo (pas de séparation Demucs) <em style="color:var(--text3);font-style:normal;">— gratuit, instant</em></span>
+      </label>
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Sélectionner ou glisser un audio">
+        <div class="dropzone-title">📁 Glisse un audio ici ou clique pour sélectionner</div>
+        <div class="dropzone-sub">MP3 · WAV · M4A · FLAC · Max 100 Mo · jusqu'à 30 min</div>
+        <input id="vid-file" type="file" accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/x-m4a,audio/mp4,audio/aac,audio/flac,audio/x-flac" />
       </div>
       <div id="upload-progress" class="upload-progress">
         <div class="upload-progress-label">
@@ -392,17 +397,7 @@
 
 </div>
 
-<!-- ─── Modal preview ─── -->
-<div class="modal-overlay" id="preview-overlay">
-  <div class="modal-box preview">
-    <div class="modal-title" id="preview-title">Aperçu</div>
-    <video id="preview-video" class="preview-video" controls preload="metadata" playsinline></video>
-    <div id="preview-controls"></div>
-    <div class="modal-actions">
-      <button type="button" id="preview-close">Fermer</button>
-    </div>
-  </div>
-</div>
+<!-- ─── Modal preview (placeholder — AnalysePlayer v2 monte son propre modal) ─── -->
 
 <!-- ─── Modal assign ─── -->
 <div class="modal-overlay" id="assign-overlay">
@@ -416,6 +411,7 @@
   </div>
 </div>
 
+<script src="/assets/js/stems-cache.js"></script>
 <script src="/assets/js/analyse-player.js"></script>
 <script>
 'use strict';
@@ -435,11 +431,27 @@ fetch('/api/admin/check', { credentials: 'same-origin' })
 // ─── Constantes ──────────────────────────────────────────────
 const MAX_SIZE_BYTES = 100 * 1024 * 1024; // 100 Mo
 const MAX_DURATION_S = 30 * 60;
-const ALLOWED_MIME = new Set(['video/mp4', 'video/webm', 'video/quicktime']);
+const ALLOWED_MIME = new Set([
+  'audio/mpeg', 'audio/mp3',
+  'audio/wav', 'audio/x-wav',
+  'audio/x-m4a', 'audio/mp4', 'audio/aac',
+  'audio/flac', 'audio/x-flac',
+]);
+const STEM_KEYS_ORDER = ['vocals', 'drums', 'bass', 'piano', 'guitar', 'other'];
+const STEM_LABELS_FR = {
+  vocals: 'Chant', drums: 'Batterie', bass: 'Basse',
+  piano: 'Piano', guitar: 'Guitare', other: 'Autres',
+};
+const STEM_COLORS = {
+  vocals: '#A78BFA', drums: '#FB923C', bass: '#34D399',
+  piano: '#60A5FA', guitar: '#F87171', other: '#94A3B8',
+};
 
 let videosCache = [];
 let elevesCache = [];
 let assignTargetId = null;
+let activePlayer = null;       // instance AnalysePlayer en cours
+const pollHandles = {};        // id → setInterval handle (multitrack pending)
 
 // ─── Helpers ─────────────────────────────────────────────────
 function escapeHtml(s) {
@@ -514,7 +526,7 @@ async function refreshList() {
 function renderList() {
   const el = document.getElementById('list-content');
   if (!videosCache.length) {
-    el.innerHTML = '<div class="list-empty">Aucune vidéo. Upload-en une ci-dessus.</div>';
+    el.innerHTML = '<div class="list-empty">Aucune analyse. Upload-en une ci-dessus.</div>';
     return;
   }
   el.innerHTML = videosCache.map((v) => {
@@ -526,14 +538,36 @@ function renderList() {
         }).join(', ')
       : 'Non assigné';
     const assignedClass = assigned.length ? 'ana-assigned assigned' : 'ana-assigned';
+
+    // Badge type
+    const type = v.type || 'single';
+    const typeBadge = type === 'multitrack'
+      ? '<span class="ana-assigned" style="background:rgba(167,139,250,0.16);color:#A78BFA;border-color:rgba(167,139,250,0.4);">🎚️ Multitrack</span>'
+      : '<span class="ana-assigned" style="background:rgba(96,165,250,0.16);color:#60A5FA;border-color:rgba(96,165,250,0.4);">🎵 Single</span>';
+
+    // Badge status (multitrack pending/failed visible)
+    let statusBadge = '';
+    if (v.status === 'pending') {
+      statusBadge = '<span class="ana-assigned" style="background:rgba(240,180,41,0.16);color:#f0b429;border-color:rgba(240,180,41,0.4);">⏳ Séparation…</span>';
+    } else if (v.status === 'failed') {
+      statusBadge = '<span class="ana-assigned" style="background:rgba(224,92,107,0.16);color:#e05c6b;border-color:rgba(224,92,107,0.4);">❌ Échec' + (v.errorCode ? ' · ' + escapeHtml(v.errorCode) : '') + '</span>';
+    }
+
+    const canPreview = v.status === 'success' || (type === 'single' && v.status !== 'failed');
+    const previewBtn = canPreview
+      ? '<button class="ana-btn" data-act="preview">▶ Aperçu</button>'
+      : '<button class="ana-btn" data-act="preview" disabled style="opacity:0.4;cursor:not-allowed;">▶ Aperçu</button>';
+
     return (
       '<div class="ana-card" data-id="' + escapeAttr(v.id) + '">' +
         '<div class="ana-card-head">' +
           '<span class="ana-title" title="Cliquer pour renommer">' + escapeHtml(v.title) + '</span>' +
+          typeBadge +
+          statusBadge +
           '<span class="ana-meta">' + escapeHtml(fmtDuration(v.durationSeconds)) + ' · ' + escapeHtml(fmtSize(v.sizeBytes)) + ' · ' + escapeHtml(fmtDate(v.uploadedAt)) + '</span>' +
           '<span class="' + assignedClass + '">' + escapeHtml(assignedLabel) + '</span>' +
           '<div class="ana-actions">' +
-            '<button class="ana-btn" data-act="preview">▶ Aperçu</button>' +
+            previewBtn +
             '<button class="ana-btn" data-act="assign">👥 Assigner</button>' +
             '<button class="ana-btn danger" data-act="delete">🗑</button>' +
           '</div>' +
@@ -614,30 +648,48 @@ function startRename(card, id) {
   input.addEventListener('blur', commit);
 }
 
-// ─── Preview modal ───────────────────────────────────────────
+// ─── Preview via AnalysePlayer v2 (modal géré par le player lui-même) ──
 function openPreview(id) {
   const v = videosCache.find((x) => x.id === id);
   if (!v) return;
-  document.getElementById('preview-title').textContent = v.title || 'Aperçu';
-  const video = document.getElementById('preview-video');
-  video.src = '/api/analyse/' + encodeURIComponent(id) + '/stream';
-  // Attach EQ + speed controls (admin preview = même expérience que l'élève)
-  const ctrl = document.getElementById('preview-controls');
-  if (window.AnalysePlayer) window.AnalysePlayer.attach(video, ctrl);
-  document.getElementById('preview-overlay').classList.add('show');
+  if (typeof window.AnalysePlayer !== 'function') {
+    toast('AnalysePlayer non chargé.', 'error');
+    return;
+  }
+  if (activePlayer) {
+    try { activePlayer.destroy(); } catch (e) {}
+    activePlayer = null;
+  }
+  const type = v.type || 'single';
+  let tracks;
+  if (type === 'multitrack') {
+    const stems = Array.isArray(v.stems) ? v.stems : [];
+    tracks = STEM_KEYS_ORDER
+      .filter((k) => stems.indexOf(k) !== -1)
+      .map((k) => ({
+        id: k,
+        label: STEM_LABELS_FR[k] || k,
+        color: STEM_COLORS[k] || '#888',
+        url: '/api/analyse/' + encodeURIComponent(id) + '/stream/' + k,
+      }));
+  } else {
+    tracks = [{
+      id: 'main',
+      label: 'Audio',
+      color: '#8B6FE8',
+      url: '/api/analyse/' + encodeURIComponent(id) + '/stream',
+    }];
+  }
+  activePlayer = new window.AnalysePlayer({
+    container: document.body,
+    type,
+    title: v.title || 'Aperçu',
+    separationId: id,
+    tracks,
+    readOnly: false,
+  });
+  activePlayer.open();
 }
-function closePreview() {
-  const video = document.getElementById('preview-video');
-  if (window.AnalysePlayer) window.AnalysePlayer.detach(video);
-  try { video.pause(); } catch {}
-  video.removeAttribute('src');
-  video.load();
-  document.getElementById('preview-overlay').classList.remove('show');
-}
-document.getElementById('preview-close').addEventListener('click', closePreview);
-document.getElementById('preview-overlay').addEventListener('click', (e) => {
-  if (e.target.id === 'preview-overlay') closePreview();
-});
 
 // ─── Assign modal ────────────────────────────────────────────
 function openAssign(id) {
@@ -750,46 +802,48 @@ async function handleFile(file) {
     return;
   }
 
-  // Lit la durée via <video> côté client
+  // Lit la durée via <audio> côté client
   let durationSec = 0;
   try {
-    durationSec = await readVideoDuration(file);
+    durationSec = await readMediaDuration(file);
   } catch (e) { /* tant pis, on enverra 0 — backend l'accepte */ }
   if (durationSec > MAX_DURATION_S) {
-    toast('Vidéo trop longue (max 30 min)', 'error');
+    toast('Audio trop long (max 30 min)', 'error');
     fileInput.value = '';
     return;
   }
 
-  uploadFile(file, title, durationSec);
+  const pianoSolo = document.getElementById('vid-piano-solo').checked;
+  uploadFile(file, title, durationSec, pianoSolo);
 }
 
-function readVideoDuration(file) {
+function readMediaDuration(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    video.onloadedmetadata = () => {
-      const d = Number.isFinite(video.duration) ? video.duration : 0;
+    const audio = document.createElement('audio');
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => {
+      const d = Number.isFinite(audio.duration) ? audio.duration : 0;
       URL.revokeObjectURL(url);
       resolve(d);
     };
-    video.onerror = () => { URL.revokeObjectURL(url); reject(new Error('metadata_failed')); };
-    video.src = url;
+    audio.onerror = () => { URL.revokeObjectURL(url); reject(new Error('metadata_failed')); };
+    audio.src = url;
   });
 }
 
-function uploadFile(file, title, durationSec) {
+function uploadFile(file, title, durationSec, pianoSolo) {
   const fd = new FormData();
   fd.append('file', file);
   fd.append('title', title);
   fd.append('duration_sec', String(Math.round(durationSec)));
   fd.append('filename', file.name);
+  fd.append('pianoSolo', pianoSolo ? 'true' : 'false');
 
   progressBox.classList.add('active');
   progressBox.classList.remove('error');
   progressFill.style.width = '0%';
-  progressPct.textContent = '0%';
+  progressPct.textContent = pianoSolo ? '0% — upload single' : '0% — upload multitrack';
   progressName.textContent = file.name;
   dropzone.classList.add('disabled');
 
@@ -800,21 +854,28 @@ function uploadFile(file, title, durationSec) {
     if (!e.lengthComputable) return;
     const pct = (e.loaded / e.total) * 100;
     progressFill.style.width = pct.toFixed(1) + '%';
-    progressPct.textContent = pct.toFixed(0) + '%';
+    progressPct.textContent = pct.toFixed(0) + '% — ' + (pianoSolo ? 'upload single' : 'upload multitrack');
   });
   xhr.addEventListener('load', () => {
     dropzone.classList.remove('disabled');
     fileInput.value = '';
+    document.getElementById('vid-piano-solo').checked = false;
     let resp;
     try { resp = JSON.parse(xhr.responseText); }
     catch { resp = { error: 'invalid_json' }; }
     if (xhr.status >= 200 && xhr.status < 300 && resp.ok) {
       progressFill.style.width = '100%';
-      progressPct.textContent = '100%';
-      setTimeout(() => { progressBox.classList.remove('active'); }, 800);
+      progressPct.textContent = pianoSolo
+        ? '100% — single OK'
+        : '100% — séparation Demucs lancée';
+      setTimeout(() => { progressBox.classList.remove('active'); }, 1500);
       titleInput.value = '';
-      toast('Vidéo uploadée ✓', 'success');
+      toast(pianoSolo ? 'Audio uploadé ✓' : 'Upload OK, séparation en cours…', 'success');
       refreshList();
+      // Si multitrack pending → démarrer polling status
+      if (!pianoSolo && resp.id && resp.predictionId) {
+        startPollingStatus(resp.id, resp.predictionId);
+      }
     } else {
       progressBox.classList.add('error');
       progressPct.textContent = 'Échec';
@@ -830,17 +891,59 @@ function uploadFile(file, title, durationSec) {
   xhr.send(fd);
 }
 
-// ─── Esc ferme les modals ────────────────────────────────────
+// ─── Polling status (multitrack pending → success/failed) ────────
+function startPollingStatus(id, predictionId) {
+  if (pollHandles[id]) return; // déjà en cours
+  const MAX_TRIES = 120; // 120 × 5s = 10 min
+  let tries = 0;
+  pollHandles[id] = setInterval(async () => {
+    tries++;
+    if (tries > MAX_TRIES) {
+      clearInterval(pollHandles[id]); delete pollHandles[id];
+      toast('Timeout polling séparation', 'error');
+      return;
+    }
+    try {
+      const r = await fetch(
+        '/api/analyse/status?id=' + encodeURIComponent(id) + '&predictionId=' + encodeURIComponent(predictionId),
+        { credentials: 'same-origin' }
+      );
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) return;
+      if (j.status === 'success') {
+        clearInterval(pollHandles[id]); delete pollHandles[id];
+        toast('Séparation terminée ✓', 'success');
+        refreshList();
+      } else if (j.status === 'failed') {
+        clearInterval(pollHandles[id]); delete pollHandles[id];
+        toast('Séparation échouée : ' + (j.detail || ''), 'error');
+        refreshList();
+      }
+      // pending : on continue
+    } catch (e) { /* silent, on continue */ }
+  }, 5000);
+}
+
+// Reprise polling au load si records pending présents
+function resumePolling() {
+  videosCache.forEach((v) => {
+    if (v.type === 'multitrack' && v.status === 'pending' && v.replicateId && !pollHandles[v.id]) {
+      startPollingStatus(v.id, v.replicateId);
+    }
+  });
+}
+
+// ─── Esc ferme la modale Assigner (preview géré par AnalysePlayer) ─
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (document.getElementById('preview-overlay').classList.contains('show')) closePreview();
-  else if (document.getElementById('assign-overlay').classList.contains('show')) closeAssign();
+  if (document.getElementById('assign-overlay').classList.contains('show')) closeAssign();
 });
 
 // ─── Init ────────────────────────────────────────────────────
 (async function init() {
   await loadEleves();
   await refreshList();
+  resumePolling();
 })();
 </script>
 </body>
