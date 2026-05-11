@@ -198,6 +198,26 @@
   cursor: pointer;
 }
 
+.mtp-track.mtp-unavailable {
+  opacity: 0.55;
+  filter: grayscale(40%);
+}
+.mtp-track-tag-unavail {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border-radius: 10px;
+  background: rgba(224, 92, 107, 0.18);
+  color: #f87171;
+  border: 1px solid rgba(224, 92, 107, 0.4);
+  cursor: help;
+  vertical-align: middle;
+}
+
 .mtp-dl-btn {
   width: 28px;
   height: 26px;

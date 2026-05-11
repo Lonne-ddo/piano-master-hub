@@ -8,6 +8,7 @@
 //   await StemsCache.setAudio(separationId, stem, blob)
 //   await StemsCache.getPeaks(separationId, stem)   → number[] | null
 //   await StemsCache.setPeaks(separationId, stem, peaks)
+//   await StemsCache.deleteAudio(separationId, stem)   → vide 1 stem audio (peaks préservés)
 //   await StemsCache.deleteSeparation(separationId) → vide les 6 stems d'une sépa
 //   await StemsCache.clear()                        → vide tout
 //   await StemsCache.size()                         → bytes total (approx)
@@ -144,6 +145,17 @@
       const key = keyFor(separationId, stem);
       return tx(STORE_PEAKS, 'readwrite', function (store) {
         store.put(peaks, key);
+        return true;
+      });
+    },
+
+    // Supprime 1 seule entrée audio (sans toucher aux peaks).
+    // Utilisé par MultitrackPlayer pour invalider un blob audio corrompu et
+    // forcer un re-fetch frais lors d'un error event au load.
+    deleteAudio: function (separationId, stem) {
+      const key = keyFor(separationId, stem);
+      return tx(STORE_AUDIO, 'readwrite', function (store) {
+        store.delete(key);
         return true;
       });
     },

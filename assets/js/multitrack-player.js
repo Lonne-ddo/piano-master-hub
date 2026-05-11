@@ -86,6 +86,7 @@
     this.volumes = {};        // stem → 0..1.5 (default 1)
     this.mutedSet = new Set();
     this.soloedStem = null;
+    this.unavailableStems = new Set(); // stems qui ont échoué à charger (fetch fail + retry fail)
 
     this.modal = null;
     this.duration = 0;
@@ -267,8 +268,9 @@
 
   MultitrackPlayer.prototype._buildTrackRow = function (track) {
     const self = this;
+    const isUnavailable = this.unavailableStems.has(track.id);
     const row = document.createElement('div');
-    row.className = 'mtp-track';
+    row.className = 'mtp-track' + (isUnavailable ? ' mtp-unavailable' : '');
     row.setAttribute('data-stem', track.id);
     row.style.setProperty('--stem-color', track.color || '#888');
 
@@ -279,6 +281,13 @@
     const labelEl = document.createElement('div');
     labelEl.className = 'mtp-track-label';
     labelEl.textContent = track.label || track.id;
+    if (isUnavailable) {
+      const tag = document.createElement('span');
+      tag.className = 'mtp-track-tag-unavail';
+      tag.textContent = 'indisponible';
+      tag.title = 'Cette piste n\'a pas pu être chargée (problème réseau ou fichier R2). Recharge la page pour réessayer.';
+      labelEl.appendChild(tag);
+    }
 
     const btnRow = document.createElement('div');
     btnRow.className = 'mtp-track-btns';
@@ -444,12 +453,19 @@
 
         // 2) Si quelque chose manque → fetch. On télécharge UNE fois et on
         // utilise le blob pour audio.src ET decodeAudioData (peaks).
+        // Catch défensif : si fetch fail (401, 5xx, network), on tombe sur
+        // blob=null. L'<audio>.src = t.url (fallback ligne ~507) tentera un
+        // direct stream ; si ça fail aussi, le error handler retentera 1x.
         let blobPromise;
         if (needsAudio || needsPeaks) {
           blobPromise = fetch(t.url, { credentials: 'same-origin' })
             .then(function (r) {
               if (!r.ok) throw new Error('fetch_' + r.status);
               return r.blob();
+            })
+            .catch(function (e) {
+              console.log('[MultitrackPlayer] initial fetch failed', t.id, e && e.message);
+              return null;
             });
         } else {
           blobPromise = Promise.resolve(cachedBlob);
@@ -533,11 +549,12 @@
           });
 
           let resolved = false;
+          let retryDone = false;
           function done() {
             if (resolved) return;
             resolved = true;
             if (!Number.isFinite(audio.duration)) {
-              console.warn('[MultitrackPlayer] audio ready but duration NaN', t.id, {
+              console.log('[MultitrackPlayer] audio ready but duration NaN', t.id, {
                 readyState: audio.readyState,
                 networkState: audio.networkState,
                 src: audio.currentSrc,
@@ -548,11 +565,44 @@
           audio.addEventListener('canplaythrough', done, { once: true });
           audio.addEventListener('loadeddata', done, { once: true });
           audio.addEventListener('error', function () {
-            console.warn('[MultitrackPlayer] audio load failed', t.id, {
+            console.log('[MultitrackPlayer] audio load failed', t.id, {
               errorCode: audio.error?.code,
               errorMessage: audio.error?.message,
             });
-            done();
+            // Retry défensif : invalide cache IndexedDB + re-fetch fresh.
+            // Si retry réussit, le nouvel audio.src déclenchera canplaythrough → done().
+            // Si retry fail, on marque la piste indisponible et on resolve quand même
+            // pour ne pas bloquer le modal (les autres pistes restent jouables).
+            if (retryDone) { done(); return; }
+            retryDone = true;
+            const doRetry = (cacheAvailable && sepId)
+              ? global.StemsCache.deleteAudio(sepId, t.id).catch(function () {})
+              : Promise.resolve();
+            doRetry
+              .then(function () {
+                return fetch(t.url, { credentials: 'same-origin', cache: 'no-store' });
+              })
+              .then(function (r) {
+                if (!r.ok) throw new Error('retry_fetch_' + r.status);
+                return r.blob();
+              })
+              .then(function (blob) {
+                if (cacheAvailable && sepId) {
+                  try { global.StemsCache.setAudio(sepId, t.id, blob); } catch (e) {}
+                }
+                const oldSrc = audio.currentSrc || audio.src;
+                if (oldSrc && oldSrc.indexOf('blob:') === 0) {
+                  try { URL.revokeObjectURL(oldSrc); } catch (e) {}
+                }
+                audio.src = URL.createObjectURL(blob);
+                audio.load();
+                console.log('[MultitrackPlayer] retry succeeded', t.id);
+              })
+              .catch(function (e) {
+                console.log('[MultitrackPlayer] retry failed', t.id, e && e.message);
+                self.unavailableStems.add(t.id);
+                done();
+              });
           });
         });
       });
@@ -578,19 +628,58 @@
     else this._playAll();
   };
 
-  MultitrackPlayer.prototype._playAll = function () {
+  // Play sériel (await chaque audio.play()) avec compensation de timing.
+  //
+  // Pourquoi : iOS Safari refuse les play() multiples hors gesture user. Le
+  // forEach parallèle (microtask) faisait que seule la 1re piste démarrait,
+  // les autres throw NotAllowedError silencieusement (catch ignoré). Le
+  // sériel garantit que chaque play() est tenté avec autorisation valide.
+  //
+  // Coût : le sériel induit un drift de quelques ms (network/decode latency)
+  // entre la 1re et la dernière piste. Compensation : on note audioCtx.currentTime
+  // au 1er play réussi (baseCtxTime + baseAudioTime), puis on re-seek chaque
+  // audio suivant à baseAudioTime + (audioCtx.currentTime - baseCtxTime).
+  // Le _syncDriftCheck RAF affine ensuite.
+  //
+  // Skip explicite des stems dans unavailableStems (retry fetch a échoué).
+  MultitrackPlayer.prototype._playAll = async function () {
     const self = this;
     if (this.audioCtx && this.audioCtx.state === 'suspended') {
-      this.audioCtx.resume().catch(function () {});
+      try { await this.audioCtx.resume(); } catch (e) {}
     }
-    Object.values(this.audioEls).forEach(function (a) {
-      a.play().catch(function (e) {
-        console.warn('[MultitrackPlayer] play() rejected', e?.message);
-      });
-    });
+
     this.isPlaying = true;
     this.playBtn.innerHTML = '⏸';
     this._startRaf();
+
+    let baseCtxTime = null;
+    let baseAudioTime = null;
+    const ids = Object.keys(this.audioEls);
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      if (this.unavailableStems.has(id)) {
+        console.log('[MultitrackPlayer] skip unavailable', id);
+        continue;
+      }
+      const audio = this.audioEls[id];
+      if (!audio) continue;
+      // Alignement : si on a déjà un baseTime, recale le currentTime sur
+      // l'horloge audio pour compenser le drift accumulé par le sériel.
+      if (baseCtxTime !== null && this.audioCtx) {
+        const elapsed = this.audioCtx.currentTime - baseCtxTime;
+        try { audio.currentTime = baseAudioTime + Math.max(0, elapsed); } catch (e) {}
+      }
+      try {
+        await audio.play();
+        if (baseCtxTime === null && this.audioCtx) {
+          baseCtxTime = this.audioCtx.currentTime;
+          baseAudioTime = audio.currentTime;
+        }
+      } catch (e) {
+        console.log('[MultitrackPlayer] play rejected', id, e && (e.name || e.message));
+        // Continue la chaîne, les autres pistes peuvent démarrer
+      }
+    }
   };
 
   MultitrackPlayer.prototype._pauseAll = function () {
