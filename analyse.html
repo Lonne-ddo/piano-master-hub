@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="description" content="Master Hub — Vidéos d'analyse à rejouer avec EQ et vitesse.">
     <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+">
-    <link rel="stylesheet" href="/assets/css/analyse-player.css">
+    <link rel="stylesheet" href="/assets/css/multitrack.css">
     <style>
         :root {
             --bg: #0f0f14;
@@ -249,7 +249,7 @@
 
         <header class="header">
             <h1>🎬 Analyse</h1>
-            <p class="subtitle">Vidéos à rejouer avec EQ et vitesse</p>
+            <p class="subtitle">Tes morceaux à rejouer avec EQ et vitesse</p>
         </header>
 
         <div id="content">
@@ -257,19 +257,10 @@
         </div>
     </div>
 
-    <!-- ── Modal player ── -->
-    <div class="player-overlay" id="player-overlay">
-        <div class="player-box">
-            <div class="player-head">
-                <div class="player-title" id="player-title">…</div>
-                <button id="player-close" class="player-close" aria-label="Fermer">&times;</button>
-            </div>
-            <video id="player-video" class="player-video" controls preload="metadata" playsinline></video>
-            <div id="player-controls"></div>
-        </div>
-    </div>
+    <!-- AnalysePlayer v2 monte son propre modal au play. -->
 
     <script src="/assets/js/eleve-guard.js"></script>
+    <script src="/assets/js/stems-cache.js"></script>
     <script src="/assets/js/analyse-player.js"></script>
     <script>
     'use strict';
@@ -291,19 +282,30 @@
     }
 
     var ELEVE_SLUG = null;
+    var activePlayer = null;
+
+    var STEM_KEYS_ORDER = ['vocals', 'drums', 'bass', 'piano', 'guitar', 'other'];
+    var STEM_LABELS_FR = {
+        vocals: 'Chant', drums: 'Batterie', bass: 'Basse',
+        piano: 'Piano', guitar: 'Guitare', other: 'Autres',
+    };
+    var STEM_COLORS = {
+        vocals: '#A78BFA', drums: '#FB923C', bass: '#34D399',
+        piano: '#60A5FA', guitar: '#F87171', other: '#94A3B8',
+    };
 
     function renderEmpty() {
         document.getElementById('content').innerHTML =
             '<div class="empty-state">' +
                 '<span class="ico">🎬</span>' +
-                '<strong>Aucune vidéo pour le moment.</strong>' +
+                '<strong>Aucune analyse pour le moment.</strong>' +
                 'Demande à ton coach de t\'en envoyer.' +
             '</div>';
     }
 
     function renderError(msg) {
         document.getElementById('content').innerHTML =
-            '<div class="empty-state"><strong>Oups.</strong>' + escapeHtml(msg || 'Impossible de charger les vidéos.') + '</div>';
+            '<div class="empty-state"><strong>Oups.</strong>' + escapeHtml(msg || 'Impossible de charger les analyses.') + '</div>';
     }
 
     function renderList(items) {
@@ -311,12 +313,18 @@
         var html = '<div class="videos-list">';
         for (var i = 0; i < items.length; i++) {
             var v = items[i];
+            var icon = v.type === 'multitrack' ? '🎚️' : '🎵';
+            var meta = fmtDuration(v.durationSeconds);
+            if (v.type === 'multitrack') {
+                var stemCount = Array.isArray(v.stems) ? v.stems.length : 0;
+                meta += ' · ' + stemCount + ' pistes';
+            }
             html +=
                 '<button type="button" class="video-card" data-id="' + escapeAttr(v.id) + '">' +
-                    '<div class="video-card-icon">🎬</div>' +
+                    '<div class="video-card-icon">' + icon + '</div>' +
                     '<div class="video-card-body">' +
                         '<div class="video-card-title">' + escapeHtml(v.title || 'Sans titre') + '</div>' +
-                        '<div class="video-card-meta">' + escapeHtml(fmtDuration(v.durationSeconds)) + '</div>' +
+                        '<div class="video-card-meta">' + escapeHtml(meta) + '</div>' +
                     '</div>' +
                     '<span class="video-card-arrow">&rsaquo;</span>' +
                 '</button>';
@@ -333,40 +341,51 @@
         });
     }
 
-    function openPlayer(video) {
-        var overlay = document.getElementById('player-overlay');
-        var titleEl = document.getElementById('player-title');
-        var videoEl = document.getElementById('player-video');
-        var ctrlEl = document.getElementById('player-controls');
-        titleEl.textContent = video.title || 'Vidéo';
-        videoEl.src = video.streamUrl || ('/api/analyse/' + encodeURIComponent(video.id) + '/stream');
-        // Attach EQ + speed (autoplay policy : AudioContext s'init au 1er play)
-        if (window.AnalysePlayer) window.AnalysePlayer.attach(videoEl, ctrlEl);
-        overlay.classList.add('show');
-        // Tente la lecture (l'autoplay peut être bloqué par le navigateur sur certains contextes)
-        try { videoEl.play().catch(function () {}); } catch (e) {}
-    }
-
-    function closePlayer() {
-        var overlay = document.getElementById('player-overlay');
-        var videoEl = document.getElementById('player-video');
-        if (window.AnalysePlayer) window.AnalysePlayer.detach(videoEl);
-        try { videoEl.pause(); } catch (e) {}
-        videoEl.removeAttribute('src');
-        videoEl.load();
-        overlay.classList.remove('show');
-    }
-
-    document.getElementById('player-close').addEventListener('click', closePlayer);
-    document.getElementById('player-overlay').addEventListener('click', function (e) {
-        if (e.target.id === 'player-overlay') closePlayer();
-    });
-    document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') {
-            var overlay = document.getElementById('player-overlay');
-            if (overlay.classList.contains('show')) closePlayer();
+    function openPlayer(item) {
+        if (typeof window.AnalysePlayer !== 'function') {
+            console.warn('AnalysePlayer non chargé');
+            return;
         }
-    });
+        if (activePlayer) {
+            try { activePlayer.destroy(); } catch (e) {}
+            activePlayer = null;
+        }
+        var type = item.type === 'multitrack' ? 'multitrack' : 'single';
+        // trackUrlPrefix vient du backend (merge legacy : /api/stems/:id/audio/
+        // pour les anciens, /api/analyse/:id/stream/ pour les nouveaux).
+        var trackPrefix = item.trackUrlPrefix
+            || ('/api/analyse/' + encodeURIComponent(item.id) + '/stream/');
+        var tracks;
+        if (type === 'multitrack') {
+            var stems = Array.isArray(item.stems) ? item.stems : [];
+            tracks = STEM_KEYS_ORDER
+                .filter(function (k) { return stems.indexOf(k) !== -1; })
+                .map(function (k) {
+                    return {
+                        id: k,
+                        label: STEM_LABELS_FR[k] || k,
+                        color: STEM_COLORS[k] || '#888',
+                        url: trackPrefix + k,
+                    };
+                });
+        } else {
+            tracks = [{
+                id: 'main',
+                label: 'Audio',
+                color: '#8B6FE8',
+                url: item.streamUrl || ('/api/analyse/' + encodeURIComponent(item.id) + '/stream'),
+            }];
+        }
+        activePlayer = new window.AnalysePlayer({
+            container: document.body,
+            type: type,
+            title: item.title || 'Analyse',
+            separationId: item.id,
+            tracks: tracks,
+            readOnly: true,
+        });
+        activePlayer.open();
+    }
 
     (async function init() {
         var params = new URLSearchParams(window.location.search);
