@@ -563,7 +563,7 @@
             margin-bottom: 18px;
         }
 
-        /* Section Mes séparations (audio Demucs assignés par l'admin) */
+        /* Section Analyse (audio assignés par l'admin — new MASTERHUB_ANALYSE + legacy stems Piano Key) */
         .separations-block {
             width: 100%;
             margin-top: 16px;
@@ -955,7 +955,7 @@
         renderFooter();
         renderDynamicSkeleton();
         fetchDashboardData(eleve);
-        loadSeparationsForEleve(eleve.slug);
+        loadAnalysesForEleve(eleve.slug);
     }
 
     // Bandeau orange visible si la session courante est issue d'une
@@ -983,18 +983,20 @@
             .then(function () { window.location.href = '/admin/eleves.html'; });
     }
 
-    // Charge la liste des séparations Demucs assignées à cet élève (lecture seule).
-    // Chaque entrée a un bouton "Ouvrir" qui lance le MultitrackPlayer en modal.
-    function loadSeparationsForEleve(slug) {
+    // Charge la liste des analyses (new + legacy stems) assignées à cet élève.
+    // Endpoint /api/eleves/:slug/analyse merge MASTERHUB_ANALYSE (single/multitrack
+    // type:..., legacy:false) + MASTERHUB_HISTORY stems:* (legacy:true) avec
+    // trackUrlPrefix qui route le player vers le bon endpoint stream.
+    function loadAnalysesForEleve(slug) {
         var zone = document.getElementById("separations-zone");
         if (!zone) return;
         zone.innerHTML = '';
-        fetch('/api/eleves/' + encodeURIComponent(slug) + '/stems', { credentials: 'include' })
+        fetch('/api/eleves/' + encodeURIComponent(slug) + '/analyse', { credentials: 'include' })
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (j) {
                 if (!j || !j.ok) return; // 401/403 ou erreur réseau → silent
                 var items = Array.isArray(j.items) ? j.items : [];
-                renderSeparations(zone, items, slug);
+                renderAnalyses(zone, items, slug);
             })
             .catch(function () { /* silent */ });
     }
@@ -1011,45 +1013,113 @@
     };
     var activePlayer = null;
 
-    function renderSeparations(zone, items, slug) {
+    function renderAnalyses(zone, items, slug) {
         if (!items.length) {
-            zone.innerHTML = '';
+            zone.innerHTML =
+                '<div class="separations-block">' +
+                    '<h2>🎬 Analyse</h2>' +
+                    '<p style="color:var(--text3);font-size:13px;margin:0;">Aucune analyse pour le moment. Demande à ton coach de t\'en envoyer.</p>' +
+                '</div>';
             return;
         }
         var monthsShort = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
 
-        function fmtDate(iso) {
-            if (!iso) return '';
-            var d = new Date(iso);
+        function fmtDate(ts) {
+            if (!ts) return '';
+            var d = new Date(ts);
             if (isNaN(d.getTime())) return '';
             return d.getDate() + ' ' + monthsShort[d.getMonth()];
         }
+        function truncate(s, max) {
+            s = String(s || '');
+            return s.length > max ? s.slice(0, max - 1) + '…' : s;
+        }
+
+        var PREVIEW_MAX = 4;
+        var preview = items.slice(0, PREVIEW_MAX);
+        var totalCount = items.length;
+        var hasMore = totalCount > PREVIEW_MAX;
 
         var html = '<div class="separations-block">' +
-            '<h2>🎹 Mes séparations</h2>';
-        items.forEach(function (s, idx) {
+            '<h2>🎬 Analyse</h2>';
+        preview.forEach(function (s, idx) {
             html += '<div class="sep-item" data-idx="' + idx + '">' +
                 '<div class="sep-item-head">' +
-                    '<span class="sep-item-title">' + escapeHtml(s.title || 'Sans titre') + '</span>' +
-                    '<span class="sep-item-date">' + escapeHtml(fmtDate(s.ts)) + '</span>' +
+                    '<span class="sep-item-title">' + escapeHtml(truncate(s.title || 'Sans titre', 40)) + '</span>' +
+                    '<span class="sep-item-date">' + escapeHtml(fmtDate(s.uploadedAt)) + '</span>' +
                     '<button type="button" class="sep-open-btn" data-id="' + escapeHtml(s.id) + '">▶ Ouvrir</button>' +
                 '</div>' +
             '</div>';
         });
+        if (hasMore) {
+            html += '<a href="/analyse?eleve=' + encodeURIComponent(slug) + '" ' +
+                'style="display:block;margin-top:10px;padding:8px;text-align:center;color:var(--v);font-size:13px;text-decoration:none;border:1px solid rgba(139,111,232,0.2);border-radius:8px;">' +
+                'Voir tout (' + totalCount + ') →</a>';
+        }
         html += '</div>';
         zone.innerHTML = html;
 
         zone.querySelectorAll('.sep-open-btn').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var idx = parseInt(btn.closest('.sep-item').getAttribute('data-idx'), 10);
-                openMultitrackPlayer(items[idx]);
+                openAnalysePlayer(preview[idx]);
             });
         });
     }
 
-    function openMultitrackPlayer(sep) {
-        if (!sep) return;
+    // Ouvre le player adapté au type :
+    //   legacy=true        → MultitrackPlayer (legacy stems Piano Key)
+    //   type='single'      → AnalysePlayer 1 track
+    //   type='multitrack'  → AnalysePlayer N tracks
+    function openAnalysePlayer(item) {
+        if (!item) return;
         if (activePlayer) { try { activePlayer.destroy(); } catch (e) {} activePlayer = null; }
+
+        if (item.legacy === true) {
+            openLegacyMultitrackPlayer(item);
+            return;
+        }
+        if (typeof window.AnalysePlayer !== 'function') {
+            console.warn('AnalysePlayer non chargé');
+            return;
+        }
+        var type = item.type === 'multitrack' ? 'multitrack' : 'single';
+        var trackPrefix = item.trackUrlPrefix
+            || ('/api/analyse/' + encodeURIComponent(item.id) + '/stream/');
+        var tracks;
+        if (type === 'multitrack') {
+            var stems = Array.isArray(item.stems) ? item.stems : [];
+            tracks = STEM_ORDER_FR
+                .filter(function (k) { return stems.indexOf(k) !== -1; })
+                .map(function (k) {
+                    return {
+                        id: k,
+                        label: STEM_LABELS_FR[k] || k,
+                        color: STEM_COLORS[k] || '#888',
+                        url: trackPrefix + k,
+                    };
+                });
+        } else {
+            tracks = [{
+                id: 'main',
+                label: 'Audio',
+                color: '#8B6FE8',
+                url: item.streamUrl || ('/api/analyse/' + encodeURIComponent(item.id) + '/stream'),
+            }];
+        }
+        activePlayer = new window.AnalysePlayer({
+            container: document.body,
+            type: type,
+            title: item.title || 'Analyse',
+            separationId: item.id,
+            tracks: tracks,
+            readOnly: true,
+        });
+        activePlayer.open();
+    }
+
+    function openLegacyMultitrackPlayer(sep) {
+        if (!sep) return;
         if (typeof window.MultitrackPlayer !== 'function') {
             console.warn('MultitrackPlayer non chargé');
             return;
@@ -1156,13 +1226,24 @@
             zone.innerHTML = '';
             return;
         }
-        var pct = (typeof stats.progression_pct === 'number')
-            ? Math.max(0, Math.min(100, stats.progression_pct))
-            : Math.max(0, Math.min(100, Math.round((stats.nb_cours / 8) * 100)));
+        // total_cours vient de stats_override (admin), fallback 8 (programme standard).
+        var total = (typeof stats.total_cours === 'number' && stats.total_cours > 0)
+            ? stats.total_cours : 8;
+        var current = stats.nb_cours;
+        var overflow = current > total;
+        // Progress bar capped \u00E0 100% en overflow.
+        var pct = overflow
+            ? 100
+            : (typeof stats.progression_pct === 'number'
+                ? Math.max(0, Math.min(100, stats.progression_pct))
+                : Math.max(0, Math.min(100, Math.round((current / total) * 100))));
+        var label = overflow
+            ? 'Cours ' + escapeHtml(String(current)) + ' \u00B7 prolongation'
+            : 'Cours ' + escapeHtml(String(current)) + ' sur ' + escapeHtml(String(total));
         zone.innerHTML =
             '<div class="programme-block">' +
                 '<div class="programme-meta">' +
-                    '<strong>Cours ' + escapeHtml(String(stats.nb_cours)) + ' sur 8</strong>' +
+                    '<strong>' + label + '</strong>' +
                     ' \u00B7 ' + escapeHtml(stats.date_debut_label) +
                     ' \u2192 ' + escapeHtml(stats.date_fin_label) +
                 '</div>' +
@@ -1467,6 +1548,7 @@
 
     <script src="/assets/js/stems-cache.js"></script>
     <script src="/assets/js/multitrack-player.js"></script>
+    <script src="/assets/js/analyse-player.js"></script>
 
 </body>
 </html>
