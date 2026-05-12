@@ -179,66 +179,7 @@
             font-size: 0.9rem;
         }
 
-        /* ── Modal player ────────────────────────────────────── */
-        .player-overlay {
-            position: fixed; inset: 0;
-            background: rgba(0,0,0,0.92);
-            backdrop-filter: blur(6px);
-            z-index: 1000;
-            display: none;
-            align-items: center; justify-content: center;
-            padding: 16px;
-        }
-        .player-overlay.show { display: flex; }
-        .player-box {
-            width: 100%;
-            max-width: 920px;
-            background: #0c0c12;
-            border: 1px solid var(--border1);
-            border-radius: 14px;
-            padding: 16px;
-            display: flex; flex-direction: column;
-            gap: 12px;
-            max-height: calc(100vh - 32px);
-            max-height: calc(100dvh - 32px);
-            overflow-y: auto;
-        }
-        .player-head {
-            display: flex; justify-content: space-between; align-items: center;
-            gap: 12px;
-        }
-        .player-title {
-            font-size: 1rem; font-weight: 600;
-            flex: 1; min-width: 0;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-        }
-        .player-close {
-            background: var(--bg-card);
-            border: 1px solid var(--border1);
-            color: var(--text-muted);
-            border-radius: 8px;
-            width: 36px; height: 36px;
-            font-size: 1.1rem;
-            cursor: pointer;
-            font-family: inherit;
-            transition: color 0.15s, background 0.15s;
-        }
-        .player-close:hover {
-            color: var(--text);
-            background: var(--bg-card-hover);
-        }
-        .player-video {
-            width: 100%;
-            background: black;
-            border-radius: 8px;
-            display: block;
-            max-height: 70vh;
-        }
-        .player-note {
-            font-size: 0.75rem;
-            color: var(--text-faint);
-            font-feature-settings: "tnum";
-        }
+        /* Modal player retiré : AnalysePlayer v2 monte son propre modal (.mtp-*). */
     </style>
 </head>
 <body>
