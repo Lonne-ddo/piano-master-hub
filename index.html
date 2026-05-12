@@ -507,6 +507,59 @@
             color: var(--text-muted);
             line-height: 1.5;
         }
+        .devoirs-h2 { display: flex; align-items: center; gap: 8px; }
+        .devoirs-refresh {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            opacity: 0.5;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.15s, color 0.15s, background 0.15s;
+        }
+        .devoirs-refresh:hover {
+            opacity: 1;
+            color: var(--v, #8B6FE8);
+            background: rgba(255,255,255,0.04);
+        }
+        .devoirs-refresh.spinning svg { animation: devoirs-spin 0.8s linear infinite; }
+        @keyframes devoirs-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .devoirs-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(8px);
+            padding: 9px 16px;
+            background: rgba(15,15,20,0.95);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            color: #eee;
+            font-size: 12.5px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 9999;
+        }
+        .devoirs-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .devoirs-toast.success {
+            border-color: rgba(94,203,139,0.45);
+            color: #5ecb8b;
+        }
+        .devoirs-toast.error {
+            border-color: rgba(224,92,107,0.5);
+            color: #f87171;
+        }
 
         /* Résumé du dernier cours */
         .resume-block {
@@ -1203,6 +1256,10 @@
                 // Re-render des cartes Ressources avec les liens personnalisés
                 // condi (Doc/Drive/Telegram) prefixés aux 4 cartes génériques.
                 renderResourceCards(eleve, data);
+                // Background : fetch devoirs auto-syncés depuis Google Doc (regex MD,
+                // cache 1h côté serveur). Re-render avec les bullets si trouvés ;
+                // sinon le fallback LLM (derniere_seance.devoirs) reste affiché.
+                fetchAutoSyncedDevoirs(eleve.slug, data && data.derniere_seance);
             })
             .catch(function(e) {
                 if (e && e.unauthorized) {
@@ -1251,13 +1308,36 @@
             '</div>';
     }
 
+    // Cache local des devoirs auto-syncés depuis le Google Doc (regex MD).
+    // Source primaire : /api/eleves/:slug/devoirs. Fallback : derniere_seance.devoirs (LLM).
+    var _autoSyncedDevoirs = null;
+    var _devoirsRefreshAvailable = true;
+    var _lastDerniereSeance = null;
+
     function renderDevoirs(derniere) {
+        _lastDerniereSeance = derniere || null;
         var zone = document.getElementById("devoirs-zone");
-        var devoirs = (derniere && Array.isArray(derniere.devoirs))
-            ? derniere.devoirs.filter(Boolean)
-            : null;
-        var html = '<div class="devoirs-block"><h2>\uD83D\uDCDD Tes devoirs pour la prochaine séance</h2>';
-        if (!devoirs || devoirs.length === 0) {
+        var devoirs = null;
+        if (Array.isArray(_autoSyncedDevoirs) && _autoSyncedDevoirs.length > 0) {
+            devoirs = _autoSyncedDevoirs;
+        } else if (derniere && Array.isArray(derniere.devoirs) && derniere.devoirs.filter(Boolean).length > 0) {
+            devoirs = derniere.devoirs.filter(Boolean);
+        }
+
+        var refreshBtn = _devoirsRefreshAvailable
+            ? '<button type="button" id="devoirs-refresh-btn" class="devoirs-refresh" title="Synchroniser depuis le Google Doc" aria-label="Synchroniser">'
+              + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+              + '<polyline points="23 4 23 10 17 10"></polyline>'
+              + '<polyline points="1 20 1 14 7 14"></polyline>'
+              + '<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>'
+              + '</svg></button>'
+            : '';
+
+        var html = '<div class="devoirs-block">'
+            + '<h2 class="devoirs-h2">📝 Tes devoirs pour la prochaine séance'
+            + refreshBtn
+            + '</h2>';
+        if (!devoirs) {
             html += '<p class="devoirs-empty">Aucun devoir spécifique. Continue à pratiquer ce qu\'on a vu en cours.</p>';
         } else {
             html += '<ul class="devoirs-list">';
@@ -1268,6 +1348,75 @@
         }
         html += '</div>';
         zone.innerHTML = html;
+
+        var btn = document.getElementById('devoirs-refresh-btn');
+        if (btn) btn.addEventListener('click', function () { triggerDevoirsRefresh(btn); });
+    }
+
+    function getCurrentSlugForDevoirs() {
+        var params = new URLSearchParams(window.location.search);
+        var slug = (params.get('eleve') || '').toLowerCase();
+        if (slug) return slug;
+        var pathSlug = (window.location.pathname.replace(/^\/+/, '').split('/')[0] || '').toLowerCase();
+        return pathSlug;
+    }
+
+    function fetchAutoSyncedDevoirs(slug, derniere) {
+        if (!slug) return;
+        fetch('/api/eleves/' + encodeURIComponent(slug) + '/devoirs', { credentials: 'include' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) {
+                if (!j) return;
+                if (j.status === 'no_doc_id') { _devoirsRefreshAvailable = false; }
+                _autoSyncedDevoirs = Array.isArray(j.bullets) ? j.bullets : [];
+                renderDevoirs(derniere);
+            })
+            .catch(function () { /* silent — fallback LLM préservé */ });
+    }
+
+    function triggerDevoirsRefresh(btn) {
+        var slug = getCurrentSlugForDevoirs();
+        if (!slug) return;
+        if (btn.classList.contains('spinning')) return;
+        btn.classList.add('spinning');
+        fetch('/api/eleves/' + encodeURIComponent(slug) + '/devoirs', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(function (r) {
+                return r.json().catch(function () { return {}; }).then(function (j) {
+                    return { ok: r.ok, status: r.status, body: j };
+                });
+            })
+            .then(function (resp) {
+                btn.classList.remove('spinning');
+                if (resp.status === 404 && resp.body && resp.body.error === 'no_drive_url') {
+                    _devoirsRefreshAvailable = false;
+                    renderDevoirs(_lastDerniereSeance);
+                    return;
+                }
+                if (!resp.ok) {
+                    showDevoirsToast('Sync impossible, réessaie plus tard', 'error');
+                    return;
+                }
+                _autoSyncedDevoirs = Array.isArray(resp.body.bullets) ? resp.body.bullets : [];
+                renderDevoirs(_lastDerniereSeance);
+                showDevoirsToast('À jour ✓', 'success');
+            })
+            .catch(function () {
+                btn.classList.remove('spinning');
+                showDevoirsToast('Erreur réseau', 'error');
+            });
+    }
+
+    function showDevoirsToast(msg, type) {
+        var t = document.querySelector('.devoirs-toast');
+        if (!t) { t = document.createElement('div'); t.className = 'devoirs-toast'; document.body.appendChild(t); }
+        t.className = 'devoirs-toast' + (type ? ' ' + type : '');
+        t.textContent = msg;
+        requestAnimationFrame(function () { t.classList.add('show'); });
+        clearTimeout(showDevoirsToast._tid);
+        showDevoirsToast._tid = setTimeout(function () { t.classList.remove('show'); }, 2200);
     }
 
     function renderResume(derniere, docUrl) {

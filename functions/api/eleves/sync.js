@@ -13,6 +13,7 @@
 // Auth : admin via cookie mh_admin_pw (HMAC).
 
 import { requireAdminPassword } from '../_lib/session.js';
+import { fetchAndParseDevoirs } from '../_lib/devoirs-parser.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -472,6 +473,39 @@ export async function onRequestPost(context) {
     }
   }
 
+  // ─── Hook devoirs parser (regex MD, en parallèle du sync LLM) ──
+  // Pour chaque élève avec un doc_id, fetch le doc en markdown et extrait
+  // les bullets devoirs de la dernière séance via regex. Stocké en
+  // `devoirs:<slug>` KV (séparé de eleve:<slug> pour ne pas polluer
+  // le record principal). Promise.allSettled + timeout interne 8s.
+  const devoirsResults = await Promise.allSettled(
+    Object.entries(DOCS).map(async ([slug, docId]) => {
+      if (!docId) return { slug, status: 'no_url' };
+      const result = await fetchAndParseDevoirs(docId);
+      const payload = {
+        bullets: result.bullets,
+        lastFetchedAt: Date.now(),
+        sourceDocId: result.docId,
+        fetchStatus: result.status,
+      };
+      if (result.error) payload.lastError = result.error;
+      try {
+        await env.MASTERHUB_STUDENTS.put(`devoirs:${slug}`, JSON.stringify(payload));
+      } catch (e) {
+        console.warn(`[sync.js] devoirs KV put failed slug=${slug}`, e?.message || e);
+      }
+      return { slug, status: result.status, count: result.bullets.length };
+    })
+  );
+  const devoirsSync = { ok: 0, failed: 0, no_url: 0 };
+  for (const r of devoirsResults) {
+    if (r.status !== 'fulfilled') { devoirsSync.failed++; continue; }
+    if (r.value.status === 'ok') devoirsSync.ok++;
+    else if (r.value.status === 'no_url' || r.value.status === 'no_doc_id') devoirsSync.no_url++;
+    else devoirsSync.failed++;
+  }
+  console.log(`[sync.js] devoirs_sync ok=${devoirsSync.ok} failed=${devoirsSync.failed} no_url=${devoirsSync.no_url}`);
+
   if (llmFailed.length > 0) {
     return jsonResponse({
       ok: false,
@@ -483,7 +517,8 @@ export async function onRequestPost(context) {
         env.ANTHROPIC_API_KEY ? 'claude' : null,
       ].filter(Boolean),
       results,
+      devoirsSync,
     }, 503);
   }
-  return jsonResponse({ ok: true, success: true, results });
+  return jsonResponse({ ok: true, success: true, results, devoirsSync });
 }
