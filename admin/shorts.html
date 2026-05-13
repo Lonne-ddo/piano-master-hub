@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Master Hub Admin — Shorts</title>
+  <meta name="theme-color" content="#0f0f14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="MH Admin" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --v: #8B6FE8;
+      --v-dim: rgba(139,111,232,0.14);
+      --v-soft: #6b54c4;
+      --bg0: #09090f;
+      --bg1: #0f0e18;
+      --bg2: #161524;
+      --bg3: #1e1c30;
+      --text1: #eeeaf8;
+      --text2: #9d9ab5;
+      --text3: #5a5870;
+      --border: #25233a;
+      --green: #5ecb8b;
+      --amber: #f0b429;
+      --red: #e05c6b;
+      --blue: #60A5FA;
+      --pink: #F472B6;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg0);
+      color: var(--text1);
+      min-height: 100vh; min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app { max-width: 920px; margin: 0 auto; padding: 24px 20px 60px; }
+
+    .admin-banner {
+      background: var(--v-dim);
+      border: 1px solid rgba(139,111,232,0.35);
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 12px; color: var(--v);
+      letter-spacing: .04em;
+      font-family: 'DM Mono', monospace;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .admin-banner .sep { opacity: .4; }
+    .admin-banner a { color: var(--text2); text-decoration: none; transition: color .15s; }
+    .admin-banner a:hover { color: var(--v); }
+
+    .ph { margin-bottom: 18px; }
+    .ph-title {
+      font-size: 22px; font-weight: 700; color: var(--text1);
+      letter-spacing: -.01em;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 10.5px; font-weight: 600;
+      letter-spacing: .04em; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 20px;
+      background: var(--v-dim); color: var(--v);
+    }
+    .ph-desc { font-size: 13.5px; color: var(--text2); margin-top: 6px; line-height: 1.5; }
+
+    .section { margin-top: 28px; }
+    .section-title {
+      font-size: 14px; font-weight: 700;
+      letter-spacing: .07em; text-transform: uppercase;
+      color: var(--text2);
+      font-family: 'DM Mono', monospace;
+      margin-bottom: 14px;
+    }
+
+    /* ── Upload ─────────────────────────────────────────────── */
+    .upload-card {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .15s;
+      background: var(--bg2);
+    }
+    .dropzone:hover { border-color: var(--v); background: var(--v-dim); }
+    .dropzone.dragover { border-color: var(--v); background: var(--v-dim); transform: scale(1.01); }
+    .dropzone.disabled { opacity: .5; pointer-events: none; }
+    .dropzone-title { font-size: 14px; font-weight: 600; color: var(--text1); margin-bottom: 4px; }
+    .dropzone-sub { font-size: 12px; color: var(--text3); }
+    .dropzone input[type=file] { display: none; }
+
+    /* ── Progress (2 étapes séquentielles) ─────────────────── */
+    .pipeline {
+      display: none;
+      margin-top: 14px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .pipeline.active { display: block; }
+    .pipeline-step {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 0;
+      font-size: 13px;
+      color: var(--text3);
+    }
+    .pipeline-step.active { color: var(--text1); }
+    .pipeline-step.done { color: var(--green); }
+    .pipeline-step.error { color: var(--red); }
+    .pipeline-icon {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    .pipeline-step:not(.active):not(.done):not(.error) .pipeline-icon {
+      background: var(--bg3); color: var(--text3);
+    }
+    .pipeline-step.active .pipeline-icon {
+      background: transparent;
+      border: 2px solid var(--v);
+      border-top-color: transparent;
+      animation: sp 0.8s linear infinite;
+    }
+    @keyframes sp { to { transform: rotate(360deg); } }
+    .pipeline-step.done .pipeline-icon {
+      background: var(--green); color: white;
+    }
+    .pipeline-step.error .pipeline-icon {
+      background: var(--red); color: white;
+    }
+
+    /* ── Cards passages ─────────────────────────────────────── */
+    .passage-card {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    .passage-head {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .badge-type {
+      font-size: 10.5px; font-weight: 600;
+      padding: 3px 9px; border-radius: 20px;
+      letter-spacing: .04em; text-transform: uppercase;
+    }
+    .badge-type.explication { background: rgba(139,111,232,0.16); color: var(--v); border: 1px solid rgba(139,111,232,0.4); }
+    .badge-type.qa          { background: rgba(96,165,250,0.16); color: var(--blue); border: 1px solid rgba(96,165,250,0.4); }
+    .badge-type.demo        { background: rgba(240,180,41,0.16); color: var(--amber); border: 1px solid rgba(240,180,41,0.4); }
+    .badge-type.anecdote    { background: rgba(94,203,139,0.16); color: var(--green); border: 1px solid rgba(94,203,139,0.4); }
+    .badge-type.punchline   { background: rgba(244,114,182,0.16); color: var(--pink); border: 1px solid rgba(244,114,182,0.4); }
+
+    .passage-tc {
+      font-size: 12px; color: var(--text2);
+      font-family: 'DM Mono', monospace;
+      font-feature-settings: "tnum";
+    }
+    .passage-tc .dur {
+      color: var(--text3);
+      margin-left: 6px;
+    }
+    .passage-dismiss {
+      margin-left: auto;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text3);
+      width: 26px; height: 26px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .passage-dismiss:hover { background: var(--bg2); color: var(--red); border-color: var(--red); }
+
+    .passage-title {
+      font-size: 15.5px; font-weight: 700;
+      color: var(--text1);
+      line-height: 1.35;
+      margin-bottom: 8px;
+    }
+    .passage-accroche {
+      font-size: 13.5px;
+      color: var(--text2);
+      line-height: 1.55;
+      font-style: italic;
+      padding: 10px 12px;
+      background: var(--bg2);
+      border-left: 3px solid var(--v);
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 10px;
+    }
+    .passage-transcript-toggle {
+      font-size: 12px;
+      color: var(--text3);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 4px 0;
+      font-family: inherit;
+    }
+    .passage-transcript-toggle:hover { color: var(--text1); }
+    .passage-transcript {
+      display: none;
+      font-size: 12.5px;
+      color: var(--text2);
+      line-height: 1.55;
+      padding: 8px 0 4px;
+      border-top: 1px dashed var(--border);
+      margin-top: 6px;
+    }
+    .passage-transcript.show { display: block; }
+    .passage-raison {
+      font-size: 12px;
+      color: var(--text3);
+      padding: 8px 0 0;
+      margin-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .passage-actions {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;
+    }
+    .pa-btn {
+      font-size: 11.5px;
+      padding: 6px 11px;
+      border-radius: 7px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all .12s;
+    }
+    .pa-btn:hover { background: var(--v-dim); color: var(--v); border-color: var(--v); }
+
+    /* ── Historique ─────────────────────────────────────────── */
+    .hist-card {
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .hist-title {
+      flex: 1 1 200px; min-width: 0;
+      font-size: 13.5px; font-weight: 600;
+      color: var(--text1);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .hist-meta {
+      font-size: 11.5px; color: var(--text3);
+      font-family: 'DM Mono', monospace;
+    }
+    .hist-btn {
+      font-size: 11.5px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .hist-btn:hover { background: var(--v-dim); color: var(--v); border-color: var(--v); }
+    .hist-btn.danger:hover { background: rgba(224,92,107,0.15); color: var(--red); border-color: var(--red); }
+
+    .list-empty {
+      padding: 30px 20px;
+      text-align: center;
+      color: var(--text3);
+      font-size: 13px;
+      background: var(--bg1);
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+    }
+
+    /* ── Toast ───────────────────────────────────────────────── */
+    .sh-toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--bg2); color: var(--text1);
+      border: 1px solid var(--border);
+      padding: 10px 18px; border-radius: 10px;
+      font-size: 13px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      z-index: 9999;
+      opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .sh-toast.show { opacity: 1; }
+    .sh-toast.success { border-color: rgba(94,203,139,0.45); color: var(--green); }
+    .sh-toast.error { border-color: rgba(224,92,107,0.55); color: var(--red); }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="admin-banner">
+    <span>👤 Admin</span>
+    <span class="sep">·</span>
+    <a href="/admin/">← Outils</a>
+  </div>
+
+  <div class="ph">
+    <div class="ph-title">
+      <span>✂️ Shorts</span>
+      <span class="badge">Whisper + Claude Sonnet</span>
+    </div>
+    <div class="ph-desc">
+      Extraire des passages postables (15-60s) d'un cours, Q&amp;R ou explication théorique.
+      Audio ou vidéo (l'audio est extrait automatiquement).
+    </div>
+  </div>
+
+  <!-- ── Upload ─────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Nouvelle extraction</div>
+    <div class="upload-card">
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Sélectionner un fichier audio ou vidéo">
+        <div class="dropzone-title">📁 Glisse un fichier ici ou clique pour sélectionner</div>
+        <div class="dropzone-sub">MP3 · WAV · M4A · FLAC · MP4 · MOV · WEBM · Max 100 Mo</div>
+        <input id="file-input" type="file" accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/x-m4a,audio/mp4,audio/aac,audio/flac,audio/x-flac,video/mp4,video/quicktime,video/webm" />
+      </div>
+      <div id="pipeline" class="pipeline">
+        <div id="step-transcribe" class="pipeline-step">
+          <span class="pipeline-icon">1</span>
+          <span class="step-label">Transcription en cours...</span>
+        </div>
+        <div id="step-analyze" class="pipeline-step">
+          <span class="pipeline-icon">2</span>
+          <span class="step-label">Extraction des passages...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Résultats ──────────────────────────────────────── -->
+  <div class="section" id="results-section" style="display:none;">
+    <div class="section-title" id="results-title">Passages extraits</div>
+    <div id="results-list"></div>
+  </div>
+
+  <!-- ── Historique ─────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-title">Historique</div>
+    <div id="history-list">
+      <div class="list-empty">Chargement…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ─── Auth garde ──────────────────────────────────────────
+fetch('/api/admin/check', { credentials: 'same-origin' })
+  .then(r => r.ok ? r.json() : null)
+  .then(j => { if (!j || !j.ok) window.location.replace('/admin/login.html?next=' + encodeURIComponent('/admin/shorts.html')); })
+  .catch(() => window.location.replace('/admin/login.html?next=' + encodeURIComponent('/admin/shorts.html')));
+
+// ─── Helpers ──────────────────────────────────────────────
+function escapeHtml(s) {
+  if (s == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+function fmtTcMs(ms) {
+  const s = Math.floor((ms || 0) / 1000);
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m + ':' + String(r).padStart(2, '0');
+}
+function fmtDuration(ms) {
+  return Math.round((ms || 0) / 1000) + 's';
+}
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts);
+  return d.toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function toast(msg, type) {
+  let t = document.querySelector('.sh-toast');
+  if (!t) { t = document.createElement('div'); document.body.appendChild(t); }
+  t.className = 'sh-toast' + (type ? ' ' + type : '');
+  t.textContent = msg;
+  requestAnimationFrame(() => t.classList.add('show'));
+  clearTimeout(toast._tid);
+  toast._tid = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ─── Pipeline UI ─────────────────────────────────────────
+function pipelineStart() {
+  document.getElementById('pipeline').classList.add('active');
+  setStepState('step-transcribe', 'active');
+  setStepState('step-analyze', '');
+}
+function pipelineStop() {
+  setTimeout(() => document.getElementById('pipeline').classList.remove('active'), 1500);
+}
+function setStepState(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('active', 'done', 'error');
+  if (state) el.classList.add(state);
+  const icon = el.querySelector('.pipeline-icon');
+  if (state === 'done') icon.textContent = '✓';
+  else if (state === 'error') icon.textContent = '✕';
+  else icon.textContent = id === 'step-transcribe' ? '1' : '2';
+}
+
+// ─── Upload + SSE ────────────────────────────────────────
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+dropzone.addEventListener('click', () => fileInput.click());
+dropzone.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+});
+['dragenter', 'dragover'].forEach(ev =>
+  dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); })
+);
+['dragleave', 'drop'].forEach(ev =>
+  dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); })
+);
+dropzone.addEventListener('drop', (e) => {
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+});
+
+async function handleFile(file) {
+  if (file.size > 100 * 1024 * 1024) { toast('Fichier > 100 Mo', 'error'); return; }
+  dropzone.classList.add('disabled');
+  pipelineStart();
+
+  const fd = new FormData();
+  fd.append('audio', file);
+  fd.append('title', file.name);
+
+  let result = null;
+  try {
+    const resp = await fetch('/api/admin/shorts/extract', {
+      method: 'POST', credentials: 'same-origin', body: fd,
+    });
+    if (!resp.ok && !resp.body) { throw new Error('HTTP ' + resp.status); }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const events = buf.split('\n\n');
+      buf = events.pop() || '';
+      for (const ev of events) {
+        const dataLine = ev.split('\n').find(l => l.startsWith('data: '));
+        if (!dataLine) continue;
+        let payload;
+        try { payload = JSON.parse(dataLine.slice(6)); } catch { continue; }
+        if (payload.step === 'transcribing') {
+          setStepState('step-transcribe', 'active');
+        } else if (payload.step === 'analyzing') {
+          setStepState('step-transcribe', 'done');
+          setStepState('step-analyze', 'active');
+        } else if (payload.step === 'done') {
+          setStepState('step-analyze', 'done');
+          result = payload;
+        } else if (payload.error) {
+          // Mark current step error
+          const transcribe = document.getElementById('step-transcribe');
+          const analyze = document.getElementById('step-analyze');
+          if (analyze.classList.contains('active')) setStepState('step-analyze', 'error');
+          else setStepState('step-transcribe', 'error');
+          toast('Erreur : ' + payload.error, 'error');
+        }
+      }
+    }
+  } catch (e) {
+    toast('Erreur réseau : ' + (e.message || ''), 'error');
+    setStepState('step-transcribe', 'error');
+  } finally {
+    dropzone.classList.remove('disabled');
+    fileInput.value = '';
+    pipelineStop();
+  }
+
+  if (result) {
+    renderResults(result);
+    loadHistory();
+    toast('Extraction terminée ✓ — ' + (result.passages?.length || 0) + ' passages', 'success');
+  }
+}
+
+// ─── Render résultats ────────────────────────────────────
+let activePassages = [];
+
+function renderResults(payload) {
+  activePassages = Array.isArray(payload.passages) ? payload.passages.slice() : [];
+  const section = document.getElementById('results-section');
+  const title = document.getElementById('results-title');
+  const list = document.getElementById('results-list');
+
+  section.style.display = 'block';
+  title.textContent = (payload.title || 'Passages extraits') + ' — ' + activePassages.length + ' passage(s)';
+
+  if (!activePassages.length) {
+    list.innerHTML = '<div class="list-empty">Aucun passage qualifiable dans cet audio. Réessaie avec un cours plus dense en explications ou Q&amp;R.</div>';
+    return;
+  }
+
+  list.innerHTML = activePassages.map((p, i) => renderPassageCard(p, i)).join('');
+  bindPassageHandlers();
+}
+
+function renderPassageCard(p, idx) {
+  const tc = fmtTcMs(p.start_ms) + ' → ' + fmtTcMs(p.end_ms);
+  const dur = fmtDuration(p.duration_ms || (p.end_ms - p.start_ms));
+  return ''
+    + '<div class="passage-card" data-idx="' + idx + '">'
+    +   '<div class="passage-head">'
+    +     '<span class="badge-type ' + escapeHtml(p.type || 'explication') + '">' + escapeHtml(p.type || 'explication') + '</span>'
+    +     '<span class="passage-tc">' + escapeHtml(tc) + '<span class="dur">(' + escapeHtml(dur) + ')</span></span>'
+    +     '<button class="passage-dismiss" data-act="dismiss" title="Masquer">✕</button>'
+    +   '</div>'
+    +   (p.hook_title ? '<div class="passage-title">' + escapeHtml(p.hook_title) + '</div>' : '')
+    +   (p.accroche ? '<div class="passage-accroche">"' + escapeHtml(p.accroche) + '"</div>' : '')
+    +   '<button class="passage-transcript-toggle" data-act="toggle-transcript">▼ Voir le transcript</button>'
+    +   '<div class="passage-transcript">' + escapeHtml(p.transcript || '') + '</div>'
+    +   (p.raison ? '<div class="passage-raison">💡 ' + escapeHtml(p.raison) + '</div>' : '')
+    +   '<div class="passage-actions">'
+    +     '<button class="pa-btn" data-act="copy-tc">📋 Copier timecode</button>'
+    +     '<button class="pa-btn" data-act="copy-accroche">📝 Copier accroche</button>'
+    +     '<button class="pa-btn" data-act="copy-transcript">📄 Copier transcript</button>'
+    +   '</div>'
+    + '</div>';
+}
+
+function bindPassageHandlers() {
+  document.querySelectorAll('.passage-card').forEach(card => {
+    const idx = parseInt(card.getAttribute('data-idx'), 10);
+    card.querySelectorAll('[data-act]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = activePassages[idx];
+        if (!p) return;
+        const act = btn.getAttribute('data-act');
+        if (act === 'dismiss') { card.style.display = 'none'; }
+        else if (act === 'toggle-transcript') {
+          const tr = card.querySelector('.passage-transcript');
+          tr.classList.toggle('show');
+          btn.textContent = tr.classList.contains('show') ? '▲ Masquer le transcript' : '▼ Voir le transcript';
+        }
+        else if (act === 'copy-tc') copyToClipboard(fmtTcMs(p.start_ms) + ' - ' + fmtTcMs(p.end_ms), 'Timecode copié');
+        else if (act === 'copy-accroche') copyToClipboard(p.accroche || '', 'Accroche copiée');
+        else if (act === 'copy-transcript') copyToClipboard(p.transcript || '', 'Transcript copié');
+      });
+    });
+  });
+}
+
+function copyToClipboard(text, successMsg) {
+  if (!text) { toast('Rien à copier', 'error'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      () => toast(successMsg + ' ✓', 'success'),
+      () => fallbackCopy(text, successMsg)
+    );
+  } else fallbackCopy(text, successMsg);
+}
+function fallbackCopy(text, successMsg) {
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); toast(successMsg + ' ✓', 'success'); }
+  catch { toast('Copie impossible', 'error'); }
+  finally { document.body.removeChild(ta); }
+}
+
+// ─── Historique ──────────────────────────────────────────
+async function loadHistory() {
+  const list = document.getElementById('history-list');
+  try {
+    const r = await fetch('/api/admin/shorts/list', { credentials: 'same-origin' });
+    if (!r.ok) { list.innerHTML = '<div class="list-empty">Impossible de charger l\'historique.</div>'; return; }
+    const j = await r.json();
+    const items = Array.isArray(j.items) ? j.items : [];
+    if (!items.length) { list.innerHTML = '<div class="list-empty">Aucune extraction encore. Upload un fichier ci-dessus.</div>'; return; }
+    list.innerHTML = items.map(item => ''
+      + '<div class="hist-card" data-id="' + escapeHtml(item.id) + '">'
+      +   '<span class="hist-title">' + escapeHtml(item.title || 'Sans titre') + '</span>'
+      +   '<span class="hist-meta">' + escapeHtml(fmtDate(item.createdAt)) + ' · ' + escapeHtml(String(item.passagesCount)) + ' passage(s)</span>'
+      +   '<button class="hist-btn" data-act="open">Ouvrir</button>'
+      +   '<button class="hist-btn danger" data-act="delete">🗑</button>'
+      + '</div>').join('');
+    document.querySelectorAll('.hist-card').forEach(card => {
+      const id = card.getAttribute('data-id');
+      card.querySelectorAll('[data-act]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const act = btn.getAttribute('data-act');
+          if (act === 'open') openHistoryItem(id);
+          else if (act === 'delete') deleteHistoryItem(id);
+        });
+      });
+    });
+  } catch {
+    list.innerHTML = '<div class="list-empty">Erreur réseau.</div>';
+  }
+}
+
+async function openHistoryItem(id) {
+  try {
+    const r = await fetch('/api/admin/shorts/' + encodeURIComponent(id), { credentials: 'same-origin' });
+    if (!r.ok) { toast('Erreur chargement', 'error'); return; }
+    const j = await r.json();
+    if (!j.ok || !j.record) { toast('Record introuvable', 'error'); return; }
+    renderResults({ title: j.record.title, passages: j.record.passages, id });
+    window.scrollTo({ top: document.getElementById('results-section').offsetTop - 20, behavior: 'smooth' });
+  } catch { toast('Erreur réseau', 'error'); }
+}
+
+async function deleteHistoryItem(id) {
+  if (!confirm('Supprimer cette extraction ?')) return;
+  try {
+    const r = await fetch('/api/admin/shorts/' + encodeURIComponent(id), {
+      method: 'DELETE', credentials: 'same-origin',
+    });
+    if (!r.ok) { toast('Erreur suppression', 'error'); return; }
+    toast('Supprimé ✓', 'success');
+    loadHistory();
+  } catch { toast('Erreur réseau', 'error'); }
+}
+
+// ─── Init ────────────────────────────────────────────────
+loadHistory();
+</script>
+</body>
+</html>
