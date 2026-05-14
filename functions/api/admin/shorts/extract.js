@@ -189,24 +189,50 @@ export async function onRequestPost({ request, env }) {
     });
   }
 
-  const file = formData.get('audio') || formData.get('file');
-  if (!file || typeof file === 'string') {
+  // Multi-file : audio[] répété N fois dans l'ordre. Fallback single 'audio'/'file'.
+  let files = formData.getAll('audio[]').filter((f) => f && typeof f !== 'string');
+  if (!files.length) files = formData.getAll('audio').filter((f) => f && typeof f !== 'string');
+  if (!files.length) {
+    const single = formData.get('audio') || formData.get('file');
+    if (single && typeof single !== 'string') files = [single];
+  }
+  if (!files.length) {
     return new Response(JSON.stringify({ error: 'file_missing' }), {
       status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
-  if (file.size > MAX_BYTES) {
-    return new Response(JSON.stringify({ error: 'file_too_large', maxBytes: MAX_BYTES }), {
+  // Validation par fichier
+  for (const f of files) {
+    if (f.size > MAX_BYTES) {
+      return new Response(JSON.stringify({ error: 'file_too_large', filename: f.name, maxBytes: MAX_BYTES }), {
+        status: 413, headers: { ...CORS, 'Content-Type': 'application/json' },
+      });
+    }
+    if (!ALLOWED_MIME.includes(f.type)) {
+      return new Response(JSON.stringify({ error: 'mime_not_allowed', filename: f.name, mimeType: f.type, allowed: ALLOWED_MIME }), {
+        status: 415, headers: { ...CORS, 'Content-Type': 'application/json' },
+      });
+    }
+  }
+
+  // Métadonnées parts (durations côté client pour fallback si Whisper ne fournit pas
+  // un end précis). Format JSON : [{ name, durationMs, offsetMs }, ...].
+  let partsMetadata = [];
+  try {
+    const raw = formData.get('parts_metadata');
+    if (typeof raw === 'string' && raw) partsMetadata = JSON.parse(raw);
+  } catch {}
+  if (!Array.isArray(partsMetadata)) partsMetadata = [];
+
+  // Hard cap durée totale 40min (anti-abuse + protection timeout)
+  const totalMetaMs = partsMetadata.reduce((acc, p) => acc + (Number(p?.durationMs) || 0), 0);
+  if (totalMetaMs > 40 * 60 * 1000) {
+    return new Response(JSON.stringify({ error: 'total_duration_too_long', maxMinutes: 40 }), {
       status: 413, headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
-  if (!ALLOWED_MIME.includes(file.type)) {
-    return new Response(JSON.stringify({ error: 'mime_not_allowed', mimeType: file.type, allowed: ALLOWED_MIME }), {
-      status: 415, headers: { ...CORS, 'Content-Type': 'application/json' },
-    });
-  }
 
-  const title = String(formData.get('title') || file.name || 'Extract').slice(0, 200);
+  const title = String(formData.get('title') || files[0].name || 'Extract').slice(0, 200);
 
   // ── SSE stream avec heartbeats ──
   const encoder = new TextEncoder();
@@ -222,41 +248,117 @@ export async function onRequestPost({ request, env }) {
       };
 
       const abortCtrl = new AbortController();
-      const tid = setTimeout(() => abortCtrl.abort(), 180000); // 3 min hard timeout
+      const tid = setTimeout(() => abortCtrl.abort(), 240000); // 4 min hard timeout (multi-file)
 
-      try {
-        // 1) Transcribe Groq Whisper
-        emit({ step: 'transcribing' });
-        const groqForm = new FormData();
-        groqForm.append('file', file);
-        groqForm.append('model', MODEL_WHISPER);
-        groqForm.append('response_format', 'verbose_json');
-        groqForm.append('timestamp_granularities[]', 'segment');
-        groqForm.append('prompt',
+      // Helper : transcrit 1 fichier Groq Whisper.
+      async function transcribeOne(file) {
+        const gf = new FormData();
+        gf.append('file', file);
+        gf.append('model', MODEL_WHISPER);
+        gf.append('response_format', 'verbose_json');
+        gf.append('timestamp_granularities[]', 'segment');
+        gf.append('prompt',
           "Cours de piano en français avec Estelon. Vocabulaire : accords maj7 min7 m7b5 sus2 sus4, voicings, renversements, tritons, tensions, degrés I II V I, gammes, modulations, arpèges, ear training, métronome.");
-
-        const groqResp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
           method: 'POST',
           headers: { Authorization: `Bearer ${env.GROQ_API_KEY}` },
-          body: groqForm,
+          body: gf,
           signal: abortCtrl.signal,
         });
-        if (!groqResp.ok) {
-          const errText = await groqResp.text().catch(() => '');
-          emit({ error: `Groq ${groqResp.status}: ${errText.slice(0, 200)}`, status: groqResp.status });
+        if (!r.ok) {
+          const errText = await r.text().catch(() => '');
+          throw new Error(`Groq ${r.status}: ${errText.slice(0, 200)}`);
+        }
+        const data = await r.json();
+        const segs = Array.isArray(data?.segments) ? data.segments : [];
+        const lastEndMs = segs.length ? Math.round(Number(segs[segs.length - 1].end || 0) * 1000) : 0;
+        return { segments: segs, durationMs: lastEndMs };
+      }
+
+      try {
+        // 1) Transcription en parallèle (Promise.allSettled)
+        emit({ step: 'transcribing', total: files.length });
+        let results = await Promise.allSettled(files.map(transcribeOne));
+
+        // Retry séquentiel pour les 429 (rate limit Groq) — on attend 1.5s
+        // entre chaque retry pour laisser la limite se reset.
+        for (let i = 0; i < results.length; i++) {
+          if (results[i].status === 'fulfilled') continue;
+          const msg = String(results[i].reason?.message || '');
+          if (!/429|rate.?limit/i.test(msg)) continue;
+          await new Promise((r) => setTimeout(r, 1500));
+          try {
+            const v = await transcribeOne(files[i]);
+            results[i] = { status: 'fulfilled', value: v };
+            emit({ step: 'retried_part', index: i, filename: files[i].name });
+          } catch (e) {
+            results[i] = { status: 'rejected', reason: e };
+          }
+        }
+
+        // Émet heartbeat application après chaque batch (déjà finis quand on
+        // arrive ici, mais le keepalive a tourné en parallèle, donc OK).
+        for (let i = 0; i < results.length; i++) {
+          emit({
+            step: 'transcribed_part',
+            index: i,
+            status: results[i].status,
+            filename: files[i].name,
+          });
+        }
+
+        // 2) Échec si TOUS fails. Si certains échouent, on les skip et continue.
+        const okCount = results.filter((r) => r.status === 'fulfilled').length;
+        if (okCount === 0) {
+          const firstErr = results[0]?.reason?.message || 'all_failed';
+          emit({ error: `Transcription : ${firstErr}`, status: 502 });
           clearInterval(heartbeat); clearTimeout(tid);
           try { controller.close(); } catch {}
           return;
         }
-        const groqData = await groqResp.json();
-        const segments = Array.isArray(groqData?.segments) ? groqData.segments : [];
-        const audioDurationMs = segments.length
-          ? Math.round(Number(segments[segments.length - 1].end || 0) * 1000)
-          : 0;
 
-        // 2) Analyze with Claude
-        emit({ step: 'analyzing', segmentsCount: segments.length });
-        const transcriptWithTs = segmentsToTranscript(segments);
+        // 3) Apply offsets cumulés selon l'ordre des files (qui = ordre upload admin).
+        //    Pour chaque part : durationMs réel = client metadata si fourni, sinon
+        //    le dernier end Whisper. offsetMs = somme des durations précédentes.
+        const allSegments = [];
+        const partsForKV = [];
+        let cumulativeOffsetMs = 0;
+        for (let i = 0; i < results.length; i++) {
+          const file = files[i];
+          const meta = partsMetadata[i] || {};
+          const result = results[i];
+          let partDuration = 0;
+          let partOk = false;
+          if (result.status === 'fulfilled') {
+            const { segments, durationMs } = result.value;
+            partDuration = Math.max(Number(meta.durationMs) || 0, durationMs);
+            partOk = true;
+            // Apply offset à chaque segment
+            for (const s of segments) {
+              const startMs = Math.round(Number(s.start || 0) * 1000) + cumulativeOffsetMs;
+              const endMs = Math.round(Number(s.end || 0) * 1000) + cumulativeOffsetMs;
+              allSegments.push({ start: startMs / 1000, end: endMs / 1000, text: String(s.text || '').trim() });
+            }
+          } else {
+            // Part fail : on garde le slot vide (passages dans cette plage seront absents),
+            // mais on AVANCE cumulativeOffsetMs avec la durée client metadata pour que
+            // les parts suivantes restent calées sur la vidéo finale.
+            partDuration = Number(meta.durationMs) || 0;
+          }
+          partsForKV.push({
+            filename: String(file.name || ''),
+            durationMs: partDuration,
+            offsetMs: cumulativeOffsetMs,
+            status: partOk ? 'ok' : 'failed',
+            error: partOk ? null : (result.reason?.message || 'failed'),
+          });
+          cumulativeOffsetMs += partDuration;
+        }
+        const totalDurationMs = cumulativeOffsetMs;
+
+        // 4) Analyze with Claude (segments unifiés, timestamps = position vidéo finale)
+        emit({ step: 'analyzing', segmentsCount: allSegments.length, totalDurationMs });
+        const transcriptWithTs = segmentsToTranscript(allSegments);
         if (!transcriptWithTs.trim()) {
           emit({ error: 'empty_transcript', status: 422 });
           clearInterval(heartbeat); clearTimeout(tid);
@@ -292,17 +394,19 @@ export async function onRequestPost({ request, env }) {
         }
         const passages = validatePassages(rawList);
 
-        // 4) Save KV
+        // 5) Save KV — record enrichi avec parts[] (multi-file metadata)
         const id = genId();
         const record = {
           id,
           title,
-          originalFilename: String(file.name || ''),
-          mimeType: file.type,
-          sizeBytes: file.size,
-          audioDurationMs,
+          originalFilename: partsForKV[0]?.filename || '',
+          mimeType: files[0].type,
+          sizeBytes: files.reduce((acc, f) => acc + (f.size || 0), 0),
+          audioDurationMs: totalDurationMs,    // alias historique (= totalDurationMs)
+          totalDurationMs,
+          parts: partsForKV,
           passages,
-          segmentsCount: segments.length,
+          segmentsCount: allSegments.length,
           createdAt: Date.now(),
         };
         try {
@@ -314,7 +418,7 @@ export async function onRequestPost({ request, env }) {
           return;
         }
 
-        emit({ step: 'done', id, title, passages, audioDurationMs });
+        emit({ step: 'done', id, title, passages, audioDurationMs: totalDurationMs, totalDurationMs, parts: partsForKV });
       } catch (err) {
         if (err && err.name === 'AbortError') {
           emit({ error: 'timeout (>180s)', status: 408 });

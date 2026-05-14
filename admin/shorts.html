@@ -103,6 +103,81 @@
     .dropzone-sub { font-size: 12px; color: var(--text3); }
     .dropzone input[type=file] { display: none; }
 
+    /* ── Liste parts (multi-file) ───────────────────────────── */
+    .parts-list {
+      margin-top: 14px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .parts-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px;
+      background: var(--bg1);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .parts-row.loading { opacity: 0.6; }
+    .parts-row.error { border-color: var(--red); }
+    .parts-order {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px; color: var(--text3);
+      min-width: 22px; text-align: center;
+    }
+    .parts-arrows { display: flex; flex-direction: column; gap: 1px; }
+    .parts-arrows button {
+      background: transparent; border: none; color: var(--text3);
+      cursor: pointer; padding: 1px 4px; font-size: 11px;
+      border-radius: 3px;
+    }
+    .parts-arrows button:hover { color: var(--v); background: var(--bg2); }
+    .parts-arrows button:disabled { opacity: 0.3; cursor: not-allowed; }
+    .parts-name {
+      flex: 1; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      color: var(--text1);
+    }
+    .parts-dur {
+      font-family: 'DM Mono', monospace;
+      font-size: 11.5px; color: var(--text2);
+      min-width: 50px; text-align: right;
+    }
+    .parts-offset {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px; color: var(--text3);
+      min-width: 110px; text-align: right;
+    }
+    .parts-remove {
+      background: transparent; border: 1px solid var(--border);
+      color: var(--text3); width: 24px; height: 24px;
+      border-radius: 5px; cursor: pointer; font-size: 12px;
+    }
+    .parts-remove:hover { color: var(--red); border-color: var(--red); }
+    .parts-footer {
+      display: flex; align-items: center; gap: 12px;
+      padding-top: 12px; margin-top: 6px;
+      border-top: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .parts-total {
+      flex: 1; font-size: 12.5px; color: var(--text2);
+      font-family: 'DM Mono', monospace;
+    }
+    .parts-total .warn { color: var(--amber); margin-left: 8px; }
+    .parts-extract-btn {
+      font-size: 13px; font-weight: 600;
+      padding: 9px 18px;
+      border-radius: 8px;
+      background: var(--v); color: white;
+      border: none; cursor: pointer;
+      transition: background .12s;
+    }
+    .parts-extract-btn:hover:not(:disabled) { background: var(--v-soft); }
+    .parts-extract-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
     /* ── Progress (2 étapes séquentielles) ─────────────────── */
     .pipeline {
       display: none;
@@ -332,11 +407,20 @@
   <div class="section">
     <div class="section-title">Nouvelle extraction</div>
     <div class="upload-card">
-      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Sélectionner un fichier audio ou vidéo">
-        <div class="dropzone-title">📁 Glisse un fichier ici ou clique pour sélectionner</div>
-        <div class="dropzone-sub">MP3 · WAV · M4A · FLAC · MP4 · MOV · WEBM · Max 100 Mo</div>
-        <input id="file-input" type="file" accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/x-m4a,audio/mp4,audio/aac,audio/flac,audio/x-flac,video/mp4,video/quicktime,video/webm" />
+      <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Sélectionner un ou plusieurs fichiers audio/vidéo">
+        <div class="dropzone-title">📁 Glisse un ou plusieurs fichiers ici (séances concatenées)</div>
+        <div class="dropzone-sub">MP3 · WAV · M4A · FLAC · MP4 · MOV · WEBM · Max 100 Mo par fichier</div>
+        <input id="file-input" type="file" multiple accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/x-m4a,audio/mp4,audio/aac,audio/flac,audio/x-flac,video/mp4,video/quicktime,video/webm" />
       </div>
+
+      <div id="parts-list" class="parts-list" style="display:none;">
+        <div id="parts-rows"></div>
+        <div class="parts-footer">
+          <span id="parts-total" class="parts-total"></span>
+          <button id="extract-btn" type="button" class="parts-extract-btn" disabled>🎬 Extraire les passages</button>
+        </div>
+      </div>
+
       <div id="pipeline" class="pipeline">
         <div id="step-transcribe" class="pipeline-step">
           <span class="pipeline-icon">1</span>
@@ -426,9 +510,18 @@ function setStepState(id, state) {
   else icon.textContent = id === 'step-transcribe' ? '1' : '2';
 }
 
-// ─── Upload + SSE ────────────────────────────────────────
+// ─── Multi-file pipeline ─────────────────────────────────
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('file-input');
+const partsListEl = document.getElementById('parts-list');
+const partsRowsEl = document.getElementById('parts-rows');
+const partsTotalEl = document.getElementById('parts-total');
+const extractBtn = document.getElementById('extract-btn');
+
+// Liste ordonnée { file, durationMs (null si pas encore lu), uid }
+let parts = [];
+let uidCounter = 0;
+
 dropzone.addEventListener('click', () => fileInput.click());
 dropzone.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
@@ -440,20 +533,139 @@ dropzone.addEventListener('keydown', (e) => {
   dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); })
 );
 dropzone.addEventListener('drop', (e) => {
-  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+    addFiles(Array.from(e.dataTransfer.files));
+  }
 });
 fileInput.addEventListener('change', () => {
-  if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+  if (fileInput.files && fileInput.files.length) addFiles(Array.from(fileInput.files));
 });
 
-async function handleFile(file) {
-  if (file.size > 100 * 1024 * 1024) { toast('Fichier > 100 Mo', 'error'); return; }
+extractBtn.addEventListener('click', () => { runExtraction(); });
+
+function addFiles(fileList) {
+  for (const f of fileList) {
+    if (f.size > 100 * 1024 * 1024) { toast('Fichier > 100 Mo : ' + f.name, 'error'); continue; }
+    const uid = ++uidCounter;
+    const part = { uid, file: f, durationMs: null };
+    parts.push(part);
+    // Lit la durée via <audio> metadata (extrait même d'un <video> source mp4)
+    readMediaDuration(f).then((ms) => {
+      part.durationMs = ms;
+      renderParts();
+    }).catch(() => {
+      part.durationMs = 0;
+      renderParts();
+    });
+  }
+  fileInput.value = '';
+  renderParts();
+}
+
+function readMediaDuration(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('audio');
+    a.preload = 'metadata';
+    a.onloadedmetadata = () => {
+      const d = Number.isFinite(a.duration) ? a.duration : 0;
+      URL.revokeObjectURL(url);
+      resolve(Math.round(d * 1000));
+    };
+    a.onerror = () => { URL.revokeObjectURL(url); reject(new Error('metadata_failed')); };
+    a.src = url;
+  });
+}
+
+function fmtDur(ms) {
+  const s = Math.floor((ms || 0) / 1000);
+  const m = Math.floor(s / 60);
+  return m + ':' + String(s % 60).padStart(2, '0');
+}
+
+function renderParts() {
+  if (!parts.length) {
+    partsListEl.style.display = 'none';
+    return;
+  }
+  partsListEl.style.display = 'block';
+  let cumul = 0;
+  const allReady = parts.every((p) => p.durationMs !== null);
+  partsRowsEl.innerHTML = parts.map((p, i) => {
+    const dur = p.durationMs;
+    const offsetStart = cumul;
+    const offsetEnd = cumul + (dur || 0);
+    if (dur !== null) cumul = offsetEnd;
+    return ''
+      + '<div class="parts-row' + (dur === null ? ' loading' : '') + '" data-uid="' + p.uid + '">'
+      +   '<div class="parts-arrows">'
+      +     '<button data-act="up" ' + (i === 0 ? 'disabled' : '') + '>▲</button>'
+      +     '<button data-act="down" ' + (i === parts.length - 1 ? 'disabled' : '') + '>▼</button>'
+      +   '</div>'
+      +   '<span class="parts-order">' + (i + 1) + '.</span>'
+      +   '<span class="parts-name">' + escapeHtml(p.file.name) + '</span>'
+      +   '<span class="parts-dur">' + (dur === null ? '…' : fmtDur(dur)) + '</span>'
+      +   '<span class="parts-offset">' + fmtDur(offsetStart) + ' → ' + (dur === null ? '…' : fmtDur(offsetEnd)) + '</span>'
+      +   '<button class="parts-remove" data-act="remove">✕</button>'
+      + '</div>';
+  }).join('');
+
+  const totalMs = cumul;
+  const totalWarn = totalMs > 30 * 60 * 1000;
+  partsTotalEl.innerHTML = 'Durée totale finale : ' + (allReady ? fmtDur(totalMs) : '…')
+    + (totalWarn ? '<span class="warn">⚠ > 30 min — risque timeout</span>' : '');
+  extractBtn.disabled = !allReady || parts.length === 0;
+
+  partsRowsEl.querySelectorAll('.parts-row').forEach((row) => {
+    const uid = parseInt(row.getAttribute('data-uid'), 10);
+    row.querySelectorAll('[data-act]').forEach((btn) => {
+      btn.addEventListener('click', () => handlePartAction(uid, btn.getAttribute('data-act')));
+    });
+  });
+}
+
+function handlePartAction(uid, act) {
+  const idx = parts.findIndex((p) => p.uid === uid);
+  if (idx < 0) return;
+  if (act === 'remove') {
+    parts.splice(idx, 1);
+  } else if (act === 'up' && idx > 0) {
+    [parts[idx - 1], parts[idx]] = [parts[idx], parts[idx - 1]];
+  } else if (act === 'down' && idx < parts.length - 1) {
+    [parts[idx], parts[idx + 1]] = [parts[idx + 1], parts[idx]];
+  }
+  renderParts();
+}
+
+async function runExtraction() {
+  if (!parts.length) return;
+  const allReady = parts.every((p) => p.durationMs !== null);
+  if (!allReady) { toast('Attends la lecture des métadonnées', 'error'); return; }
+
+  const totalMs = parts.reduce((acc, p) => acc + (p.durationMs || 0), 0);
+  if (totalMs > 40 * 60 * 1000) {
+    toast('Durée totale > 40 min, splitte en plusieurs extractions', 'error');
+    return;
+  }
+  if (totalMs > 30 * 60 * 1000) {
+    if (!confirm('Durée totale > 30 min, risque de timeout. Continuer ?')) return;
+  }
+
   dropzone.classList.add('disabled');
+  extractBtn.disabled = true;
   pipelineStart();
 
+  // Build FormData : audio[] répété N fois dans l'ordre + parts_metadata JSON
   const fd = new FormData();
-  fd.append('audio', file);
-  fd.append('title', file.name);
+  const metaArr = [];
+  let cumul = 0;
+  for (const p of parts) {
+    fd.append('audio[]', p.file);
+    metaArr.push({ name: p.file.name, durationMs: p.durationMs, offsetMs: cumul });
+    cumul += p.durationMs;
+  }
+  fd.append('parts_metadata', JSON.stringify(metaArr));
+  fd.append('title', parts.length === 1 ? parts[0].file.name : (parts[0].file.name.replace(/\.[^.]+$/, '') + ' (+' + (parts.length - 1) + ')'));
 
   let result = null;
   try {
@@ -500,12 +712,16 @@ async function handleFile(file) {
   } finally {
     dropzone.classList.remove('disabled');
     fileInput.value = '';
+    extractBtn.disabled = parts.length === 0;
     pipelineStop();
   }
 
   if (result) {
     renderResults(result);
     loadHistory();
+    // Vide la liste parts pour permettre une nouvelle extraction propre
+    parts = [];
+    renderParts();
     toast('Extraction terminée ✓ — ' + (result.passages?.length || 0) + ' passages', 'success');
   }
 }
@@ -602,13 +818,23 @@ async function loadHistory() {
     const j = await r.json();
     const items = Array.isArray(j.items) ? j.items : [];
     if (!items.length) { list.innerHTML = '<div class="list-empty">Aucune extraction encore. Upload un fichier ci-dessus.</div>'; return; }
-    list.innerHTML = items.map(item => ''
-      + '<div class="hist-card" data-id="' + escapeHtml(item.id) + '">'
+    list.innerHTML = items.map(item => {
+      const partsCount = item.partsCount || 1;
+      const dur = item.totalDurationMs || item.audioDurationMs || 0;
+      const partsLabel = partsCount > 1
+        ? partsCount + ' fichiers · ' + fmtTcMs(dur)
+        : fmtTcMs(dur);
+      const partsTitle = (partsCount > 1 && Array.isArray(item.parts))
+        ? ' title="' + escapeHtml(item.parts.map(p => p.filename).join(' + ')) + '"'
+        : '';
+      return ''
+      + '<div class="hist-card" data-id="' + escapeHtml(item.id) + '"' + partsTitle + '>'
       +   '<span class="hist-title">' + escapeHtml(item.title || 'Sans titre') + '</span>'
-      +   '<span class="hist-meta">' + escapeHtml(fmtDate(item.createdAt)) + ' · ' + escapeHtml(String(item.passagesCount)) + ' passage(s)</span>'
+      +   '<span class="hist-meta">' + escapeHtml(fmtDate(item.createdAt)) + ' · ' + escapeHtml(partsLabel) + ' · ' + escapeHtml(String(item.passagesCount)) + ' passage(s)</span>'
       +   '<button class="hist-btn" data-act="open">Ouvrir</button>'
       +   '<button class="hist-btn danger" data-act="delete">🗑</button>'
-      + '</div>').join('');
+      + '</div>';
+    }).join('');
     document.querySelectorAll('.hist-card').forEach(card => {
       const id = card.getAttribute('data-id');
       card.querySelectorAll('[data-act]').forEach(btn => {

@@ -47,7 +47,12 @@ export async function onRequestGet({ request, env }) {
           id: v.id,
           title: v.title || 'Sans titre',
           originalFilename: v.originalFilename || '',
-          audioDurationMs: v.audioDurationMs || 0,
+          audioDurationMs: v.totalDurationMs || v.audioDurationMs || 0,
+          totalDurationMs: v.totalDurationMs || v.audioDurationMs || 0,
+          partsCount: Array.isArray(v.parts) ? v.parts.length : 1,
+          parts: Array.isArray(v.parts)
+            ? v.parts.map((p) => ({ filename: p.filename, durationMs: p.durationMs }))
+            : null,
           passagesCount: Array.isArray(v.passages) ? v.passages.length : 0,
           createdAt: v.createdAt || 0,
         });
