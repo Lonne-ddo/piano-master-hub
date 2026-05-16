@@ -662,9 +662,8 @@ async function runExtraction() {
     toast('Durée totale > 2h30, splitte en plusieurs extractions', 'error');
     return;
   }
-  if (totalMs > 60 * 60 * 1000) {
-    if (!confirm('Audio long (> 60 min). Le traitement prendra ~2-3 min. Continuer ?')) return;
-  }
+  // Warning textuel déjà affiché à côté de la durée totale si > 60 min,
+  // pas besoin de double validation par confirm() bloquant.
 
   dropzone.classList.add('disabled');
   extractBtn.disabled = true;
