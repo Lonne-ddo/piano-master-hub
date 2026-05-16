@@ -224,10 +224,12 @@ export async function onRequestPost({ request, env }) {
   } catch {}
   if (!Array.isArray(partsMetadata)) partsMetadata = [];
 
-  // Hard cap durée totale 40min (anti-abuse + protection timeout)
+  // Hard cap durée totale 2h30 (Whisper parallèle absorbe les longs audios).
+  // Worst case Groq Whisper sur 2h en parallèle : ~90s + Claude 30s = sous
+  // le timeout 240s du stream serveur (cf abortCtrl ci-dessous).
   const totalMetaMs = partsMetadata.reduce((acc, p) => acc + (Number(p?.durationMs) || 0), 0);
-  if (totalMetaMs > 40 * 60 * 1000) {
-    return new Response(JSON.stringify({ error: 'total_duration_too_long', maxMinutes: 40 }), {
+  if (totalMetaMs > 150 * 60 * 1000) {
+    return new Response(JSON.stringify({ error: 'total_duration_too_long', maxMinutes: 150 }), {
       status: 413, headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }

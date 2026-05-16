@@ -544,12 +544,17 @@ fileInput.addEventListener('change', () => {
 extractBtn.addEventListener('click', () => { runExtraction(); });
 
 function addFiles(fileList) {
-  for (const f of fileList) {
+  // Tri naturel par filename avant ajout : 'part01' < 'part02' < 'part10'
+  // via localeCompare numeric. Préserve l'ordre relatif des fichiers du
+  // même batch ; l'user peut toujours réordonner manuellement après.
+  const sorted = fileList.slice().sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+  );
+  for (const f of sorted) {
     if (f.size > 100 * 1024 * 1024) { toast('Fichier > 100 Mo : ' + f.name, 'error'); continue; }
     const uid = ++uidCounter;
     const part = { uid, file: f, durationMs: null };
     parts.push(part);
-    // Lit la durée via <audio> metadata (extrait même d'un <video> source mp4)
     readMediaDuration(f).then((ms) => {
       part.durationMs = ms;
       renderParts();
@@ -611,9 +616,19 @@ function renderParts() {
   }).join('');
 
   const totalMs = cumul;
-  const totalWarn = totalMs > 30 * 60 * 1000;
+  const totalWarn = totalMs > 60 * 60 * 1000;
+  // Check si l'ordre courant matche le tri naturel des filenames (rassure
+  // que les parts sont dans le bon ordre temporel pour une vidéo finale).
+  const sortedNames = parts.map((p) => p.file.name).slice()
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  const naturalOrder = parts.length > 1
+    && parts.every((p, i) => p.file.name === sortedNames[i]);
+  const orderBadge = (parts.length > 1 && naturalOrder)
+    ? '<span style="color:var(--green);margin-left:8px;font-size:11px;">✓ ordre alphabétique</span>'
+    : '';
   partsTotalEl.innerHTML = 'Durée totale finale : ' + (allReady ? fmtDur(totalMs) : '…')
-    + (totalWarn ? '<span class="warn">⚠ > 30 min — risque timeout</span>' : '');
+    + orderBadge
+    + (totalWarn ? '<span class="warn">⚠ audio long — traitement ~2-3 min</span>' : '');
   extractBtn.disabled = !allReady || parts.length === 0;
 
   partsRowsEl.querySelectorAll('.parts-row').forEach((row) => {
@@ -643,12 +658,12 @@ async function runExtraction() {
   if (!allReady) { toast('Attends la lecture des métadonnées', 'error'); return; }
 
   const totalMs = parts.reduce((acc, p) => acc + (p.durationMs || 0), 0);
-  if (totalMs > 40 * 60 * 1000) {
-    toast('Durée totale > 40 min, splitte en plusieurs extractions', 'error');
+  if (totalMs > 150 * 60 * 1000) {
+    toast('Durée totale > 2h30, splitte en plusieurs extractions', 'error');
     return;
   }
-  if (totalMs > 30 * 60 * 1000) {
-    if (!confirm('Durée totale > 30 min, risque de timeout. Continuer ?')) return;
+  if (totalMs > 60 * 60 * 1000) {
+    if (!confirm('Audio long (> 60 min). Le traitement prendra ~2-3 min. Continuer ?')) return;
   }
 
   dropzone.classList.add('disabled');
