@@ -43,7 +43,14 @@ function genId() {
   return out;
 }
 
-const SHORTS_SYSTEM_PROMPT = `Tu es un éditeur de contenu social media spécialisé piano/musique. Tu reçois la transcription d'un cours ou d'une conversation prof-élève piano avec timecodes. Identifie 3 à 7 passages qui formeraient un clip court (<60s, idéalement 20-45s) postable sur Instagram Reels, YouTube Shorts ou TikTok.
+const SHORTS_SYSTEM_PROMPT = `Tu es un éditeur de contenu social media spécialisé piano/musique. Tu reçois la transcription d'un cours ou d'une conversation prof-élève piano avec timecodes. Identifie les passages qui formeraient un clip court (<60s, idéalement 20-45s) postable sur Instagram Reels, YouTube Shorts ou TikTok.
+
+PRIORITÉ ABSOLUE : CLARTÉ DE L'EXPLICATION.
+Un passage à 95 doit :
+- Livrer un concept piano de manière propre et fluide
+- Sans bafouillage majeur, sans hésitation longue
+- Avec une structure naturelle : pose le problème → explique → conclut
+- Compréhensible par un débutant-intermédiaire en piano
 
 CRITÈRES STRICTS :
 - Self-contained : le passage doit pouvoir être compris seul, sans contexte amont/aval. Démarre sur une phrase qui pose le sujet, finit sur une conclusion ou un punchline.
@@ -51,6 +58,12 @@ CRITÈRES STRICTS :
 - Hookable : le passage doit avoir une "accroche" dans les 3 premières secondes (question, statement fort, problème nommé).
 - Pas de filler : pas de "euh", "donc voilà", "vous voyez" en début ou fin. Trim aux frontières naturelles.
 - Durée : 15-60s strict. Sous 15s = pas assez de matière. Au-dessus de 60s = pas postable en short.
+
+SCORING (entier 0-100) :
+- 90+ : exceptionnel, à publier en priorité (clair, hookable, self-contained, punchy)
+- 75-89 : très bon, vaut le coup (clair + au moins 2 autres critères)
+- 60-74 : bon, publiable (clair mais manque de hook OU pas parfaitement self-contained)
+- < 60 : NE PAS RETOURNER ce passage (filtre-le toi-même).
 
 TYPES POSSIBLES :
 - "explication" : Lonne explique un concept (ex. "pourquoi le m7b5 sonne triste")
@@ -68,11 +81,13 @@ OUTPUT (JSON array strict, AUCUN texte ni markdown wrapper hors du JSON) :
     "type": "explication",
     "hook_title": "Titre punchy 5-8 mots, premier mot fort",
     "accroche": "Phrase d'ouverture suggérée 1-2 phrases, à dire par-dessus la vidéo en intro pour capter l'attention",
-    "raison": "Pourquoi ce passage marche en short, 1 phrase courte"
+    "raison": "Pourquoi ce passage marche en short, 1 phrase courte",
+    "score": 87
   }
 ]
 
-Classe par potentiel hook descendant (le meilleur en premier).
+Filtre toi-même les passages < 60 avant de retourner.
+Trie par score descendant strict (le meilleur en premier).
 Si l'audio n'a vraiment aucun passage qualifiable, retourne [].`;
 
 function extractJson(text) {
@@ -108,6 +123,11 @@ function validatePassages(rawList) {
     const hook_title = typeof p.hook_title === 'string' ? p.hook_title.trim().slice(0, 120) : '';
     const accroche = typeof p.accroche === 'string' ? p.accroche.trim().slice(0, 400) : '';
     const raison = typeof p.raison === 'string' ? p.raison.trim().slice(0, 200) : '';
+    // Score 0-100, clamp + filter < 60 (sécurité backend si Claude oublie de filtrer)
+    let score = Number(p.score);
+    if (!Number.isFinite(score)) score = 60;
+    score = Math.max(0, Math.min(100, Math.round(score)));
+    if (score < 60) continue;
     cleaned.push({
       start_ms: Math.round(start_ms),
       end_ms: Math.round(end_ms),
@@ -117,8 +137,11 @@ function validatePassages(rawList) {
       hook_title,
       accroche,
       raison,
+      score,
     });
   }
+  // Tri score desc (sécurité backend si Claude n'a pas trié)
+  cleaned.sort((a, b) => (b.score || 0) - (a.score || 0));
   return cleaned;
 }
 
@@ -177,6 +200,11 @@ export async function onRequestPost({ request, env }) {
   }
   if (!env.MASTERHUB_HISTORY) {
     return new Response(JSON.stringify({ error: 'kv_not_bound' }), {
+      status: 500, headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+  }
+  if (!env.ANALYSE_R2) {
+    return new Response(JSON.stringify({ error: 'r2_not_bound' }), {
       status: 500, headers: { ...CORS, 'Content-Type': 'application/json' },
     });
   }
@@ -252,6 +280,17 @@ export async function onRequestPost({ request, env }) {
       const abortCtrl = new AbortController();
       const tid = setTimeout(() => abortCtrl.abort(), 240000); // 4 min hard timeout (multi-file)
 
+      // ID généré tôt pour préfixer les keys R2 (shorts/<id>/part_N.ext)
+      const recordId = genId();
+      // ext par MIME pour le naming R2
+      const EXT_BY_MIME = {
+        'audio/mpeg': 'mp3', 'audio/mp3': 'mp3',
+        'audio/wav': 'wav', 'audio/x-wav': 'wav',
+        'audio/x-m4a': 'm4a', 'audio/mp4': 'm4a', 'audio/aac': 'm4a',
+        'audio/flac': 'flac', 'audio/x-flac': 'flac',
+        'video/mp4': 'mp4', 'video/quicktime': 'mov', 'video/webm': 'webm',
+      };
+
       // Helper : transcrit 1 fichier Groq Whisper.
       async function transcribeOne(file) {
         const gf = new FormData();
@@ -278,9 +317,30 @@ export async function onRequestPost({ request, env }) {
       }
 
       try {
-        // 1) Transcription en parallèle (Promise.allSettled)
+        // 1) Transcription Whisper + Upload R2 en parallèle (Promise.allSettled
+        //    indépendants). Le upload R2 ne bloque pas le SSE : il tourne
+        //    pendant que Whisper transcribe.
         emit({ step: 'transcribing', total: files.length });
-        let results = await Promise.allSettled(files.map(transcribeOne));
+
+        async function uploadOneToR2(file, index) {
+          const ext = EXT_BY_MIME[file.type] || 'bin';
+          const key = `shorts/${recordId}/part_${index}.${ext}`;
+          try {
+            await env.ANALYSE_R2.put(key, file.stream(), {
+              httpMetadata: { contentType: file.type },
+            });
+            return { ok: true, key, mimeType: file.type };
+          } catch (e) {
+            console.warn('[shorts] R2 upload failed', key, e?.message || e);
+            return { ok: false, key: null, error: e?.message || 'r2_put_failed' };
+          }
+        }
+
+        const [transcriptions, uploads] = await Promise.all([
+          Promise.allSettled(files.map(transcribeOne)),
+          Promise.allSettled(files.map((f, i) => uploadOneToR2(f, i))),
+        ]);
+        let results = transcriptions;
 
         // Retry séquentiel pour les 429 (rate limit Groq) — on attend 1.5s
         // entre chaque retry pour laisser la limite se reset.
@@ -347,12 +407,18 @@ export async function onRequestPost({ request, env }) {
             // les parts suivantes restent calées sur la vidéo finale.
             partDuration = Number(meta.durationMs) || 0;
           }
+          // R2 upload result (parallèle, indépendant de la transcription).
+          const upload = uploads[i];
+          const r2Key = (upload.status === 'fulfilled' && upload.value.ok) ? upload.value.key : null;
+          const mimeType = file.type;
           partsForKV.push({
             filename: String(file.name || ''),
             durationMs: partDuration,
             offsetMs: cumulativeOffsetMs,
             status: partOk ? 'ok' : 'failed',
             error: partOk ? null : (result.reason?.message || 'failed'),
+            r2Key,
+            mimeType,
           });
           cumulativeOffsetMs += partDuration;
         }
@@ -397,7 +463,7 @@ export async function onRequestPost({ request, env }) {
         const passages = validatePassages(rawList);
 
         // 5) Save KV — record enrichi avec parts[] (multi-file metadata)
-        const id = genId();
+        const id = recordId;
         const record = {
           id,
           title,

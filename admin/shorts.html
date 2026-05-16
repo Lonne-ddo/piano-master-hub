@@ -326,6 +326,76 @@
     }
     .pa-btn:hover { background: var(--v-dim); color: var(--v); border-color: var(--v); }
 
+    /* ── Redesign cards minimaliste ─────────────────────────── */
+    .passage-tc-btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      padding: 5px 11px;
+      border-radius: 14px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text1);
+      cursor: pointer;
+      transition: all .15s;
+      display: inline-flex; align-items: center; gap: 5px;
+      font-feature-settings: "tnum";
+    }
+    .passage-tc-btn:hover { background: var(--v-dim); color: var(--v); border-color: var(--v); }
+    .passage-tc-btn.playing {
+      background: var(--v-dim); color: var(--v); border-color: var(--v);
+      animation: tc-pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes tc-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(139,111,232,0.4); }
+      50%      { box-shadow: 0 0 0 4px rgba(139,111,232,0.05); }
+    }
+    .passage-score {
+      font-size: 12px; font-weight: 700;
+      color: #f0b429;
+      font-family: 'DM Mono', monospace;
+      font-feature-settings: "tnum";
+    }
+    .passage-kebab {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text3);
+      width: 26px; height: 26px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      display: inline-flex; align-items: center; justify-content: center;
+      transition: all .12s;
+      position: relative;
+    }
+    .passage-kebab:hover { background: var(--bg2); color: var(--text1); border-color: var(--border); }
+    .passage-menu {
+      position: absolute;
+      top: 30px; right: 0;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      min-width: 200px;
+      z-index: 100;
+      display: none;
+      padding: 4px;
+    }
+    .passage-menu.show { display: block; }
+    .passage-menu-item {
+      display: block; width: 100%;
+      padding: 8px 12px;
+      font-size: 12.5px;
+      color: var(--text1);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      text-align: left;
+      border-radius: 6px;
+      transition: background .1s;
+    }
+    .passage-menu-item:hover { background: var(--bg3); color: var(--v); }
+
     /* ── Historique ─────────────────────────────────────────── */
     .hist-card {
       background: var(--bg1);
@@ -740,11 +810,20 @@ async function runExtraction() {
   }
 }
 
-// ─── Render résultats ────────────────────────────────────
+// ─── Render résultats + player audio inline ──────────────
 let activePassages = [];
+let activeRecordId = null;
+let activeParts = [];          // [{ filename, durationMs, offsetMs, r2Key, mimeType }]
+let activeAudio = null;        // HTMLAudioElement courant (1 seule lecture à la fois)
+let activeAudioPartIdx = -1;
+let activeAudioBtn = null;
+let activeAudioStopTimer = null;
 
 function renderResults(payload) {
   activePassages = Array.isArray(payload.passages) ? payload.passages.slice() : [];
+  activeRecordId = payload.id || null;
+  activeParts = Array.isArray(payload.parts) ? payload.parts.slice() : [];
+  stopAudio(); // reset player si on switch d'extraction
   const section = document.getElementById('results-section');
   const title = document.getElementById('results-title');
   const list = document.getElementById('results-list');
@@ -762,25 +841,34 @@ function renderResults(payload) {
 }
 
 function renderPassageCard(p, idx) {
-  const tc = fmtTcMs(p.start_ms) + ' → ' + fmtTcMs(p.end_ms);
-  const dur = fmtDuration(p.duration_ms || (p.end_ms - p.start_ms));
+  const startTc = fmtTcMs(p.start_ms);
+  const scoreBadge = (typeof p.score === 'number')
+    ? '<span class="passage-score">★ ' + p.score + '</span>'
+    : '';
   return ''
     + '<div class="passage-card" data-idx="' + idx + '">'
     +   '<div class="passage-head">'
     +     '<span class="badge-type ' + escapeHtml(p.type || 'explication') + '">' + escapeHtml(p.type || 'explication') + '</span>'
-    +     '<span class="passage-tc">' + escapeHtml(tc) + '<span class="dur">(' + escapeHtml(dur) + ')</span></span>'
-    +     '<button class="passage-dismiss" data-act="dismiss" title="Masquer">✕</button>'
+    +     scoreBadge
+    +     '<button class="passage-tc-btn" data-act="play" data-idx="' + idx + '">'
+    +       '<span class="tc-icon">▶</span><span class="tc-text">' + escapeHtml(startTc) + '</span>'
+    +     '</button>'
+    +     '<span style="flex:1;"></span>'
+    +     '<div style="position:relative;">'
+    +       '<button class="passage-kebab" data-act="menu-toggle">⋮</button>'
+    +       '<div class="passage-menu" data-role="menu">'
+    +         '<button class="passage-menu-item" data-act="copy-tc">📋 Copier timecode</button>'
+    +         '<button class="passage-menu-item" data-act="copy-accroche">📝 Copier accroche</button>'
+    +         '<button class="passage-menu-item" data-act="copy-transcript">📄 Copier transcript</button>'
+    +         '<button class="passage-menu-item" data-act="toggle-transcript">👁 Voir le transcript</button>'
+    +         '<button class="passage-menu-item" data-act="dismiss">✕ Masquer cette card</button>'
+    +       '</div>'
+    +     '</div>'
     +   '</div>'
     +   (p.hook_title ? '<div class="passage-title">' + escapeHtml(p.hook_title) + '</div>' : '')
     +   (p.accroche ? '<div class="passage-accroche">"' + escapeHtml(p.accroche) + '"</div>' : '')
-    +   '<button class="passage-transcript-toggle" data-act="toggle-transcript">▼ Voir le transcript</button>'
     +   '<div class="passage-transcript">' + escapeHtml(p.transcript || '') + '</div>'
     +   (p.raison ? '<div class="passage-raison">💡 ' + escapeHtml(p.raison) + '</div>' : '')
-    +   '<div class="passage-actions">'
-    +     '<button class="pa-btn" data-act="copy-tc">📋 Copier timecode</button>'
-    +     '<button class="pa-btn" data-act="copy-accroche">📝 Copier accroche</button>'
-    +     '<button class="pa-btn" data-act="copy-transcript">📄 Copier transcript</button>'
-    +   '</div>'
     + '</div>';
 }
 
@@ -788,15 +876,25 @@ function bindPassageHandlers() {
   document.querySelectorAll('.passage-card').forEach(card => {
     const idx = parseInt(card.getAttribute('data-idx'), 10);
     card.querySelectorAll('[data-act]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
         const p = activePassages[idx];
         if (!p) return;
         const act = btn.getAttribute('data-act');
-        if (act === 'dismiss') { card.style.display = 'none'; }
+        const menu = card.querySelector('[data-role="menu"]');
+        if (act === 'menu-toggle') {
+          // Close all other menus
+          document.querySelectorAll('.passage-menu.show').forEach((m) => { if (m !== menu) m.classList.remove('show'); });
+          if (menu) menu.classList.toggle('show');
+          return;
+        }
+        // Tout autre click ferme le menu courant
+        if (menu) menu.classList.remove('show');
+        if (act === 'play') playPassage(idx, btn);
+        else if (act === 'dismiss') { card.style.display = 'none'; }
         else if (act === 'toggle-transcript') {
           const tr = card.querySelector('.passage-transcript');
-          tr.classList.toggle('show');
-          btn.textContent = tr.classList.contains('show') ? '▲ Masquer le transcript' : '▼ Voir le transcript';
+          if (tr) tr.classList.toggle('show');
         }
         else if (act === 'copy-tc') copyToClipboard(fmtTcMs(p.start_ms) + ' - ' + fmtTcMs(p.end_ms), 'Timecode copié');
         else if (act === 'copy-accroche') copyToClipboard(p.accroche || '', 'Accroche copiée');
@@ -804,6 +902,95 @@ function bindPassageHandlers() {
       });
     });
   });
+}
+
+// Click ailleurs ferme tous les menus kebab ouverts.
+document.addEventListener('click', () => {
+  document.querySelectorAll('.passage-menu.show').forEach((m) => m.classList.remove('show'));
+});
+
+function stopAudio() {
+  if (activeAudio) {
+    try { activeAudio.pause(); } catch {}
+    activeAudio.removeAttribute('src');
+    activeAudio.load();
+    activeAudio = null;
+  }
+  if (activeAudioStopTimer) { clearTimeout(activeAudioStopTimer); activeAudioStopTimer = null; }
+  if (activeAudioBtn) {
+    activeAudioBtn.classList.remove('playing');
+    const icon = activeAudioBtn.querySelector('.tc-icon');
+    if (icon) icon.textContent = '▶';
+    activeAudioBtn = null;
+  }
+  activeAudioPartIdx = -1;
+}
+
+function findPartIndex(absMs) {
+  if (!Array.isArray(activeParts) || !activeParts.length) return -1;
+  for (let i = 0; i < activeParts.length; i++) {
+    const p = activeParts[i];
+    const start = p.offsetMs || 0;
+    const end = start + (p.durationMs || 0);
+    if (absMs >= start && absMs < end) return i;
+  }
+  // Si absMs == total exact (cas borne haute), retourne la dernière part
+  return activeParts.length - 1;
+}
+
+function playPassage(idx, btn) {
+  const p = activePassages[idx];
+  if (!p) return;
+  // Si on re-click la même card en cours → toggle pause
+  if (activeAudioBtn === btn && activeAudio && !activeAudio.paused) {
+    stopAudio();
+    return;
+  }
+  stopAudio();
+
+  if (!activeRecordId) { toast('Audio non disponible — re-extrais pour activer', 'error'); return; }
+  const partIdx = findPartIndex(p.start_ms);
+  if (partIdx < 0) { toast('Partie introuvable', 'error'); return; }
+  const part = activeParts[partIdx];
+  if (!part || !part.r2Key) {
+    toast('Audio non disponible — re-extrais pour activer', 'error');
+    return;
+  }
+
+  const audio = document.createElement('audio');
+  audio.src = '/api/admin/shorts/' + encodeURIComponent(activeRecordId) + '/audio/' + partIdx;
+  audio.preload = 'auto';
+  const offsetSec = Math.max(0, (p.start_ms - (part.offsetMs || 0)) / 1000);
+  const durationSec = Math.max(0, (p.end_ms - p.start_ms) / 1000);
+
+  activeAudio = audio;
+  activeAudioPartIdx = partIdx;
+  activeAudioBtn = btn;
+
+  btn.classList.add('playing');
+  const icon = btn.querySelector('.tc-icon');
+  if (icon) icon.textContent = '⏸';
+
+  const startPlay = () => {
+    try { audio.currentTime = offsetSec; } catch {}
+    audio.play().catch((e) => {
+      console.warn('[shorts] play error', e?.message);
+      toast('Lecture impossible', 'error');
+      stopAudio();
+    });
+    // Auto-pause à end_ms
+    if (activeAudioStopTimer) clearTimeout(activeAudioStopTimer);
+    activeAudioStopTimer = setTimeout(() => { stopAudio(); }, durationSec * 1000);
+  };
+
+  // Si déjà ready, play direct ; sinon attend loadedmetadata
+  if (audio.readyState >= 1) startPlay();
+  else audio.addEventListener('loadedmetadata', startPlay, { once: true });
+  audio.addEventListener('ended', () => stopAudio(), { once: true });
+  audio.addEventListener('error', () => {
+    toast('Erreur chargement audio', 'error');
+    stopAudio();
+  }, { once: true });
 }
 
 function copyToClipboard(text, successMsg) {
@@ -870,7 +1057,12 @@ async function openHistoryItem(id) {
     if (!r.ok) { toast('Erreur chargement', 'error'); return; }
     const j = await r.json();
     if (!j.ok || !j.record) { toast('Record introuvable', 'error'); return; }
-    renderResults({ title: j.record.title, passages: j.record.passages, id });
+    renderResults({
+      title: j.record.title,
+      passages: j.record.passages,
+      parts: j.record.parts || [],
+      id,
+    });
     window.scrollTo({ top: document.getElementById('results-section').offsetTop - 20, behavior: 'smooth' });
   } catch { toast('Erreur réseau', 'error'); }
 }
