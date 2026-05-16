@@ -396,6 +396,74 @@
     }
     .passage-menu-item:hover { background: var(--bg3); color: var(--v); }
 
+    .passage-tc-btn .tc-sep { opacity: 0.5; }
+    .passage-tc-btn .tc-dur {
+      color: var(--text2);
+      font-size: 11px;
+    }
+    .passage-tc-btn.playing .tc-dur { color: var(--v); opacity: 0.9; }
+
+    .passage-overlay {
+      position: relative;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      background: linear-gradient(135deg, rgba(240,180,41,0.08), rgba(240,180,41,0.04));
+      border: 1px solid rgba(240,180,41,0.35);
+      border-radius: 8px;
+      color: #f6c971;
+      font-size: 14px;
+      font-style: italic;
+      line-height: 1.45;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+    }
+
+    .passage-scrubber {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 0;
+      margin-top: 6px;
+    }
+    .scrub-time-cur, .scrub-time-end {
+      font-family: 'DM Mono', monospace;
+      font-size: 11.5px;
+      color: var(--text3);
+      font-feature-settings: "tnum";
+      min-width: 36px;
+    }
+    .scrub-time-end { text-align: right; }
+    .scrub-range {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 3px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+      margin: 0;
+    }
+    .scrub-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--text3);
+      border: 2px solid var(--bg1);
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .scrub-range::-webkit-slider-thumb:hover { transform: scale(1.2); }
+    .scrub-range::-moz-range-thumb {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--text3);
+      border: 2px solid var(--bg1);
+      cursor: pointer;
+    }
+    .scrub-range.playing { background: rgba(139,111,232,0.18); }
+    .scrub-range.playing::-webkit-slider-thumb { background: var(--v); }
+    .scrub-range.playing::-moz-range-thumb { background: var(--v); }
+
     /* ── Historique ─────────────────────────────────────────── */
     .hist-card {
       background: var(--bg1);
@@ -535,8 +603,34 @@ function escapeHtml(s) {
   d.textContent = String(s);
   return d.innerHTML;
 }
+// Format timecode adaptatif :
+//   totalMs >= 3600s (1h)  → H:MM:SS (1:12:38)
+//   sinon                  → MM:SS (5:23)
+// Tous les passages d'une extraction utilisent le même format basé sur totalMs.
+function fmtTime(ms, totalMs) {
+  const s = Math.max(0, Math.floor((ms || 0) / 1000));
+  const total = Math.max(0, Math.floor((totalMs || 0) / 1000));
+  if (total >= 3600) {
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const r = s % 60;
+    return h + ':' + String(m).padStart(2, '0') + ':' + String(r).padStart(2, '0');
+  }
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m + ':' + String(r).padStart(2, '0');
+}
+// Durée d'un passage : <60s "Ns", sinon "MmSSs"
+function fmtPassageDur(ms) {
+  const s = Math.max(0, Math.round((ms || 0) / 1000));
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m + 'm' + String(r).padStart(2, '0') + 's';
+}
+// Compat : fmtTcMs ancien usage (sans totalMs) → MM:SS sans heures
 function fmtTcMs(ms) {
-  const s = Math.floor((ms || 0) / 1000);
+  const s = Math.max(0, Math.floor((ms || 0) / 1000));
   const m = Math.floor(s / 60);
   const r = s % 60;
   return m + ':' + String(r).padStart(2, '0');
@@ -814,15 +908,26 @@ async function runExtraction() {
 let activePassages = [];
 let activeRecordId = null;
 let activeParts = [];          // [{ filename, durationMs, offsetMs, r2Key, mimeType }]
+let activeTotalMs = 0;         // pour choix format MM:SS vs H:MM:SS cohérent
 let activeAudio = null;        // HTMLAudioElement courant (1 seule lecture à la fois)
 let activeAudioPartIdx = -1;
 let activeAudioBtn = null;
+let activeAudioCardIdx = -1;   // pour update scrubber lié
 let activeAudioStopTimer = null;
 
 function renderResults(payload) {
   activePassages = Array.isArray(payload.passages) ? payload.passages.slice() : [];
   activeRecordId = payload.id || null;
   activeParts = Array.isArray(payload.parts) ? payload.parts.slice() : [];
+  // totalMs : priorité payload.totalDurationMs/audioDurationMs, sinon max(end_ms) sur passages,
+  // sinon sum parts. Pour anciens records qui n'avaient pas le champ.
+  activeTotalMs = Number(payload.totalDurationMs) || Number(payload.audioDurationMs) || 0;
+  if (!activeTotalMs && activePassages.length) {
+    activeTotalMs = activePassages.reduce((m, p) => Math.max(m, p.end_ms || 0), 0);
+  }
+  if (!activeTotalMs && activeParts.length) {
+    activeTotalMs = activeParts.reduce((acc, p) => acc + (p.durationMs || 0), 0);
+  }
   stopAudio(); // reset player si on switch d'extraction
   const section = document.getElementById('results-section');
   const title = document.getElementById('results-title');
@@ -841,9 +946,14 @@ function renderResults(payload) {
 }
 
 function renderPassageCard(p, idx) {
-  const startTc = fmtTcMs(p.start_ms);
+  const startTc = fmtTime(p.start_ms, activeTotalMs);
+  const dur = fmtPassageDur(p.duration_ms || (p.end_ms - p.start_ms));
+  const durSec = Math.max(0, (p.end_ms - p.start_ms) / 1000);
   const scoreBadge = (typeof p.score === 'number')
     ? '<span class="passage-score">★ ' + p.score + '</span>'
+    : '';
+  const overlayHtml = (p.overlay_caption && String(p.overlay_caption).trim())
+    ? '<div class="passage-overlay">«&nbsp;' + escapeHtml(p.overlay_caption) + '&nbsp;»</div>'
     : '';
   return ''
     + '<div class="passage-card" data-idx="' + idx + '">'
@@ -851,13 +961,17 @@ function renderPassageCard(p, idx) {
     +     '<span class="badge-type ' + escapeHtml(p.type || 'explication') + '">' + escapeHtml(p.type || 'explication') + '</span>'
     +     scoreBadge
     +     '<button class="passage-tc-btn" data-act="play" data-idx="' + idx + '">'
-    +       '<span class="tc-icon">▶</span><span class="tc-text">' + escapeHtml(startTc) + '</span>'
+    +       '<span class="tc-icon">▶</span>'
+    +       '<span class="tc-text">' + escapeHtml(startTc) + '</span>'
+    +       '<span class="tc-sep">·</span>'
+    +       '<span class="tc-dur">' + escapeHtml(dur) + '</span>'
     +     '</button>'
     +     '<span style="flex:1;"></span>'
     +     '<div style="position:relative;">'
     +       '<button class="passage-kebab" data-act="menu-toggle">⋮</button>'
     +       '<div class="passage-menu" data-role="menu">'
     +         '<button class="passage-menu-item" data-act="copy-tc">📋 Copier timecode</button>'
+    +         '<button class="passage-menu-item" data-act="copy-overlay">🎬 Copier overlay caption</button>'
     +         '<button class="passage-menu-item" data-act="copy-accroche">📝 Copier accroche</button>'
     +         '<button class="passage-menu-item" data-act="copy-transcript">📄 Copier transcript</button>'
     +         '<button class="passage-menu-item" data-act="toggle-transcript">👁 Voir le transcript</button>'
@@ -866,7 +980,13 @@ function renderPassageCard(p, idx) {
     +     '</div>'
     +   '</div>'
     +   (p.hook_title ? '<div class="passage-title">' + escapeHtml(p.hook_title) + '</div>' : '')
+    +   overlayHtml
     +   (p.accroche ? '<div class="passage-accroche">"' + escapeHtml(p.accroche) + '"</div>' : '')
+    +   '<div class="passage-scrubber">'
+    +     '<span class="scrub-time-cur" data-role="cur">0:00</span>'
+    +     '<input type="range" class="scrub-range" data-role="range" min="0" max="' + durSec.toFixed(2) + '" step="0.1" value="0" data-idx="' + idx + '" />'
+    +     '<span class="scrub-time-end">' + escapeHtml(fmtTcMs((p.end_ms - p.start_ms) || 0)) + '</span>'
+    +   '</div>'
     +   '<div class="passage-transcript">' + escapeHtml(p.transcript || '') + '</div>'
     +   (p.raison ? '<div class="passage-raison">💡 ' + escapeHtml(p.raison) + '</div>' : '')
     + '</div>';
@@ -896,11 +1016,26 @@ function bindPassageHandlers() {
           const tr = card.querySelector('.passage-transcript');
           if (tr) tr.classList.toggle('show');
         }
-        else if (act === 'copy-tc') copyToClipboard(fmtTcMs(p.start_ms) + ' - ' + fmtTcMs(p.end_ms), 'Timecode copié');
+        else if (act === 'copy-tc') copyToClipboard(fmtTime(p.start_ms, activeTotalMs) + ' - ' + fmtTime(p.end_ms, activeTotalMs), 'Timecode copié');
+        else if (act === 'copy-overlay') copyToClipboard(p.overlay_caption || '', p.overlay_caption ? 'Overlay caption copié' : 'Aucun overlay caption');
         else if (act === 'copy-accroche') copyToClipboard(p.accroche || '', 'Accroche copiée');
         else if (act === 'copy-transcript') copyToClipboard(p.transcript || '', 'Transcript copié');
       });
     });
+    // Scrubber : seek manuel via range input
+    const scrubRange = card.querySelector('[data-role="range"]');
+    if (scrubRange) {
+      scrubRange.addEventListener('input', () => {
+        if (activeAudioCardIdx !== idx || !activeAudio) return;
+        const p = activePassages[idx];
+        if (!p) return;
+        const partIdx = activeAudioPartIdx;
+        const part = activeParts[partIdx];
+        if (!part) return;
+        const offsetInPartSec = (p.start_ms - (part.offsetMs || 0)) / 1000;
+        try { activeAudio.currentTime = offsetInPartSec + parseFloat(scrubRange.value); } catch {}
+      });
+    }
   });
 }
 
@@ -923,7 +1058,18 @@ function stopAudio() {
     if (icon) icon.textContent = '▶';
     activeAudioBtn = null;
   }
+  // Reset scrubber sur la card précédemment active
+  if (activeAudioCardIdx >= 0) {
+    const prevCard = document.querySelector('.passage-card[data-idx="' + activeAudioCardIdx + '"]');
+    if (prevCard) {
+      const range = prevCard.querySelector('[data-role="range"]');
+      const cur = prevCard.querySelector('[data-role="cur"]');
+      if (range) { range.value = '0'; range.classList.remove('playing'); }
+      if (cur) cur.textContent = '0:00';
+    }
+  }
   activeAudioPartIdx = -1;
+  activeAudioCardIdx = -1;
 }
 
 function findPartIndex(absMs) {
@@ -966,10 +1112,26 @@ function playPassage(idx, btn) {
   activeAudio = audio;
   activeAudioPartIdx = partIdx;
   activeAudioBtn = btn;
+  activeAudioCardIdx = idx;
 
   btn.classList.add('playing');
   const icon = btn.querySelector('.tc-icon');
   if (icon) icon.textContent = '⏸';
+
+  const card = document.querySelector('.passage-card[data-idx="' + idx + '"]');
+  const range = card ? card.querySelector('[data-role="range"]') : null;
+  const cur = card ? card.querySelector('[data-role="cur"]') : null;
+  if (range) range.classList.add('playing');
+
+  // Sync scrubber sur timeupdate
+  audio.addEventListener('timeupdate', () => {
+    if (!card || !range || !cur) return;
+    const relSec = Math.max(0, audio.currentTime - offsetSec);
+    range.value = String(Math.min(durationSec, relSec));
+    cur.textContent = fmtTcMs(Math.round(relSec * 1000));
+    // Auto-stop si on dépasse end_ms (cas où le setTimeout fire un peu tard)
+    if (relSec >= durationSec) stopAudio();
+  });
 
   const startPlay = () => {
     try { audio.currentTime = offsetSec; } catch {}
@@ -978,12 +1140,11 @@ function playPassage(idx, btn) {
       toast('Lecture impossible', 'error');
       stopAudio();
     });
-    // Auto-pause à end_ms
+    // Auto-pause à end_ms (filet de sécurité — timeupdate stop avant si OK)
     if (activeAudioStopTimer) clearTimeout(activeAudioStopTimer);
-    activeAudioStopTimer = setTimeout(() => { stopAudio(); }, durationSec * 1000);
+    activeAudioStopTimer = setTimeout(() => { stopAudio(); }, (durationSec + 0.3) * 1000);
   };
 
-  // Si déjà ready, play direct ; sinon attend loadedmetadata
   if (audio.readyState >= 1) startPlay();
   else audio.addEventListener('loadedmetadata', startPlay, { once: true });
   audio.addEventListener('ended', () => stopAudio(), { once: true });
@@ -1023,8 +1184,8 @@ async function loadHistory() {
       const partsCount = item.partsCount || 1;
       const dur = item.totalDurationMs || item.audioDurationMs || 0;
       const partsLabel = partsCount > 1
-        ? partsCount + ' fichiers · ' + fmtTcMs(dur)
-        : fmtTcMs(dur);
+        ? partsCount + ' fichiers · ' + fmtTime(dur, dur)
+        : fmtTime(dur, dur);
       const partsTitle = (partsCount > 1 && Array.isArray(item.parts))
         ? ' title="' + escapeHtml(item.parts.map(p => p.filename).join(' + ')) + '"'
         : '';

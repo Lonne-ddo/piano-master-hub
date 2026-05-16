@@ -72,6 +72,24 @@ TYPES POSSIBLES :
 - "anecdote" : un mini-récit pédagogique ou une analogie
 - "punchline" : une révélation ou un statement contre-intuitif
 
+OVERLAY_CAPTION (NOUVEAU CHAMP) :
+Phrase courte (5-12 mots), punchy, à afficher en INCRUSTATION GRAPHIQUE sur la vidéo verticale Reel/TikTok.
+DIFFÉRENT du hook_title (titre style thumbnail YouTube) et de l'accroche (script parlé en intro).
+Objectif : arrêter le scroll en 1 seconde. Caractéristiques :
+- 5-12 mots strict, doit tenir en 2 lignes max sur écran vertical
+- Claim FORT, affirmation marquante OU promesse claire OU statement contre-intuitif
+- Pas de jargon technique piano hyper pointu (doit intriguer même un non-pianiste)
+- Pas de question rhétorique molle ("Tu connais ce truc ?") — préférer une affirmation
+- Style "scroll-stop"
+
+Exemples :
+- "Personne ne t'apprendra ça mais ça change ta façon de jouer"
+- "Le pire accord à éviter quand tu débutes"
+- "L'astuce gospel que 99% des pianistes ignorent"
+- "Cet accord va transformer ton jeu"
+- "Comment sonner pro en 30 secondes"
+- "Tu joues toujours les mêmes accords ? Voilà pourquoi"
+
 OUTPUT (JSON array strict, AUCUN texte ni markdown wrapper hors du JSON) :
 [
   {
@@ -80,6 +98,7 @@ OUTPUT (JSON array strict, AUCUN texte ni markdown wrapper hors du JSON) :
     "transcript": "le texte exact du passage",
     "type": "explication",
     "hook_title": "Titre punchy 5-8 mots, premier mot fort",
+    "overlay_caption": "Personne ne t'apprendra ça mais ça change ta façon de jouer",
     "accroche": "Phrase d'ouverture suggérée 1-2 phrases, à dire par-dessus la vidéo en intro pour capter l'attention",
     "raison": "Pourquoi ce passage marche en short, 1 phrase courte",
     "score": 87
@@ -121,6 +140,7 @@ function validatePassages(rawList) {
     const type = (typeof p.type === 'string' && VALID_TYPES.has(p.type.toLowerCase()))
       ? p.type.toLowerCase() : 'explication';
     const hook_title = typeof p.hook_title === 'string' ? p.hook_title.trim().slice(0, 120) : '';
+    const overlay_caption = typeof p.overlay_caption === 'string' ? p.overlay_caption.trim().slice(0, 200) : '';
     const accroche = typeof p.accroche === 'string' ? p.accroche.trim().slice(0, 400) : '';
     const raison = typeof p.raison === 'string' ? p.raison.trim().slice(0, 200) : '';
     // Score 0-100, clamp + filter < 60 (sécurité backend si Claude oublie de filtrer)
@@ -135,6 +155,7 @@ function validatePassages(rawList) {
       transcript,
       type,
       hook_title,
+      overlay_caption,
       accroche,
       raison,
       score,
