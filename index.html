@@ -876,7 +876,7 @@
     function renderDynamicSkeleton() {
         document.getElementById("hero-zone").innerHTML =
             '<div class="mh-card mh-card-hero">' +
-                '<div class="mh-hero-head"><div class="mh-section-label">Prochaine séance</div></div>' +
+                '<div class="mh-hero-head"><div class="mh-section-label">Programme en cours</div></div>' +
                 '<div class="mh-skeleton" style="width:60%; height:18px"></div>' +
                 '<div class="mh-skeleton" style="width:100%; height:2px; margin:14px 0 18px"></div>' +
                 '<div class="mh-section-label">Devoirs à préparer</div>' +
@@ -918,7 +918,7 @@
                 console.error('[espace] fetch failed:', e && e.message ? e.message : e);
                 document.getElementById("hero-zone").innerHTML =
                     '<div class="mh-card mh-card-hero">' +
-                        '<div class="mh-section-label">Prochaine séance</div>' +
+                        '<div class="mh-section-label">Programme en cours</div>' +
                         '<p class="mh-empty">Données momentanément indisponibles. Réessaie plus tard.</p>' +
                     '</div>';
                 document.getElementById("resume-zone").innerHTML = '';
@@ -998,7 +998,7 @@
         zone.innerHTML =
             '<div class="mh-card mh-card-hero">' +
                 '<div class="mh-hero-head">' +
-                    '<div class="mh-section-label">Prochaine séance</div>' +
+                    '<div class="mh-section-label">Programme en cours</div>' +
                     headDateHtml +
                 '</div>' +
                 titleHtml +
