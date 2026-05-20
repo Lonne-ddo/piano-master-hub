@@ -1,0 +1,461 @@
+/* ════════════════════════════════════════════════════════════════
+   Master Hub — Design System (Premium A)
+   Tokens + utility classes shared across all pages.
+   Charger AVANT toute feuille de style spécifique à la page.
+   Fonts (Cormorant Garamond + Plus Jakarta Sans) sont chargées via
+   <link rel="stylesheet"> dans le <head> des pages (FOUT-friendly).
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Backgrounds ── */
+  --mh-bg-base: #0a0a0f;
+  --mh-bg-card: rgba(255, 255, 255, 0.025);
+  --mh-bg-card-hover: rgba(255, 255, 255, 0.04);
+
+  /* ── Borders ── */
+  --mh-border-card: rgba(255, 255, 255, 0.05);
+  --mh-border-card-strong: rgba(255, 255, 255, 0.12);
+
+  /* ── Accent : OR (premium, CTA principal, hero) ── */
+  --mh-gold: #d5b048;
+  --mh-gold-glow: rgba(213, 176, 72, 0.14);
+  --mh-gold-border: rgba(213, 176, 72, 0.22);
+
+  /* ── Accent : VIOLET (pédagogie, secondaire) ── */
+  --mh-violet: #b9aef8;
+  --mh-violet-glow: rgba(139, 111, 232, 0.14);
+  --mh-violet-border: rgba(139, 111, 232, 0.35);
+
+  /* ── Accent : TEAL (audio tools) ── */
+  --mh-teal: #5dcaa5;
+  --mh-teal-glow: rgba(93, 202, 165, 0.14);
+
+  /* ── Accent : ROSE (creative tools) ── */
+  --mh-pink: #ed93b1;
+  --mh-pink-glow: rgba(244, 192, 209, 0.14);
+
+  /* ── Text ── */
+  --mh-text-primary: #f5f5f7;
+  --mh-text-secondary: rgba(255, 255, 255, 0.75);
+  --mh-text-tertiary: rgba(255, 255, 255, 0.5);
+  --mh-text-label: rgba(255, 255, 255, 0.32);
+
+  /* ── Fonts ── */
+  --mh-font-serif: 'Cormorant Garamond', Georgia, serif;
+  --mh-font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+
+  /* ── Radii ── */
+  --mh-radius-sm: 10px;
+  --mh-radius-md: 14px;
+  --mh-radius-lg: 18px;
+  --mh-radius-xl: 22px;
+
+  /* ── Shadows (réservés aux vraies pages, pas aux mockups widgets) ── */
+  --mh-shadow-card: 0 2px 12px rgba(0, 0, 0, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
+  --mh-shadow-hero: 0 4px 24px rgba(213, 176, 72, 0.06), inset 0 0.5px 0 rgba(213, 176, 72, 0.1);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Typographie utilitaires
+   ════════════════════════════════════════════════════════════════ */
+
+.mh-section-label {
+  font-family: var(--mh-font-sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--mh-text-label);
+  margin: 0 0 0.85rem;
+  line-height: 1.2;
+}
+
+.mh-title-hero {
+  font-family: var(--mh-font-serif);
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.18;
+  color: var(--mh-text-primary);
+  margin: 0;
+}
+
+.mh-title-section {
+  font-family: var(--mh-font-serif);
+  font-size: 17.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  color: var(--mh-text-primary);
+  margin: 0;
+}
+
+@media (min-width: 420px) {
+  .mh-title-hero    { font-size: 24px; }
+  .mh-title-section { font-size: 18px; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Cards
+   ════════════════════════════════════════════════════════════════ */
+
+.mh-card {
+  display: block;
+  background: var(--mh-bg-card);
+  border: 1px solid var(--mh-border-card);
+  border-radius: var(--mh-radius-lg);
+  padding: 1.25rem;
+  color: var(--mh-text-primary);
+  text-decoration: none;
+  transition: background 200ms ease, border-color 200ms ease, transform 80ms ease;
+}
+
+.mh-card:hover {
+  background: var(--mh-bg-card-hover);
+}
+
+.mh-card:active {
+  transform: scale(0.98);
+}
+
+/* Hero (or premium) card */
+.mh-card-hero {
+  background: rgba(213, 176, 72, 0.06);
+  border-color: var(--mh-gold-border);
+  box-shadow: var(--mh-shadow-hero);
+}
+
+.mh-card-hero:hover {
+  background: rgba(213, 176, 72, 0.08);
+}
+
+/* Layout horizontal pour les rangées (admin tool rows) */
+.mh-card-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mh-card-row .mh-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Layout vertical pour les ressources (icon top, title + sub) */
+.mh-card-stack {
+  padding: 1.1rem 1rem;
+}
+
+.mh-card-stack .mh-icon-box {
+  margin-bottom: 12px;
+}
+
+.mh-card-title {
+  font-family: var(--mh-font-serif);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--mh-text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  margin: 0 0 2px;
+}
+
+.mh-card-sub {
+  font-family: var(--mh-font-sans);
+  font-size: 12.5px;
+  color: var(--mh-text-tertiary);
+  line-height: 1.35;
+  margin: 0;
+}
+
+/* Grille 2 colonnes pour les ressources */
+.mh-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Pile verticale (sections) */
+.mh-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Icon boxes
+   ════════════════════════════════════════════════════════════════ */
+
+.mh-icon-box {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.mh-icon-box .ti       { font-size: 20px; }
+
+.mh-icon-box.gold      { background: var(--mh-gold-glow);     color: var(--mh-gold);   }
+.mh-icon-box.violet    { background: var(--mh-violet-glow);   color: var(--mh-violet); }
+.mh-icon-box.teal      { background: var(--mh-teal-glow);     color: var(--mh-teal);   }
+.mh-icon-box.pink      { background: var(--mh-pink-glow);     color: var(--mh-pink);   }
+.mh-icon-box.neutral   { background: rgba(255, 255, 255, 0.05); color: var(--mh-text-secondary); }
+
+/* ════════════════════════════════════════════════════════════════
+   Buttons
+   ════════════════════════════════════════════════════════════════ */
+
+.mh-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--mh-gold);
+  color: #1a1a1f;
+  border: none;
+  border-radius: var(--mh-radius-md);
+  font-family: var(--mh-font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  transition: filter 150ms ease, transform 80ms ease;
+}
+
+.mh-btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.mh-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.mh-btn-primary .ti {
+  font-size: 18px;
+}
+
+.mh-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  background: transparent;
+  color: var(--mh-violet);
+  border: 1px solid var(--mh-violet-border);
+  border-radius: var(--mh-radius-sm);
+  font-family: var(--mh-font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.mh-btn-secondary:hover {
+  background: var(--mh-violet-glow);
+  border-color: var(--mh-violet);
+}
+
+.mh-btn-secondary .ti {
+  font-size: 14px;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Chevron
+   ════════════════════════════════════════════════════════════════ */
+
+.mh-chevron-right {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+  line-height: 1;
+  display: inline-flex;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Badges
+   ════════════════════════════════════════════════════════════════ */
+
+.mh-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  font-family: var(--mh-font-sans);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.mh-badge.gold {
+  background: var(--mh-gold-glow);
+  color: var(--mh-gold);
+  border: 1px solid var(--mh-gold-border);
+}
+
+/* Inline stat à droite d'une rangée admin (compteurs) */
+.mh-inline-stat {
+  font-family: var(--mh-font-sans);
+  font-size: 11.5px;
+  color: var(--mh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Bullets (devoirs / résumé)
+   ════════════════════════════════════════════════════════════════ */
+
+.mh-bullets {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.mh-bullets li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-family: var(--mh-font-sans);
+  font-size: 0.93rem;
+  line-height: 1.5;
+  color: var(--mh-text-secondary);
+  white-space: pre-wrap;
+}
+
+.mh-bullets li::before {
+  content: "•";
+  color: var(--mh-text-tertiary);
+  flex-shrink: 0;
+  font-size: 1.1rem;
+  line-height: 1.3;
+  margin-top: -2px;
+}
+
+.mh-bullets.mh-bullets-gold   li::before { color: var(--mh-gold);   }
+.mh-bullets.mh-bullets-violet li::before { color: var(--mh-violet); }
+
+/* ════════════════════════════════════════════════════════════════
+   Progress bar fine
+   ════════════════════════════════════════════════════════════════ */
+
+.mh-progress {
+  width: 100%;
+  height: 2px;
+  background: rgba(213, 176, 72, 0.16);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.mh-progress-fill {
+  height: 100%;
+  background: var(--mh-gold);
+  border-radius: 999px;
+  transition: width 400ms ease;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Footer
+   ════════════════════════════════════════════════════════════════ */
+
+.mh-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 0 8px;
+  font-family: var(--mh-font-sans);
+  font-size: 12.5px;
+  color: var(--mh-text-tertiary);
+}
+
+.mh-footer .mh-footer-spacer { flex: 1; }
+
+.mh-link-muted {
+  background: none;
+  border: none;
+  color: var(--mh-text-tertiary);
+  font-family: var(--mh-font-sans);
+  font-size: 12.5px;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 6px 4px;
+  transition: color 150ms ease;
+}
+
+.mh-link-muted:hover {
+  color: var(--mh-text-secondary);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Animations subtiles
+   ════════════════════════════════════════════════════════════════ */
+
+@keyframes mh-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.mh-fade-in {
+  animation: mh-fade-in 400ms ease-out both;
+}
+
+.mh-stagger > * {
+  animation: mh-fade-in 400ms ease-out both;
+  opacity: 0;
+}
+
+.mh-stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.mh-stagger > *:nth-child(2) { animation-delay: 0.08s; }
+.mh-stagger > *:nth-child(3) { animation-delay: 0.12s; }
+.mh-stagger > *:nth-child(4) { animation-delay: 0.16s; }
+.mh-stagger > *:nth-child(5) { animation-delay: 0.20s; }
+.mh-stagger > *:nth-child(6) { animation-delay: 0.24s; }
+.mh-stagger > *:nth-child(7) { animation-delay: 0.28s; }
+.mh-stagger > *:nth-child(8) { animation-delay: 0.32s; }
+
+/* ════════════════════════════════════════════════════════════════
+   Sections (label + section group)
+   ════════════════════════════════════════════════════════════════ */
+
+.mh-section {
+  margin-top: 24px;
+}
+
+.mh-section:first-child {
+  margin-top: 0;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Reduced motion
+   ════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .mh-fade-in,
+  .mh-stagger > * {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .mh-card,
+  .mh-btn-primary,
+  .mh-btn-secondary {
+    transition: none;
+  }
+}

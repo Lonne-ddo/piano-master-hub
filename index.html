@@ -4,13 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Master Hub — Espace élève</title>
-    <meta name="theme-color" content="#0f0f14">
+    <meta name="theme-color" content="#0a0a0f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Master Hub">
     <meta name="description" content="Master Hub — Espace élève. Accédez à vos cours, ressources et réservations.">
     <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+">
     <link rel="apple-touch-icon" sizes="180x180" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+">
+
+    <!-- Fonts : préconnect pour éviter le FOUT, puis chargement du Cormorant + Plus Jakarta -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap">
+
+    <!-- Tabler Icons (webfont) -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.30.0/dist/tabler-icons.min.css">
+
+    <!-- Design system Master Hub (tokens + utility classes) -->
+    <link rel="stylesheet" href="/assets/css/design-system.css">
+    <link rel="stylesheet" href="/assets/css/multitrack.css">
+
     <script>window.Koalendar=window.Koalendar||function(){(Koalendar.props=Koalendar.props||[]).push(arguments)};</script>
     <script async src="https://koalendar.com/assets/widget.js"></script>
     <script type="application/manifest+json">
@@ -20,8 +34,8 @@
         "description": "Espace élève — Master Hub",
         "start_url": ".",
         "display": "standalone",
-        "background_color": "#0f0f14",
-        "theme_color": "#0f0f14",
+        "background_color": "#0a0a0f",
+        "theme_color": "#0a0a0f",
         "icons": [
             {
                 "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+",
@@ -37,24 +51,13 @@
     }
     </script>
     <style>
-        :root {
-            --bg: #0f0f14;
-            --bg-card: #1a1a24;
-            --bg-card-hover: #22222f;
-            --text: #eee;
-            --text-muted: #888;
-            --accent: #c9a84c;
-            --accent-soft: rgba(201, 168, 76, 0.12);
-            --radius: 16px;
-            --tap-min: 48px;
-        }
-
+        /* ── Reset minimal ── */
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg);
-            color: var(--text);
+            font-family: var(--mh-font-sans);
+            background: var(--mh-bg-base);
+            color: var(--mh-text-primary);
             min-height: 100vh;
             min-height: 100dvh;
             -webkit-font-smoothing: antialiased;
@@ -71,671 +74,352 @@
             z-index: 0;
         }
 
-        .container {
+        .mh-container {
             position: relative;
             z-index: 1;
             max-width: 480px;
             margin: 0 auto;
-            padding: 24px 16px 40px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            padding: 28px 18px 40px;
             min-height: 100vh;
             min-height: 100dvh;
-            justify-content: flex-start;
+            display: flex;
+            flex-direction: column;
         }
 
-        /* Header */
-        .header {
+        /* ── Header ── */
+        .mh-header {
             text-align: center;
-            padding: 32px 0 8px;
-            width: 100%;
             display: flex;
             flex-direction: column;
             align-items: center;
-        }
-
-        .header .logo {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 16px;
-            display: block;
-        }
-
-        .header h1 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            color: #ffffff;
-        }
-
-        .header .subtitle {
-            font-size: 0.95rem;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        .greeting {
-            text-align: center;
-            font-size: 15px;
-            color: rgba(255, 255, 255, 0.7);
-            margin-top: 8px;
-            font-weight: 400;
-        }
-
-        #content {
-            width: 100%;
-        }
-
-        /* Cards */
-        .cards {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 28px;
-            width: 100%;
-        }
-
-        .card {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            background: var(--bg-card);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: var(--radius);
-            padding: 16px;
-            text-decoration: none;
-            color: var(--text);
-            min-height: var(--tap-min);
-            transition: background 0.2s, transform 0.15s;
-            opacity: 0;
-            transform: translateY(12px);
-            animation: fadeInUp 0.4s ease forwards;
-        }
-
-        .card:nth-child(1) { animation-delay: 0.05s; }
-        .card:nth-child(2) { animation-delay: 0.10s; }
-        .card:nth-child(3) { animation-delay: 0.15s; }
-        .card:nth-child(4) { animation-delay: 0.20s; }
-        .card:nth-child(5) { animation-delay: 0.25s; }
-        .card:nth-child(6) { animation-delay: 0.30s; }
-        .card:nth-child(7) { animation-delay: 0.35s; }
-
-        @keyframes fadeInUp {
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .card:active {
-            transform: scale(0.97);
-            background: var(--bg-card-hover);
-        }
-
-        @media (hover: hover) {
-            .card:hover {
-                background: var(--bg-card-hover);
-                transform: translateY(-2px);
-            }
-        }
-
-        .card-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
-            background: var(--accent-soft);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            font-size: 1.3rem;
-        }
-
-        .card-body {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .card-title {
-            font-size: 1rem;
-            font-weight: 600;
-            line-height: 1.3;
-        }
-
-        .card-sub {
-            font-size: 0.82rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        .card-arrow {
-            color: var(--text-muted);
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
-
-        /* Koalendar inline widget */
-        .koalendar-section {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.4s ease, opacity 0.3s ease;
-            opacity: 0;
-        }
-
-        .koalendar-section.open {
-            max-height: 800px;
-            opacity: 1;
-        }
-
-        .koalendar-wrapper {
-            background: var(--bg-card);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: var(--radius);
-            padding: 16px 8px;
-            margin-top: 4px;
-        }
-
-        .koalendar-wrapper iframe {
-            border-radius: 8px;
-        }
-
-        .card-chevron {
-            color: var(--text-muted);
-            font-size: 1.1rem;
-            flex-shrink: 0;
-            transition: transform 0.3s ease;
-            display: inline-block;
-        }
-
-        .card-chevron.open {
-            transform: rotate(180deg);
-        }
-
-        /* Écran login (email magic link — Chantier C) */
-        .login-section {
-            width: 100%;
-            margin-top: 28px;
-            background: var(--bg-card);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: var(--radius);
-            padding: 24px 20px;
-        }
-
-        .login-section h2 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 6px;
-        }
-
-        .login-section .lead {
-            font-size: 0.88rem;
-            color: var(--text-muted);
-            margin-bottom: 18px;
-        }
-
-        .login-error-msg {
-            background: rgba(255, 107, 107, 0.08);
-            border: 1px solid rgba(255, 107, 107, 0.25);
-            color: #ff8a8a;
-            padding: 10px 12px;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            margin-bottom: 14px;
-            line-height: 1.4;
-        }
-
-        .login-form {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-
-        .login-input {
-            width: 100%;
-            padding: 14px 16px;
-            background: var(--bg);
-            color: var(--text);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 12px;
-            font-size: 16px;
-            font-family: inherit;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .login-input:focus {
-            border-color: var(--accent);
-        }
-
-        .login-input:disabled {
-            opacity: 0.6;
-        }
-
-        .login-submit {
-            width: 100%;
-            padding: 14px 16px;
-            background: var(--accent);
-            color: #0f0f14;
-            border: none;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: inherit;
-            min-height: var(--tap-min);
-            transition: opacity 0.2s, transform 0.15s;
-        }
-
-        .login-submit:active {
-            transform: scale(0.97);
-            opacity: 0.85;
-        }
-
-        .login-submit[disabled] {
-            opacity: 0.6;
-            cursor: wait;
-        }
-
-        .login-status {
-            font-size: 0.88rem;
-            margin-top: 14px;
-            min-height: 1em;
-            line-height: 1.45;
-        }
-
-        .login-status.ok {
-            color: #5ecb8b;
-            background: rgba(94, 203, 139, 0.08);
-            border: 1px solid rgba(94, 203, 139, 0.25);
-            padding: 12px 14px;
-            border-radius: 8px;
-        }
-
-        .login-status.err {
-            color: #ff8a8a;
-        }
-
-        .login-help {
-            margin-top: 18px;
-            text-align: center;
-            font-size: 0.82rem;
-            color: var(--text-muted);
-        }
-
-        .login-help a {
-            color: var(--accent);
-            text-decoration: none;
-        }
-        .login-help a:hover { text-decoration: underline; }
-
-        /* Footer "Changer de profil" */
-        .footer-actions {
-            margin-top: 32px;
-            text-align: center;
-            width: 100%;
-        }
-
-        .footer-actions button {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            font-size: 0.82rem;
-            cursor: pointer;
-            font-family: inherit;
-            padding: 8px 12px;
-        }
-
-        .footer-actions button:hover {
-            color: var(--text);
-            text-decoration: underline;
-        }
-
-        /* ── Dashboard élève ─────────────────────────────────── */
-
-        .programme-block {
-            width: 100%;
-            margin-top: 24px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: var(--radius);
-            padding: 14px 18px;
-        }
-
-        .programme-meta {
-            font-size: 0.88rem;
-            color: var(--text-muted);
-            line-height: 1.5;
-            margin-bottom: 10px;
-        }
-
-        .programme-meta strong {
-            color: var(--text);
-            font-weight: 600;
-        }
-
-        .progress-track {
-            width: 100%;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.06);
-            border-radius: 999px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: var(--accent);
-            border-radius: 999px;
-            transition: width 0.4s ease;
-        }
-
-        /* Devoirs — accent violet, mis en avant */
-        .devoirs-block {
-            width: 100%;
-            margin-top: 16px;
-            background: rgba(139, 111, 232, 0.08);
-            border: 1px solid rgba(139, 111, 232, 0.3);
-            border-radius: var(--radius);
-            padding: 22px 22px 20px;
-        }
-
-        .devoirs-block h2 {
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 14px;
-        }
-
-        .devoirs-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .devoirs-list li {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            font-size: 0.95rem;
-            line-height: 1.5;
-            color: var(--text);
-            white-space: pre-wrap;
-        }
-
-        .devoirs-list li::before {
-            content: "•";
-            color: #8B6FE8;
-            font-size: 1.25rem;
-            line-height: 1;
-            flex-shrink: 0;
-            margin-top: 2px;
-        }
-
-        /* ── Bandeau impersonation admin (mode "Voir son espace") ── */
-        .impersonation-banner {
-            display: flex;
-            align-items: center;
-            justify-content: center;
             gap: 14px;
-            flex-wrap: wrap;
-            background: #FB923C;
-            color: #1a1a1a;
-            padding: 12px 16px;
-            border-radius: 10px;
-            font-size: 0.88rem;
-            font-weight: 500;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 12px rgba(251, 146, 60, 0.25);
+            padding: 24px 0 8px;
         }
-        .impersonation-banner strong { font-weight: 700; }
-        .impersonation-banner button {
-            background: #1a1a1a;
-            color: #FB923C;
-            border: none;
-            padding: 6px 14px;
-            border-radius: 6px;
-            font-family: inherit;
-            font-size: 0.82rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.15s;
-        }
-        .impersonation-banner button:hover { opacity: 0.85; }
-        .impersonation-banner button:disabled { opacity: 0.5; cursor: wait; }
 
-        .devoirs-empty {
-            font-size: 0.92rem;
-            color: var(--text-muted);
-            line-height: 1.5;
+        .mh-header .mh-logo {
+            width: 56px;
+            height: 56px;
         }
-        .devoirs-h2 { display: flex; align-items: center; gap: 8px; }
-        .devoirs-refresh {
+
+        .mh-header .mh-greeting {
+            font-family: var(--mh-font-sans);
+            font-size: 14px;
+            color: var(--mh-text-secondary);
+            margin-top: -4px;
+        }
+
+        /* ── Hero card (prochaine séance + devoirs fusionnés) ── */
+        .mh-hero-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+        .mh-hero-head .mh-section-label { margin: 0; }
+        .mh-hero-head-date {
+            font-family: var(--mh-font-sans);
+            font-size: 11.5px;
+            font-weight: 500;
+            color: var(--mh-gold);
+            opacity: 0.85;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .mh-hero-title { margin-bottom: 16px; }
+        .mh-hero-progress { margin-bottom: 22px; }
+        .mh-hero-devoirs-label { margin-bottom: 0.7rem; }
+
+        /* ── Devoirs refresh button (inline dans le label devoirs) ── */
+        .mh-devoirs-label-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 0.7rem;
+        }
+        .mh-devoirs-label-row .mh-section-label { margin: 0; }
+
+        .mh-devoirs-refresh {
             background: transparent;
             border: none;
-            color: var(--text-muted);
-            opacity: 0.5;
+            color: var(--mh-text-label);
             cursor: pointer;
             padding: 4px;
             border-radius: 6px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            transition: opacity 0.15s, color 0.15s, background 0.15s;
+            transition: color 150ms ease, background 150ms ease;
         }
-        .devoirs-refresh:hover {
-            opacity: 1;
-            color: var(--v, #8B6FE8);
-            background: rgba(255,255,255,0.04);
+        .mh-devoirs-refresh:hover {
+            color: var(--mh-gold);
+            background: rgba(255, 255, 255, 0.04);
         }
-        .devoirs-refresh.spinning svg { animation: devoirs-spin 0.8s linear infinite; }
-        @keyframes devoirs-spin {
+        .mh-devoirs-refresh.spinning svg { animation: mh-devoirs-spin 0.8s linear infinite; }
+        @keyframes mh-devoirs-spin {
             from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
+            to   { transform: rotate(360deg); }
         }
-        .devoirs-toast {
+
+        /* Toast devoirs */
+        .mh-toast {
             position: fixed;
             bottom: 24px;
             left: 50%;
             transform: translateX(-50%) translateY(8px);
             padding: 9px 16px;
-            background: rgba(15,15,20,0.95);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(15, 15, 20, 0.95);
+            border: 1px solid var(--mh-border-card-strong);
             border-radius: 10px;
-            color: #eee;
+            color: var(--mh-text-primary);
+            font-family: var(--mh-font-sans);
             font-size: 12.5px;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.2s, transform 0.2s;
             z-index: 9999;
         }
-        .devoirs-toast.show {
+        .mh-toast.show {
             opacity: 1;
             transform: translateX(-50%) translateY(0);
         }
-        .devoirs-toast.success {
-            border-color: rgba(94,203,139,0.45);
-            color: #5ecb8b;
-        }
-        .devoirs-toast.error {
-            border-color: rgba(224,92,107,0.5);
-            color: #f87171;
-        }
+        .mh-toast.success { border-color: rgba(94, 203, 139, 0.45); color: #5ecb8b; }
+        .mh-toast.error   { border-color: rgba(224, 92, 107, 0.5);  color: #f87171; }
 
-        /* Résumé du dernier cours */
-        .resume-block {
-            width: 100%;
-            margin-top: 16px;
-            background: var(--bg-card);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: var(--radius);
-            padding: 20px;
-        }
-
-        .resume-block h2 {
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 4px;
-        }
-
-        .resume-block .resume-meta {
-            font-size: 0.82rem;
-            color: var(--text-muted);
-            margin-bottom: 14px;
-        }
-
-        .resume-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 18px;
-        }
-
-        .resume-list li {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            font-size: 0.92rem;
-            line-height: 1.5;
-            color: var(--text);
-            white-space: pre-wrap;
-        }
-
-        .resume-list li::before {
-            content: "—";
-            color: var(--text-muted);
-            flex-shrink: 0;
-            margin-top: 1px;
-        }
-
-        .resume-empty {
+        /* ── Empty/error states ── */
+        .mh-empty {
+            font-family: var(--mh-font-sans);
             font-size: 0.9rem;
-            color: var(--text-muted);
+            color: var(--mh-text-tertiary);
             line-height: 1.5;
+        }
+
+        /* ── Resume card meta ── */
+        .mh-meta {
+            font-family: var(--mh-font-sans);
+            font-size: 12px;
+            color: var(--mh-text-tertiary);
+            margin: 4px 0 12px;
+        }
+
+        /* ── Analyse items ── */
+        .mh-sep-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--mh-border-card);
+        }
+        .mh-sep-item:last-child { border-bottom: none; padding-bottom: 0; }
+        .mh-sep-item:first-of-type { padding-top: 0; }
+        .mh-sep-title {
+            flex: 1;
+            min-width: 0;
+            font-family: var(--mh-font-sans);
+            font-size: 13.5px;
+            font-weight: 500;
+            color: var(--mh-text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .mh-sep-date {
+            font-family: var(--mh-font-sans);
+            font-size: 11px;
+            color: var(--mh-text-tertiary);
+            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+        }
+        .mh-sep-open {
+            flex-shrink: 0;
+            font-family: var(--mh-font-sans);
+            font-size: 12px;
+            font-weight: 500;
+            background: var(--mh-violet-glow);
+            color: var(--mh-violet);
+            border: 1px solid var(--mh-violet-border);
+            border-radius: 8px;
+            padding: 5px 11px;
+            cursor: pointer;
+            transition: background 150ms ease;
+        }
+        .mh-sep-open:hover { background: rgba(139, 111, 232, 0.22); }
+        .mh-sep-viewall {
+            display: block;
+            margin-top: 12px;
+            padding: 9px;
+            text-align: center;
+            color: var(--mh-violet);
+            font-family: var(--mh-font-sans);
+            font-size: 12.5px;
+            text-decoration: none;
+            border: 1px solid var(--mh-violet-border);
+            border-radius: 10px;
+            transition: background 150ms ease;
+        }
+        .mh-sep-viewall:hover { background: var(--mh-violet-glow); }
+
+        /* ── Impersonation banner (orange conservé, design refined) ── */
+        .mh-impersonation-banner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            background: rgba(251, 146, 60, 0.92);
+            color: #1a1a1a;
+            padding: 12px 16px;
+            border-radius: var(--mh-radius-lg);
+            border: 1px solid rgba(251, 146, 60, 0.45);
+            font-family: var(--mh-font-sans);
+            font-size: 0.86rem;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+        .mh-impersonation-banner strong { font-weight: 700; }
+        .mh-impersonation-banner button {
+            background: #1a1a1a;
+            color: #FB923C;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .mh-impersonation-banner button:hover  { opacity: 0.85; }
+        .mh-impersonation-banner button:disabled { opacity: 0.5; cursor: wait; }
+
+        /* ── Koalendar widget toggle ── */
+        .mh-booking-cta-wrap { margin-top: 18px; }
+        .mh-koalendar-section {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease, opacity 0.3s ease;
+            opacity: 0;
+            margin-top: 0;
+        }
+        .mh-koalendar-section.open {
+            max-height: 800px;
+            opacity: 1;
+            margin-top: 10px;
+        }
+        .mh-koalendar-wrapper {
+            background: var(--mh-bg-card);
+            border: 1px solid var(--mh-border-card);
+            border-radius: var(--mh-radius-lg);
+            padding: 16px 8px;
+        }
+        .mh-koalendar-wrapper iframe { border-radius: 8px; }
+
+        /* ── Login (magic link) ── */
+        .mh-login-card {
+            width: 100%;
+            margin-top: 28px;
+            background: var(--mh-bg-card);
+            border: 1px solid var(--mh-border-card);
+            border-radius: var(--mh-radius-lg);
+            padding: 24px 22px;
+        }
+        .mh-login-title {
+            font-family: var(--mh-font-serif);
+            font-size: 20px;
+            font-weight: 500;
+            color: var(--mh-text-primary);
+            margin-bottom: 6px;
+        }
+        .mh-login-lead {
+            font-size: 0.88rem;
+            color: var(--mh-text-tertiary);
             margin-bottom: 18px;
         }
-
-        /* Section Analyse (audio assignés par l'admin — new MASTERHUB_ANALYSE + legacy stems Piano Key) */
-        .separations-block {
+        .mh-login-form { display: flex; flex-direction: column; gap: 12px; }
+        .mh-login-input {
             width: 100%;
-            margin-top: 16px;
-            background: var(--bg-card);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: var(--radius);
-            padding: 20px;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--mh-text-primary);
+            border: 1px solid var(--mh-border-card-strong);
+            border-radius: var(--mh-radius-md);
+            font-family: var(--mh-font-sans);
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.2s;
         }
-        .separations-block h2 {
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 12px;
+        .mh-login-input:focus { border-color: var(--mh-gold); }
+        .mh-login-input:disabled { opacity: 0.6; }
+        .mh-login-status {
+            font-size: 0.86rem;
+            margin-top: 14px;
+            min-height: 1em;
+            line-height: 1.45;
+            font-family: var(--mh-font-sans);
         }
-        .separations-empty {
-            font-size: 0.88rem;
-            color: var(--text-muted);
-            line-height: 1.5;
-        }
-        .sep-item {
-            border: 1px solid rgba(255, 255, 255, 0.07);
-            border-radius: 12px;
-            margin-bottom: 8px;
-            overflow: hidden;
-        }
-        .sep-item:last-child { margin-bottom: 0; }
-        .sep-item-head {
-            display: flex; align-items: center; gap: 10px;
+        .mh-login-status.ok {
+            color: #5ecb8b;
+            background: rgba(94, 203, 139, 0.08);
+            border: 1px solid rgba(94, 203, 139, 0.25);
             padding: 12px 14px;
-            background: rgba(255,255,255,0.02);
-        }
-        .sep-item-title { font-size: 0.95rem; font-weight: 600; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .sep-item-date { font-size: 0.75rem; color: var(--text-muted); font-family: monospace; flex-shrink: 0; }
-        .sep-open-btn {
-            flex-shrink: 0;
-            font-family: inherit;
-            font-size: 0.82rem;
-            font-weight: 600;
-            background: var(--accent, #8B6FE8);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            padding: 7px 14px;
-            cursor: pointer;
-            transition: background 0.15s, transform 0.1s;
-            min-height: 36px;
-        }
-        .sep-open-btn:hover { background: #6b54c4; }
-        .sep-open-btn:active { transform: scale(0.97); }
-
-        .doc-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 10px 16px;
-            border: 1px solid rgba(139, 111, 232, 0.5);
             border-radius: 10px;
-            background: rgba(139, 111, 232, 0.08);
-            color: #b69dfb;
-            font-size: 0.88rem;
-            font-weight: 500;
+        }
+        .mh-login-status.err { color: #f87171; }
+        .mh-login-error-msg {
+            background: rgba(255, 107, 107, 0.08);
+            border: 1px solid rgba(255, 107, 107, 0.25);
+            color: #ff8a8a;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            margin-bottom: 14px;
+            line-height: 1.4;
+            font-family: var(--mh-font-sans);
+        }
+        .mh-login-help {
+            margin-top: 18px;
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--mh-text-tertiary);
+            font-family: var(--mh-font-sans);
+        }
+        .mh-login-help a {
+            color: var(--mh-gold);
             text-decoration: none;
-            transition: background 0.2s, border-color 0.2s;
-            min-height: 40px;
         }
+        .mh-login-help a:hover { text-decoration: underline; }
 
-        .doc-btn:hover {
-            background: rgba(139, 111, 232, 0.18);
-            border-color: rgba(139, 111, 232, 0.7);
-            color: #d2c2ff;
-        }
-
-        /* Skeleton inline pendant fetch */
-        .skeleton {
+        /* ── Skeleton loader ── */
+        .mh-skeleton {
             height: 12px;
             background: linear-gradient(90deg, rgba(255,255,255,0.04), rgba(255,255,255,0.10), rgba(255,255,255,0.04));
             background-size: 200% 100%;
             border-radius: 6px;
-            animation: shimmer 1.4s ease-in-out infinite;
+            animation: mh-shimmer 1.4s ease-in-out infinite;
             margin-bottom: 10px;
         }
-
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
+        @keyframes mh-shimmer {
+            0%   { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
 
-        /* Section ressources */
-        .cards-section-title {
-            font-size: 0.74rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            font-weight: 600;
-            margin-top: 28px;
-            margin-bottom: 8px;
-            padding: 0 4px;
-            width: 100%;
-        }
+        /* ── Tabler icon size adjustment ── */
+        .mh-icon-box .ti { font-size: 22px; }
 
-        .dashboard-cards {
-            margin-top: 4px;
+        /* ── Small-screen tweaks ── */
+        @media (max-width: 380px) {
+            .mh-container { padding: 22px 14px 32px; }
+            .mh-card { padding: 1.1rem; }
         }
-
-        @media (max-width: 480px) {
-            .devoirs-block { padding: 18px 16px 16px; }
-            .resume-block { padding: 16px; }
-            .programme-block { padding: 12px 14px; }
-        }
-
     </style>
-    <link rel="stylesheet" href="/assets/css/multitrack.css" />
 </head>
 <body>
 
     <canvas id="bg-canvas"></canvas>
-    <div class="container">
-        <header class="header">
-            <svg class="logo" width="64" height="64" viewBox="0 0 72 72">
+    <div class="mh-container">
+        <header class="mh-header mh-fade-in">
+            <svg class="mh-logo" width="56" height="56" viewBox="0 0 72 72" aria-hidden="true">
                 <circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
                 <rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
                 <rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
@@ -743,8 +427,8 @@
                 <rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
                 <rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
             </svg>
-            <h1>Master Hub</h1>
-            <p class="subtitle">Espace élève</p>
+            <h1 class="mh-title-hero" style="font-size:24px">Master Hub</h1>
+            <div class="mh-section-label" style="margin:0">Espace élève</div>
             <div id="greeting"></div>
         </header>
         <div id="content"></div>
@@ -771,7 +455,7 @@
     function normalize(s) {
         return String(s == null ? "" : s)
             .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[̀-ͯ]/g, "")
             .toLowerCase()
             .trim();
     }
@@ -789,28 +473,14 @@
     }
 
     // ──────────────────────────────────────────────
-    //  Icônes (SVG inline, blanc 20x20)
-    // ──────────────────────────────────────────────
-    var ICONS = {
-        play:     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><polygon points="7,4 19,12 7,20" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" fill="none"/></svg>',
-        tools:    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>',
-        bolt:     '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" stroke="#fff" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" fill="none"/></svg>',
-        calendar: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="4" width="18" height="18" rx="3" stroke="#fff" stroke-width="1.5" fill="none"/><line x1="3" y1="10" x2="21" y2="10" stroke="#fff" stroke-width="1.5"/><line x1="8" y1="2" x2="8" y2="6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/><line x1="16" y1="2" x2="16" y2="6" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>'
-    };
-
-    // ──────────────────────────────────────────────
     //  Init — auth magic link (Chantier C)
-    //  Si URL = /{slug} → fetch /api/eleves/{slug}/public avec cookie
-    //                      → 200 = render dashboard ; 401 = écran login
-    //  Si URL = / → check whoami → si auth, redirect /{slug} ; sinon écran login
+    //  Si URL = /?eleve={slug} → fetch /api/eleves/{slug}/public avec cookie
+    //                          → 200 = render dashboard ; 401 = écran login
+    //  Si URL = / → check whoami → si auth, redirect /?eleve={slug} ; sinon écran login
     // ──────────────────────────────────────────────
-    // Stocke la dernière réponse whoami pour les guards de sécurité (chooser).
     var _lastWhoami = null;
 
     function runInit() {
-        // Routing par query string (?eleve=slug) au lieu de path /{slug} — contourne
-        // un bug observé sur CF Pages où le rewrite _redirects ne fonctionne pas
-        // de façon fiable et l'URL /japhet est silencieusement réécrite vers /.
         var params = new URLSearchParams(window.location.search);
         var initialError = params.get("error");
         if (initialError) {
@@ -820,11 +490,6 @@
         }
         var slugParam = normalize(params.get("eleve") || "");
 
-        // Cas spécial : admin en consultation cross-élève. Si l'URL contient
-        // ?eleve=<slug>, l'admin (cookie mh_admin_pw) doit pouvoir consulter
-        // l'espace élève sans avoir de cookie mh_session. Le backend
-        // /api/eleves/:slug/public accepte les deux (cf requireEleveOrAdmin).
-        // → On essaie /api/admin/check d'abord pour cette branche.
         function tryAdminThenRender() {
             return fetch("/api/admin/check", { credentials: "include" })
                 .then(function(r) { return r.ok ? r.json() : null; })
@@ -847,7 +512,6 @@
                 var authed = j && j.ok;
 
                 if (!authed) {
-                    // Pas de session élève. Si ?eleve= explicite → tente admin.
                     if (slugParam) {
                         return tryAdminThenRender().then(function(ok) {
                             if (!ok) renderLoginEmail(initialError);
@@ -857,9 +521,7 @@
                     return;
                 }
 
-                // Session élève valide.
                 if (!j.slug) {
-                    // Cas anormal (session sans slug) → fallback admin si ?eleve=
                     if (slugParam) {
                         return tryAdminThenRender().then(function(ok) {
                             if (!ok) renderLoginEmail(initialError);
@@ -878,7 +540,6 @@
                 renderEspaceEleve(meEleve);
             })
             .catch(function() {
-                // Erreur réseau sur whoami : si ?eleve= explicite, tente admin.
                 if (slugParam) {
                     return tryAdminThenRender().then(function(ok) {
                         if (!ok) renderLoginEmail(initialError);
@@ -888,8 +549,7 @@
             });
     }
 
-    // Source de vérité : /api/eleves (KV eleves:list). Fallback ELEVES_WHITELIST
-    // hardcodé en cas de KV/réseau down.
+    // Source de vérité : /api/eleves (KV eleves:list). Fallback ELEVES_WHITELIST.
     fetch('/api/eleves').then(function(r) { return r.json(); }).then(function(j) {
         if (j && j.ok && Array.isArray(j.eleves) && j.eleves.length) {
             var fresh = {};
@@ -913,22 +573,22 @@
         if (footer) footer.innerHTML = '';
 
         var errorMsg = '';
-        if (error === 'expired') errorMsg = 'Le lien a expiré. Demande un nouveau lien ci-dessous.';
+        if (error === 'expired')           errorMsg = 'Le lien a expiré. Demande un nouveau lien ci-dessous.';
         else if (error === 'missing_token') errorMsg = 'Lien invalide. Demande un nouveau lien ci-dessous.';
-        else if (error === 'kv_error') errorMsg = 'Erreur temporaire. Réessaie dans un instant.';
+        else if (error === 'kv_error')      errorMsg = 'Erreur temporaire. Réessaie dans un instant.';
 
         var content = document.getElementById("content");
         content.innerHTML =
-            '<div class="login-section">' +
-                '<h2>Bienvenue</h2>' +
-                '<p class="lead">Entre ton email pour recevoir ton lien de connexion.</p>' +
-                (errorMsg ? '<div class="login-error-msg">' + escapeHtml(errorMsg) + '</div>' : '') +
-                '<form class="login-form" id="login-form" autocomplete="on">' +
-                    '<input type="email" class="login-input" id="login-input" placeholder="ton@email.com" autocomplete="email" required />' +
-                    '<button type="submit" class="login-submit" id="login-submit">Recevoir mon lien</button>' +
+            '<div class="mh-login-card mh-fade-in">' +
+                '<h2 class="mh-login-title">Bienvenue</h2>' +
+                '<p class="mh-login-lead">Entre ton email pour recevoir ton lien de connexion.</p>' +
+                (errorMsg ? '<div class="mh-login-error-msg">' + escapeHtml(errorMsg) + '</div>' : '') +
+                '<form class="mh-login-form" id="login-form" autocomplete="on">' +
+                    '<input type="email" class="mh-login-input" id="login-input" placeholder="ton@email.com" autocomplete="email" required aria-label="Email" />' +
+                    '<button type="submit" class="mh-btn-primary" id="login-submit">Recevoir mon lien</button>' +
                 '</form>' +
-                '<div class="login-status" id="login-status"></div>' +
-                '<p class="login-help">Pas encore inscrit ? <a href="https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master" target="_blank" rel="noopener noreferrer">Découvrir Piano Master</a></p>' +
+                '<div class="mh-login-status" id="login-status" role="status" aria-live="polite"></div>' +
+                '<p class="mh-login-help">Pas encore inscrit ? <a href="https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master" target="_blank" rel="noopener noreferrer">Découvrir Piano Master</a></p>' +
             '</div>';
 
         var form = document.getElementById("login-form");
@@ -939,11 +599,11 @@
         form.addEventListener("submit", function(e) {
             e.preventDefault();
             status.textContent = '';
-            status.className = 'login-status';
+            status.className = 'mh-login-status';
             var email = (input.value || '').trim().toLowerCase();
             if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
                 status.textContent = 'Email invalide.';
-                status.className = 'login-status err';
+                status.className = 'mh-login-status err';
                 return;
             }
             btn.disabled = true;
@@ -963,20 +623,20 @@
                     input.disabled = true;
                     btn.style.display = 'none';
                     status.innerHTML = '📧 Email envoyé ! Vérifie ta boîte de réception. Le lien expire dans 15 minutes.';
-                    status.className = 'login-status ok';
+                    status.className = 'mh-login-status ok';
                 } else {
                     var msg = (res.data && res.data.error === 'invalid_email')
                         ? 'Email invalide.'
                         : 'Erreur d\'envoi. Réessaie plus tard.';
                     status.textContent = msg;
-                    status.className = 'login-status err';
+                    status.className = 'mh-login-status err';
                     btn.disabled = false;
                     btn.textContent = 'Recevoir mon lien';
                 }
             })
             .catch(function() {
                 status.textContent = 'Erreur réseau. Réessaie plus tard.';
-                status.className = 'login-status err';
+                status.className = 'mh-login-status err';
                 btn.disabled = false;
                 btn.textContent = 'Recevoir mon lien';
             });
@@ -987,24 +647,28 @@
 
     // ──────────────────────────────────────────────
     //  Mode 2 — élève identifié : dashboard riche
-    //  (programme, devoirs, résumé dernier cours, ressources)
     // ──────────────────────────────────────────────
     function renderEspaceEleve(eleve) {
         var greeting = document.getElementById("greeting");
-        greeting.innerHTML = '<p class="greeting">Bonjour ' + escapeHtml(eleve.display) + ' \uD83D\uDC4B</p>';
+        greeting.innerHTML = '<span class="mh-greeting">Bonjour ' + escapeHtml(eleve.display) + ' 👋</span>';
 
         var content = document.getElementById("content");
         content.innerHTML =
             '<div id="impersonation-banner-host"></div>' +
-            '<div id="programme-zone"></div>' +
-            '<div id="devoirs-zone"></div>' +
-            '<div id="resume-zone"></div>' +
-            '<div id="separations-zone"></div>' +
-            '<div class="cards-section-title">Ressources</div>' +
-            '<div class="cards dashboard-cards" id="cards"></div>';
+            '<div class="mh-stack mh-stagger" style="margin-top:24px">' +
+                '<div id="hero-zone"></div>' +
+                '<div id="resume-zone"></div>' +
+                '<div id="analyse-zone"></div>' +
+            '</div>' +
+            '<div class="mh-section">' +
+                '<div class="mh-section-label">Ressources</div>' +
+                '<div class="mh-grid-2 mh-stagger" id="resources-grid"></div>' +
+            '</div>' +
+            '<div class="mh-booking-cta-wrap" id="booking-cta-wrap"></div>';
 
         renderImpersonationBanner(eleve);
         renderResourceCards(eleve);
+        renderBookingCta(eleve);
         renderFooter();
         renderDynamicSkeleton();
         fetchDashboardData(eleve);
@@ -1012,17 +676,15 @@
     }
 
     // Bandeau orange visible si la session courante est issue d'une
-    // impersonation admin (cf POST /api/admin/impersonate/:slug). Permet \u00E0
-    // l'admin de quitter le mode impersonation et revenir \u00E0 /admin/eleves.html
-    // sans perdre son cookie admin (qui reste valide en parall\u00E8le).
+    // impersonation admin (cf POST /api/admin/impersonate/:slug).
     function renderImpersonationBanner(eleve) {
         if (!_lastWhoami || !_lastWhoami.isAdminImpersonation) return;
         var host = document.getElementById("impersonation-banner-host");
         if (!host) return;
         var name = _lastWhoami.name || (eleve && eleve.display) || _lastWhoami.slug || '';
         host.innerHTML =
-            '<div class="impersonation-banner">' +
-                '<span>\uD83D\uDC41 <strong>Mode impersonation</strong> \u2014 connect\u00E9 en tant que ' + escapeHtml(name) + '</span>' +
+            '<div class="mh-impersonation-banner">' +
+                '<span>👁 <strong>Mode impersonation</strong> — connecté en tant que ' + escapeHtml(name) + '</span>' +
                 '<button type="button" id="exit-impersonation-btn">Quitter</button>' +
             '</div>';
         document.getElementById("exit-impersonation-btn").addEventListener("click", exitImpersonation);
@@ -1030,24 +692,23 @@
 
     function exitImpersonation() {
         var btn = document.getElementById("exit-impersonation-btn");
-        if (btn) { btn.disabled = true; btn.textContent = '\u2026'; }
+        if (btn) { btn.disabled = true; btn.textContent = '…'; }
         fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
             .catch(function () {})
             .then(function () { window.location.href = '/admin/eleves.html'; });
     }
 
-    // Charge la liste des analyses (new + legacy stems) assignées à cet élève.
-    // Endpoint /api/eleves/:slug/analyse merge MASTERHUB_ANALYSE (single/multitrack
-    // type:..., legacy:false) + MASTERHUB_HISTORY stems:* (legacy:true) avec
-    // trackUrlPrefix qui route le player vers le bon endpoint stream.
+    // ──────────────────────────────────────────────
+    //  Analyses (assignées par l'admin)
+    // ──────────────────────────────────────────────
     function loadAnalysesForEleve(slug) {
-        var zone = document.getElementById("separations-zone");
+        var zone = document.getElementById("analyse-zone");
         if (!zone) return;
         zone.innerHTML = '';
         fetch('/api/eleves/' + encodeURIComponent(slug) + '/analyse', { credentials: 'include' })
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (j) {
-                if (!j || !j.ok) return; // 401/403 ou erreur réseau → silent
+                if (!j || !j.ok) return;
                 var items = Array.isArray(j.items) ? j.items : [];
                 renderAnalyses(zone, items, slug);
             })
@@ -1069,9 +730,10 @@
     function renderAnalyses(zone, items, slug) {
         if (!items.length) {
             zone.innerHTML =
-                '<div class="separations-block">' +
-                    '<h2>🎬 Analyse</h2>' +
-                    '<p style="color:var(--text3);font-size:13px;margin:0;">Aucune analyse pour le moment. Demande à ton coach de t\'en envoyer.</p>' +
+                '<div class="mh-card">' +
+                    '<div class="mh-section-label">Analyse</div>' +
+                    '<h3 class="mh-title-section" style="margin-bottom:10px">Aucune analyse</h3>' +
+                    '<p class="mh-empty">Aucune analyse pour le moment. Demande à ton coach de t\'en envoyer.</p>' +
                 '</div>';
             return;
         }
@@ -1093,37 +755,31 @@
         var totalCount = items.length;
         var hasMore = totalCount > PREVIEW_MAX;
 
-        var html = '<div class="separations-block">' +
-            '<h2>🎬 Analyse</h2>';
+        var html = '<div class="mh-card">' +
+            '<div class="mh-section-label">Analyse</div>' +
+            '<h3 class="mh-title-section" style="margin-bottom:14px">Tes morceaux à étudier</h3>';
         preview.forEach(function (s, idx) {
-            html += '<div class="sep-item" data-idx="' + idx + '">' +
-                '<div class="sep-item-head">' +
-                    '<span class="sep-item-title">' + escapeHtml(truncate(s.title || 'Sans titre', 40)) + '</span>' +
-                    '<span class="sep-item-date">' + escapeHtml(fmtDate(s.uploadedAt)) + '</span>' +
-                    '<button type="button" class="sep-open-btn" data-id="' + escapeHtml(s.id) + '">▶ Ouvrir</button>' +
-                '</div>' +
+            html += '<div class="mh-sep-item" data-idx="' + idx + '">' +
+                '<span class="mh-sep-title">' + escapeHtml(truncate(s.title || 'Sans titre', 40)) + '</span>' +
+                '<span class="mh-sep-date">' + escapeHtml(fmtDate(s.uploadedAt)) + '</span>' +
+                '<button type="button" class="mh-sep-open" data-id="' + escapeHtml(s.id) + '" aria-label="Ouvrir l\'analyse">▶ Ouvrir</button>' +
             '</div>';
         });
         if (hasMore) {
-            html += '<a href="/analyse?eleve=' + encodeURIComponent(slug) + '" ' +
-                'style="display:block;margin-top:10px;padding:8px;text-align:center;color:var(--v);font-size:13px;text-decoration:none;border:1px solid rgba(139,111,232,0.2);border-radius:8px;">' +
+            html += '<a class="mh-sep-viewall" href="/analyse?eleve=' + encodeURIComponent(slug) + '">' +
                 'Voir tout (' + totalCount + ') →</a>';
         }
         html += '</div>';
         zone.innerHTML = html;
 
-        zone.querySelectorAll('.sep-open-btn').forEach(function (btn) {
+        zone.querySelectorAll('.mh-sep-open').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var idx = parseInt(btn.closest('.sep-item').getAttribute('data-idx'), 10);
+                var idx = parseInt(btn.closest('.mh-sep-item').getAttribute('data-idx'), 10);
                 openAnalysePlayer(preview[idx]);
             });
         });
     }
 
-    // Ouvre le player adapté au type :
-    //   legacy=true        → MultitrackPlayer (legacy stems Piano Key)
-    //   type='single'      → AnalysePlayer 1 track
-    //   type='multitrack'  → AnalysePlayer N tracks
     function openAnalysePlayer(item) {
         if (!item) return;
         if (activePlayer) { try { activePlayer.destroy(); } catch (e) {} activePlayer = null; }
@@ -1178,7 +834,6 @@
             return;
         }
 
-        // Tente de fetcher les peaks cachés depuis R2 d'abord
         fetch('/api/stems/' + encodeURIComponent(sep.id) + '/waveforms', { credentials: 'include' })
             .then(function (r) { return r.ok ? r.json() : null; })
             .catch(function () { return null; })
@@ -1203,7 +858,6 @@
                     waveforms: waveforms,
                     readOnly: true,
                     onWaveformsCalculated: function (peaks) {
-                        // Élève peut aussi cacher les peaks (auth élève-assigné OK côté backend)
                         fetch('/api/stems/' + encodeURIComponent(sep.id) + '/waveforms', {
                             method: 'POST',
                             credentials: 'include',
@@ -1216,25 +870,26 @@
             });
     }
 
+    // ──────────────────────────────────────────────
+    //  Skeletons & data fetch
+    // ──────────────────────────────────────────────
     function renderDynamicSkeleton() {
-        document.getElementById("programme-zone").innerHTML =
-            '<div class="programme-block">' +
-                '<div class="skeleton" style="width:78%"></div>' +
-                '<div class="skeleton" style="width:42%; margin-bottom:0; margin-top:6px"></div>' +
-            '</div>';
-        document.getElementById("devoirs-zone").innerHTML =
-            '<div class="devoirs-block">' +
-                '<h2>\uD83D\uDCDD Tes devoirs pour la prochaine séance</h2>' +
-                '<div class="skeleton" style="width:85%"></div>' +
-                '<div class="skeleton" style="width:65%"></div>' +
-                '<div class="skeleton" style="width:90%; margin-bottom:0"></div>' +
+        document.getElementById("hero-zone").innerHTML =
+            '<div class="mh-card mh-card-hero">' +
+                '<div class="mh-hero-head"><div class="mh-section-label">Prochaine séance</div></div>' +
+                '<div class="mh-skeleton" style="width:60%; height:18px"></div>' +
+                '<div class="mh-skeleton" style="width:100%; height:2px; margin:14px 0 18px"></div>' +
+                '<div class="mh-section-label">Devoirs à préparer</div>' +
+                '<div class="mh-skeleton" style="width:85%"></div>' +
+                '<div class="mh-skeleton" style="width:65%"></div>' +
+                '<div class="mh-skeleton" style="width:90%; margin-bottom:0"></div>' +
             '</div>';
         document.getElementById("resume-zone").innerHTML =
-            '<div class="resume-block">' +
-                '<h2>\u2728 Dernier cours</h2>' +
-                '<div class="resume-meta"><span class="skeleton" style="display:inline-block; width:55%; height:10px; vertical-align:middle"></span></div>' +
-                '<div class="skeleton" style="width:92%"></div>' +
-                '<div class="skeleton" style="width:70%; margin-bottom:0"></div>' +
+            '<div class="mh-card">' +
+                '<div class="mh-section-label">Dernier cours</div>' +
+                '<div class="mh-skeleton" style="width:55%; height:16px; margin-bottom:14px"></div>' +
+                '<div class="mh-skeleton" style="width:92%"></div>' +
+                '<div class="mh-skeleton" style="width:70%; margin-bottom:0"></div>' +
             '</div>';
     }
 
@@ -1250,16 +905,10 @@
                 return r.json();
             })
             .then(function(data) {
-                renderProgramme(data && data.stats);
-                renderDevoirs(data && data.derniere_seance);
+                renderHero(data && data.stats, data && data.derniere_seance);
                 renderResume(data && data.derniere_seance, data && data.doc_url);
-                // Re-render des cartes Ressources avec les liens personnalisés
-                // condi (Doc/Drive/Telegram) prefixés aux 4 cartes génériques.
                 renderResourceCards(eleve, data);
-                // Background : fetch devoirs auto-syncés depuis Google Doc (regex MD,
-                // cache 1h côté serveur). Re-render avec les bullets si trouvés ;
-                // sinon le fallback LLM (derniere_seance.devoirs) reste affiché.
-                fetchAutoSyncedDevoirs(eleve.slug, data && data.derniere_seance);
+                fetchAutoSyncedDevoirs(eleve.slug, data && data.derniere_seance, data && data.stats);
             })
             .catch(function(e) {
                 if (e && e.unauthorized) {
@@ -1267,56 +916,58 @@
                     return;
                 }
                 console.error('[espace] fetch failed:', e && e.message ? e.message : e);
-                document.getElementById("programme-zone").innerHTML = '';
-                document.getElementById("devoirs-zone").innerHTML =
-                    '<div class="devoirs-block">' +
-                        '<h2>\uD83D\uDCDD Tes devoirs pour la prochaine séance</h2>' +
-                        '<p class="devoirs-empty">Données momentanément indisponibles. Réessaie plus tard.</p>' +
+                document.getElementById("hero-zone").innerHTML =
+                    '<div class="mh-card mh-card-hero">' +
+                        '<div class="mh-section-label">Prochaine séance</div>' +
+                        '<p class="mh-empty">Données momentanément indisponibles. Réessaie plus tard.</p>' +
                     '</div>';
                 document.getElementById("resume-zone").innerHTML = '';
             });
     }
 
-    function renderProgramme(stats) {
-        var zone = document.getElementById("programme-zone");
-        if (!stats || stats.nb_cours == null || !stats.date_debut_label || !stats.date_fin_label) {
-            zone.innerHTML = '';
-            return;
-        }
-        // total_cours vient de stats_override (admin), fallback 8 (programme standard).
-        var total = (typeof stats.total_cours === 'number' && stats.total_cours > 0)
-            ? stats.total_cours : 8;
-        var current = stats.nb_cours;
-        var overflow = current > total;
-        // Progress bar capped \u00E0 100% en overflow.
-        var pct = overflow
-            ? 100
-            : (typeof stats.progression_pct === 'number'
-                ? Math.max(0, Math.min(100, stats.progression_pct))
-                : Math.max(0, Math.min(100, Math.round((current / total) * 100))));
-        var label = overflow
-            ? 'Cours ' + escapeHtml(String(current)) + ' \u00B7 prolongation'
-            : 'Cours ' + escapeHtml(String(current)) + ' sur ' + escapeHtml(String(total));
-        zone.innerHTML =
-            '<div class="programme-block">' +
-                '<div class="programme-meta">' +
-                    '<strong>' + label + '</strong>' +
-                    ' \u00B7 ' + escapeHtml(stats.date_debut_label) +
-                    ' \u2192 ' + escapeHtml(stats.date_fin_label) +
-                '</div>' +
-                '<div class="progress-track"><div class="progress-fill" style="width:' + pct + '%"></div></div>' +
-            '</div>';
-    }
-
-    // Cache local des devoirs auto-syncés depuis le Google Doc (regex MD).
-    // Source primaire : /api/eleves/:slug/devoirs. Fallback : derniere_seance.devoirs (LLM).
+    // Cache pour devoirs auto-syncés depuis Google Doc.
     var _autoSyncedDevoirs = null;
     var _devoirsRefreshAvailable = true;
     var _lastDerniereSeance = null;
+    var _lastStats = null;
 
-    function renderDevoirs(derniere) {
+    // ──────────────────────────────────────────────
+    //  Hero card (fusion programme + devoirs)
+    // ──────────────────────────────────────────────
+    function renderHero(stats, derniere) {
+        _lastStats = stats || null;
         _lastDerniereSeance = derniere || null;
-        var zone = document.getElementById("devoirs-zone");
+        var zone = document.getElementById("hero-zone");
+        if (!zone) return;
+
+        // Titre + progression
+        var titleHtml = '';
+        var progressHtml = '';
+        var headDateHtml = '';
+        if (stats && stats.nb_cours != null) {
+            var total = (typeof stats.total_cours === 'number' && stats.total_cours > 0) ? stats.total_cours : 8;
+            var current = stats.nb_cours;
+            var overflow = current > total;
+            var pct = overflow
+                ? 100
+                : (typeof stats.progression_pct === 'number'
+                    ? Math.max(0, Math.min(100, stats.progression_pct))
+                    : Math.max(0, Math.min(100, Math.round((current / total) * 100))));
+            var label = overflow
+                ? 'Cours ' + current + ' · prolongation'
+                : 'Cours ' + current + ' sur ' + total;
+            titleHtml = '<h2 class="mh-title-hero mh-hero-title">' + escapeHtml(label) + '</h2>';
+            progressHtml = '<div class="mh-progress mh-hero-progress"><div class="mh-progress-fill" style="width:' + pct + '%"></div></div>';
+            // Date à droite : on n'a pas de "prochaine séance" exacte ; on affiche la borne de fin de programme.
+            if (stats.date_fin_label) {
+                headDateHtml = '<span class="mh-hero-head-date">Jusqu\'au ' + escapeHtml(stats.date_fin_label) + '</span>';
+            }
+        } else {
+            titleHtml = '<h2 class="mh-title-hero mh-hero-title">À planifier</h2>';
+            progressHtml = '<div class="mh-progress mh-hero-progress"><div class="mh-progress-fill" style="width:0%"></div></div>';
+        }
+
+        // Devoirs (auto-syncés en priorité, fallback LLM)
         var devoirs = null;
         if (Array.isArray(_autoSyncedDevoirs) && _autoSyncedDevoirs.length > 0) {
             devoirs = _autoSyncedDevoirs;
@@ -1325,7 +976,7 @@
         }
 
         var refreshBtn = _devoirsRefreshAvailable
-            ? '<button type="button" id="devoirs-refresh-btn" class="devoirs-refresh" title="Synchroniser depuis le Google Doc" aria-label="Synchroniser">'
+            ? '<button type="button" id="devoirs-refresh-btn" class="mh-devoirs-refresh" title="Synchroniser depuis le Google Doc" aria-label="Synchroniser les devoirs">'
               + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
               + '<polyline points="23 4 23 10 17 10"></polyline>'
               + '<polyline points="1 20 1 14 7 14"></polyline>'
@@ -1333,21 +984,31 @@
               + '</svg></button>'
             : '';
 
-        var html = '<div class="devoirs-block">'
-            + '<h2 class="devoirs-h2">📝 Tes devoirs pour la prochaine séance'
-            + refreshBtn
-            + '</h2>';
+        var devoirsHtml = '';
         if (!devoirs) {
-            html += '<p class="devoirs-empty">Aucun devoir spécifique. Continue à pratiquer ce qu\'on a vu en cours.</p>';
+            devoirsHtml = '<p class="mh-empty">Aucun devoir spécifique. Continue à pratiquer ce qu\'on a vu en cours.</p>';
         } else {
-            html += '<ul class="devoirs-list">';
+            devoirsHtml = '<ul class="mh-bullets mh-bullets-gold">';
             for (var i = 0; i < devoirs.length; i++) {
-                html += '<li>' + escapeHtml(String(devoirs[i])) + '</li>';
+                devoirsHtml += '<li>' + escapeHtml(String(devoirs[i])) + '</li>';
             }
-            html += '</ul>';
+            devoirsHtml += '</ul>';
         }
-        html += '</div>';
-        zone.innerHTML = html;
+
+        zone.innerHTML =
+            '<div class="mh-card mh-card-hero">' +
+                '<div class="mh-hero-head">' +
+                    '<div class="mh-section-label">Prochaine séance</div>' +
+                    headDateHtml +
+                '</div>' +
+                titleHtml +
+                progressHtml +
+                '<div class="mh-devoirs-label-row">' +
+                    '<div class="mh-section-label">Devoirs à préparer</div>' +
+                    refreshBtn +
+                '</div>' +
+                devoirsHtml +
+            '</div>';
 
         var btn = document.getElementById('devoirs-refresh-btn');
         if (btn) btn.addEventListener('click', function () { triggerDevoirsRefresh(btn); });
@@ -1361,7 +1022,7 @@
         return pathSlug;
     }
 
-    function fetchAutoSyncedDevoirs(slug, derniere) {
+    function fetchAutoSyncedDevoirs(slug, derniere, stats) {
         if (!slug) return;
         fetch('/api/eleves/' + encodeURIComponent(slug) + '/devoirs', { credentials: 'include' })
             .then(function (r) { return r.ok ? r.json() : null; })
@@ -1369,7 +1030,7 @@
                 if (!j) return;
                 if (j.status === 'no_doc_id') { _devoirsRefreshAvailable = false; }
                 _autoSyncedDevoirs = Array.isArray(j.bullets) ? j.bullets : [];
-                renderDevoirs(derniere);
+                renderHero(stats || _lastStats, derniere || _lastDerniereSeance);
             })
             .catch(function () { /* silent — fallback LLM préservé */ });
     }
@@ -1392,7 +1053,7 @@
                 btn.classList.remove('spinning');
                 if (resp.status === 404 && resp.body && resp.body.error === 'no_drive_url') {
                     _devoirsRefreshAvailable = false;
-                    renderDevoirs(_lastDerniereSeance);
+                    renderHero(_lastStats, _lastDerniereSeance);
                     return;
                 }
                 if (!resp.ok) {
@@ -1400,7 +1061,7 @@
                     return;
                 }
                 _autoSyncedDevoirs = Array.isArray(resp.body.bullets) ? resp.body.bullets : [];
-                renderDevoirs(_lastDerniereSeance);
+                renderHero(_lastStats, _lastDerniereSeance);
                 showDevoirsToast('À jour ✓', 'success');
             })
             .catch(function () {
@@ -1410,15 +1071,18 @@
     }
 
     function showDevoirsToast(msg, type) {
-        var t = document.querySelector('.devoirs-toast');
-        if (!t) { t = document.createElement('div'); t.className = 'devoirs-toast'; document.body.appendChild(t); }
-        t.className = 'devoirs-toast' + (type ? ' ' + type : '');
+        var t = document.querySelector('.mh-toast');
+        if (!t) { t = document.createElement('div'); t.className = 'mh-toast'; document.body.appendChild(t); }
+        t.className = 'mh-toast' + (type ? ' ' + type : '');
         t.textContent = msg;
         requestAnimationFrame(function () { t.classList.add('show'); });
         clearTimeout(showDevoirsToast._tid);
         showDevoirsToast._tid = setTimeout(function () { t.classList.remove('show'); }, 2200);
     }
 
+    // ──────────────────────────────────────────────
+    //  Dernier cours
+    // ──────────────────────────────────────────────
     function renderResume(derniere, docUrl) {
         var zone = document.getElementById("resume-zone");
         var resume = (derniere && Array.isArray(derniere.resume))
@@ -1429,16 +1093,18 @@
         var metaBits = [];
         if (date) metaBits.push(date);
         if (titre) metaBits.push(titre);
-        var meta = metaBits.join(' \u00B7 ');
+        var meta = metaBits.join(' · ');
 
-        var html = '<div class="resume-block">' +
-            '<h2>\u2728 Dernier cours</h2>';
-        if (meta) html += '<div class="resume-meta">' + escapeHtml(meta) + '</div>';
+        var html = '<div class="mh-card">' +
+            '<div class="mh-section-label">Dernier cours</div>' +
+            '<h3 class="mh-title-section">' + (titre ? escapeHtml(titre) : 'Résumé') + '</h3>';
+        if (date && !titre) html += '<div class="mh-meta">' + escapeHtml(date) + '</div>';
+        else if (date) html += '<div class="mh-meta">' + escapeHtml(date) + '</div>';
 
         if (!resume || resume.length === 0) {
-            html += '<p class="resume-empty">Pas encore de résumé disponible. Reviens après ton prochain cours.</p>';
+            html += '<p class="mh-empty" style="margin-top:12px">Pas encore de résumé disponible. Reviens après ton prochain cours.</p>';
         } else {
-            html += '<ul class="resume-list">';
+            html += '<ul class="mh-bullets mh-bullets-violet" style="margin-top:14px">';
             for (var i = 0; i < resume.length; i++) {
                 html += '<li>' + escapeHtml(String(resume[i])) + '</li>';
             }
@@ -1446,8 +1112,8 @@
         }
 
         if (docUrl) {
-            html += '<a class="doc-btn" href="' + escapeHtml(docUrl) + '" target="_blank" rel="noopener noreferrer">' +
-                'Ouvrir mes notes complètes \u2192' +
+            html += '<a class="mh-btn-secondary" style="margin-top:16px" href="' + escapeHtml(docUrl) + '" target="_blank" rel="noopener noreferrer">' +
+                'Voir mes notes complètes <i class="ti ti-arrow-right" aria-hidden="true"></i>' +
             '</a>';
         }
         html += '</div>';
@@ -1462,119 +1128,94 @@
         return parseInt(m[3], 10) + " " + months[parseInt(m[2], 10) - 1] + " " + m[1];
     }
 
+    // ──────────────────────────────────────────────
+    //  Ressources (grid 2-col)
+    // ──────────────────────────────────────────────
     function renderResourceCards(eleve, data) {
-        var cardsContainer = document.getElementById("cards");
+        var grid = document.getElementById("resources-grid");
+        if (!grid) return;
         var slug = eleve.slug;
-        var koalendarUrl = "https://koalendar.com/e/cours-piano-master?name=" + encodeURIComponent(eleve.display);
-        var koalendarInitialized = false;
 
-        // Cartes conditionnelles personnalisées (Doc/Drive/Telegram) — préfixées
-        // aux 4 cartes génériques. Présentes uniquement si data fourni (après
-        // fetch /api/eleves/:slug/public) ET le lien est défini pour cet élève.
-        // 1er render avant fetch : seules les 4 cartes génériques sont affichées,
-        // puis re-render quand fetchDashboardData reçoit les liens.
         var docUrl = data && data.doc_url;
         var driveUrl = data && data.links && data.links.drive;
         var telegramUrl = data && data.links && data.links.telegram;
 
-        var personalCards = '';
-        if (docUrl) {
-            personalCards +=
-                '<a class="card" href="' + escapeHtml(docUrl) + '" target="_blank" rel="noopener noreferrer">' +
-                    '<div class="card-icon">📄</div>' +
-                    '<div class="card-body">' +
-                        '<div class="card-title">Suivi de progression</div>' +
-                        '<div class="card-sub">Google Doc</div>' +
-                    '</div>' +
-                    '<span class="card-arrow">↗</span>' +
-                '</a>';
-        }
-        if (driveUrl) {
-            personalCards +=
-                '<a class="card" href="' + escapeHtml(driveUrl) + '" target="_blank" rel="noopener noreferrer">' +
-                    '<div class="card-icon">📁</div>' +
-                    '<div class="card-body">' +
-                        '<div class="card-title">Mes ressources Drive</div>' +
-                        '<div class="card-sub">Partitions, audio, vidéos</div>' +
-                    '</div>' +
-                    '<span class="card-arrow">↗</span>' +
-                '</a>';
-        }
-        if (telegramUrl) {
-            personalCards +=
-                '<a class="card" href="' + escapeHtml(telegramUrl) + '" target="_blank" rel="noopener noreferrer">' +
-                    '<div class="card-icon">💬</div>' +
-                    '<div class="card-body">' +
-                        '<div class="card-title">Telegram</div>' +
-                        '<div class="card-sub">Discussions avec Lonne</div>' +
-                    '</div>' +
-                    '<span class="card-arrow">↗</span>' +
-                '</a>';
-        }
+        var html = '';
 
-        // Cartes générées en HTML template inline. Outils est un vrai <a> avec
-        // href interpolé sur le slug courant — pas de div+JS handler.
-        cardsContainer.innerHTML =
-            personalCards +
-            // Outils — anchor interne, slug en query string (bypass CF Pages multi-segment rewrite)
-            '<a class="card" href="/outils?eleve=' + encodeURIComponent(slug) + '">' +
-                '<div class="card-icon">' + ICONS.tools + '</div>' +
-                '<div class="card-body">' +
-                    '<div class="card-title">Outils</div>' +
-                    '<div class="card-sub">Tes exercices interactifs</div>' +
-                '</div>' +
-                '<span class="card-arrow">\u203A</span>' +
-            '</a>' +
-            // Vidéos — anchor externe Bonzai
-            '<a class="card" href="https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master" target="_blank" rel="noopener noreferrer">' +
-                '<div class="card-icon">' + ICONS.play + '</div>' +
-                '<div class="card-body">' +
-                    '<div class="card-title">Cours vidéo</div>' +
-                    '<div class="card-sub">Accès à Bonzai</div>' +
-                '</div>' +
-                '<span class="card-arrow">\u203A</span>' +
-            '</a>' +
-            // Cours en live — anchor Discord (deeplink mobile câblé après render)
-            '<a class="card" id="card-live" href="https://discord.gg/KtJF8dPT" target="_blank" rel="noopener noreferrer">' +
-                '<div class="card-icon">' + ICONS.bolt + '</div>' +
-                '<div class="card-body">' +
-                    '<div class="card-title">Cours en live</div>' +
-                    '<div class="card-sub">Rejoindre sur Discord</div>' +
-                '</div>' +
-                '<span class="card-arrow">\u203A</span>' +
-            '</a>' +
-            // Réserver — bouton toggle pour widget Koalendar inline
-            '<div class="card" role="button" tabindex="0" id="card-rdv" style="cursor:pointer">' +
-                '<div class="card-icon">' + ICONS.calendar + '</div>' +
-                '<div class="card-body">' +
-                    '<div class="card-title">Réserver un cours</div>' +
-                    '<div class="card-sub">Koalendar</div>' +
-                '</div>' +
-                '<span class="card-chevron">\u25BC</span>' +
-            '</div>' +
-            '<div class="koalendar-section" id="koalendar-section">' +
-                '<div class="koalendar-wrapper">' +
-                    '<div id="inline-widget-cours-piano-master"></div>' +
-                '</div>' +
-            '</div>';
+        // 1. Suivi (Google Doc) — accent violet
+        if (docUrl) {
+            html += resourceCardHtml(docUrl, 'ti-file-text', 'violet', 'Suivi', 'Google Doc', true);
+        }
+        // 2. Ressources (Drive) — violet
+        if (driveUrl) {
+            html += resourceCardHtml(driveUrl, 'ti-folder', 'violet', 'Ressources', 'Partitions & audio', true);
+        }
+        // 3. Telegram — neutral
+        if (telegramUrl) {
+            html += resourceCardHtml(telegramUrl, 'ti-brand-telegram', 'neutral', 'Telegram', 'Discussions avec Lonne', true);
+        }
+        // 4. Outils — teal (lien interne)
+        html += resourceCardHtml('/outils?eleve=' + encodeURIComponent(slug), 'ti-tool', 'teal', 'Outils', 'Exercices interactifs', false);
+        // 5. Cours vidéo (Bonzai) — pink
+        html += resourceCardHtml('https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master', 'ti-player-play', 'pink', 'Cours vidéo', 'Accès Bonzai', true);
+        // 6. Cours en live (Discord) — gold (id explicite pour le deeplink mobile)
+        html += '<a class="mh-card mh-card-stack" id="card-live" href="https://discord.gg/KtJF8dPT" target="_blank" rel="noopener noreferrer" aria-label="Cours en live sur Discord">' +
+            '<div class="mh-icon-box gold"><i class="ti ti-bolt" aria-hidden="true"></i></div>' +
+            '<div class="mh-card-title">Cours en live</div>' +
+            '<div class="mh-card-sub">Discord</div>' +
+        '</a>';
+
+        grid.innerHTML = html;
 
         // Discord deeplink sur mobile (fallback web après 800 ms)
         var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         if (isMobile) {
-            document.getElementById("card-live").addEventListener("click", function(e) {
-                e.preventDefault();
-                window.location.href = "discord://channels/KtJF8dPT";
-                setTimeout(function() { window.open("https://discord.gg/KtJF8dPT", "_blank", "noopener"); }, 800);
-            });
+            var cardLive = document.getElementById("card-live");
+            if (cardLive) {
+                cardLive.addEventListener("click", function(e) {
+                    e.preventDefault();
+                    window.location.href = "discord://channels/KtJF8dPT";
+                    setTimeout(function() { window.open("https://discord.gg/KtJF8dPT", "_blank", "noopener"); }, 800);
+                });
+            }
         }
+    }
 
-        // Toggle Koalendar inline
-        var rdvBtn = document.getElementById("card-rdv");
-        var koalendarSection = document.getElementById("koalendar-section");
-        rdvBtn.addEventListener("click", function() {
-            var isOpen = koalendarSection.classList.toggle("open");
-            var chevron = rdvBtn.querySelector(".card-chevron");
-            if (chevron) chevron.classList.toggle("open", isOpen);
+    function resourceCardHtml(href, iconClass, accent, title, sub, external) {
+        var ext = external
+            ? ' target="_blank" rel="noopener noreferrer"'
+            : '';
+        return '<a class="mh-card mh-card-stack" href="' + escapeHtml(href) + '"' + ext + ' aria-label="' + escapeHtml(title) + '">' +
+            '<div class="mh-icon-box ' + accent + '"><i class="ti ' + iconClass + '" aria-hidden="true"></i></div>' +
+            '<div class="mh-card-title">' + escapeHtml(title) + '</div>' +
+            '<div class="mh-card-sub">' + escapeHtml(sub) + '</div>' +
+        '</a>';
+    }
+
+    // ──────────────────────────────────────────────
+    //  CTA bas — Réserver mon prochain cours (Koalendar inline toggle)
+    // ──────────────────────────────────────────────
+    function renderBookingCta(eleve) {
+        var wrap = document.getElementById("booking-cta-wrap");
+        if (!wrap) return;
+        var koalendarUrl = "https://koalendar.com/e/cours-piano-master?name=" + encodeURIComponent(eleve.display);
+        wrap.innerHTML =
+            '<button type="button" class="mh-btn-primary" id="booking-cta-btn">' +
+                '<i class="ti ti-calendar-plus" aria-hidden="true"></i>' +
+                '<span>Réserver mon prochain cours</span>' +
+            '</button>' +
+            '<div class="mh-koalendar-section" id="koalendar-section">' +
+                '<div class="mh-koalendar-wrapper">' +
+                    '<div id="inline-widget-cours-piano-master"></div>' +
+                '</div>' +
+            '</div>';
+
+        var koalendarInitialized = false;
+        var btn = document.getElementById("booking-cta-btn");
+        var section = document.getElementById("koalendar-section");
+        btn.addEventListener("click", function() {
+            var isOpen = section.classList.toggle("open");
+            btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
             if (isOpen && !koalendarInitialized) {
                 koalendarInitialized = true;
                 Koalendar("inline", {
@@ -1582,19 +1223,24 @@
                     "selector": "#inline-widget-cours-piano-master"
                 });
             }
+            if (isOpen) {
+                setTimeout(function () { section.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 280);
+            }
         });
     }
 
+    // ──────────────────────────────────────────────
+    //  Footer (logout)
+    // ──────────────────────────────────────────────
     function renderFooter() {
         var footer = document.getElementById("footer");
         footer.innerHTML =
-            '<div class="footer-actions">' +
-                '<button type="button" id="logout-btn">Se déconnecter</button>' +
+            '<div class="mh-footer">' +
+                '<button type="button" id="logout-btn" class="mh-link-muted">Se déconnecter</button>' +
             '</div>';
         document.getElementById("logout-btn").addEventListener("click", function() {
-            // Logout best-effort : on supprime la session côté serveur puis on rentre.
             fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
-                .catch(function() { /* best effort */ })
+                .catch(function() {})
                 .then(function() {
                     localStorage.removeItem("eleve_slug");
                     window.location.href = "/";

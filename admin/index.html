@@ -10,38 +10,41 @@
       .then(function (j) {
         if (!j || !j.ok) { window.location.replace('/admin/login.html'); return; }
         document.body.style.display = 'block';
+        window.__adminInfo = j;
       })
       .catch(function () { window.location.replace('/admin/login.html'); });
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Master Hub Admin &mdash; Outils</title>
-    <meta name="theme-color" content="#0f0f14">
+    <title>Master Hub Admin — Outils</title>
+    <meta name="theme-color" content="#0a0a0f">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="MH Admin">
-    <meta name="description" content="Master Hub Admin &mdash; console d'outils">
+    <meta name="description" content="Master Hub Admin — console d'outils">
     <link rel="icon" id="app-icon">
     <link rel="apple-touch-icon" id="app-touch-icon" sizes="180x180">
-    <style>
-        :root {
-            --bg: #0f0f14;
-            --bg-card: #1a1a24;
-            --bg-card-hover: #22222f;
-            --text: #eee;
-            --text-muted: #888;
-            --accent: #8B6FE8;
-            --accent-soft: rgba(139, 111, 232, 0.14);
-            --radius: 16px;
-            --tap-min: 48px;
-        }
 
+    <!-- Fonts : préconnect + Cormorant + Plus Jakarta -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap">
+
+    <!-- Tabler Icons (webfont) -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.30.0/dist/tabler-icons.min.css">
+
+    <!-- Design system Master Hub -->
+    <link rel="stylesheet" href="/assets/css/design-system.css">
+
+    <style>
+        /* ── Reset minimal ── */
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background: var(--bg);
-            color: var(--text);
+            font-family: var(--mh-font-sans);
+            background: var(--mh-bg-base);
+            color: var(--mh-text-primary);
             min-height: 100vh;
             min-height: 100dvh;
             -webkit-font-smoothing: antialiased;
@@ -58,171 +61,67 @@
             z-index: 0;
         }
 
-        .container {
+        .mh-container {
             position: relative;
             z-index: 1;
             max-width: 480px;
             margin: 0 auto;
-            padding: 24px 16px 40px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            padding: 28px 18px 32px;
             min-height: 100vh;
             min-height: 100dvh;
-            justify-content: flex-start;
+            display: flex;
+            flex-direction: column;
         }
 
-        .back-link {
+        /* ── Header ── */
+        .mh-header {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            padding: 16px 0 4px;
+        }
+        .mh-header .mh-logo { width: 56px; height: 56px; }
+
+        .mh-back-link {
             align-self: flex-start;
-            color: var(--text-muted);
-            font-size: 0.85rem;
+            color: var(--mh-text-tertiary);
+            font-family: var(--mh-font-sans);
+            font-size: 12.5px;
             text-decoration: none;
             padding: 4px 8px;
-            margin-bottom: 4px;
-        }
-
-        .back-link:hover { color: var(--text); }
-
-        .header {
-            text-align: center;
-            padding: 24px 0 8px;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
+            display: inline-flex;
             align-items: center;
+            gap: 4px;
+            transition: color 150ms ease;
+        }
+        .mh-back-link:hover { color: var(--mh-text-secondary); }
+
+        /* ── Tool row card (override mh-card padding for denser layout) ── */
+        .mh-tool-card {
+            padding: 14px 16px;
         }
 
-        .header .logo {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 16px;
-            display: block;
-        }
-
-        .header h1 {
-            font-size: 1.75rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            color: #ffffff;
-        }
-
-        .header .subtitle {
-            font-size: 0.95rem;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        .cards {
+        /* ── Footer admin (email left + logout right) ── */
+        .mh-footer-admin {
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
             gap: 12px;
             margin-top: 28px;
-            width: 100%;
+            padding: 16px 4px;
+            font-family: var(--mh-font-sans);
+            font-size: 12px;
+            color: var(--mh-text-tertiary);
         }
 
-        .card {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            background: var(--bg-card);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: var(--radius);
-            padding: 16px;
-            text-decoration: none;
-            color: var(--text);
-            min-height: var(--tap-min);
-            transition: background 0.2s, transform 0.15s;
-            opacity: 0;
-            transform: translateY(12px);
-            animation: fadeInUp 0.4s ease forwards;
-        }
+        /* ── Tabler icon size adjustment ── */
+        .mh-icon-box .ti { font-size: 22px; }
 
-        .card:nth-child(1) { animation-delay: 0.05s; }
-        .card:nth-child(2) { animation-delay: 0.10s; }
-        .card:nth-child(3) { animation-delay: 0.15s; }
-        .card:nth-child(4) { animation-delay: 0.20s; }
-        .card:nth-child(5) { animation-delay: 0.25s; }
-        .card:nth-child(6) { animation-delay: 0.30s; }
-        .card:nth-child(7) { animation-delay: 0.35s; }
-
-        @keyframes fadeInUp {
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .card:active {
-            transform: scale(0.97);
-            background: var(--bg-card-hover);
-        }
-
-        @media (hover: hover) {
-            .card:hover {
-                background: var(--bg-card-hover);
-                transform: translateY(-2px);
-            }
-        }
-
-        .card.disabled {
-            opacity: 0.5;
-            cursor: default;
-            pointer-events: none;
-        }
-
-        .card.disabled:hover,
-        .card.disabled:active {
-            background: var(--bg-card);
-            transform: none;
-        }
-
-        .card-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
-            background: var(--accent-soft);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            font-size: 1.3rem;
-        }
-
-        .card-body {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .card-title {
-            font-size: 1rem;
-            font-weight: 600;
-            line-height: 1.3;
-        }
-
-        .card-sub {
-            font-size: 0.82rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        .card-arrow {
-            color: var(--text-muted);
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
-
-        .logout {
-            margin-top: 32px;
-            color: var(--text-muted);
-            font-size: 0.82rem;
-            text-decoration: none;
-            cursor: pointer;
-            background: none;
-            border: none;
-            font-family: inherit;
-            padding: 8px 12px;
-        }
-
-        .logout:hover {
-            color: var(--text);
-            text-decoration: underline;
+        @media (max-width: 380px) {
+            .mh-container { padding: 22px 14px 24px; }
+            .mh-tool-card { padding: 12px 14px; }
         }
     </style>
 </head>
@@ -230,10 +129,14 @@
 
     <canvas id="bg-canvas"></canvas>
 
-    <div class="container">
-        <a href="/" class="back-link">&larr; Espace &eacute;l&egrave;ve</a>
-        <header class="header">
-            <svg class="logo" width="64" height="64" viewBox="0 0 72 72">
+    <div class="mh-container">
+        <a href="/" class="mh-back-link" aria-label="Retour à l'espace élève">
+            <i class="ti ti-chevron-left" aria-hidden="true"></i>
+            <span>Espace élève</span>
+        </a>
+
+        <header class="mh-header mh-fade-in">
+            <svg class="mh-logo" width="56" height="56" viewBox="0 0 72 72" aria-hidden="true">
                 <circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
                 <rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
                 <rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
@@ -241,73 +144,108 @@
                 <rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
                 <rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
             </svg>
-            <h1>Master Hub Admin</h1>
-            <p class="subtitle">Outils</p>
+            <h1 class="mh-title-hero" style="font-size:24px">Master Hub</h1>
+            <div class="mh-section-label" style="margin:0">Admin · Outils</div>
         </header>
 
-        <div class="cards">
-            <a class="card" href="/admin/transcripteur.html">
-                <div class="card-icon">&#127897;&#65039;</div>
-                <div class="card-body">
-                    <div class="card-title">Transcripteur</div>
-                    <div class="card-sub">Audio &rarr; texte &rarr; cours</div>
-                </div>
-                <span class="card-arrow">&rsaquo;</span>
-            </a>
-            <a class="card" href="/admin/shorts.html">
-                <div class="card-icon">&#9986;&#65039;</div>
-                <div class="card-body">
-                    <div class="card-title">Shorts</div>
-                    <div class="card-sub">Passages postables Insta/TikTok</div>
-                </div>
-                <span class="card-arrow">&rsaquo;</span>
-            </a>
-            <a class="card" href="/admin/loops.html">
-                <div class="card-icon">&#129345;</div>
-                <div class="card-body">
-                    <div class="card-title">Mes boucles</div>
-                    <div class="card-sub">Biblioth&egrave;que cross-device</div>
-                </div>
-                <span class="card-arrow">&rsaquo;</span>
-            </a>
-            <a class="card" href="/admin/quiz.html">
-                <div class="card-icon">&#127925;</div>
-                <div class="card-body">
-                    <div class="card-title">Quiz</div>
-                    <div class="card-sub">Sessions &eacute;l&egrave;ves &amp; statistiques</div>
-                </div>
-                <span class="card-arrow">&rsaquo;</span>
-            </a>
-            <a class="card" href="/admin/stems.html">
-                <div class="card-icon">&#127898;&#65039;</div>
-                <div class="card-body">
-                    <div class="card-title">S&eacute;parateur de pistes</div>
-                    <div class="card-sub" id="stems-sub">Demucs &middot; isole chant / batterie / basse</div>
-                </div>
-                <span class="card-arrow">&rsaquo;</span>
-            </a>
-            <a class="card" href="/admin/analyse.html">
-                <div class="card-icon">&#127916;</div>
-                <div class="card-body">
-                    <div class="card-title">Analyse</div>
-                    <div class="card-sub">Vid&eacute;os p&eacute;dagogiques &middot; EQ &amp; vitesse</div>
-                </div>
-                <span class="card-arrow">&rsaquo;</span>
-            </a>
-            <a class="card" href="/admin/eleves.html">
-                <div class="card-icon">&#128101;</div>
-                <div class="card-body">
-                    <div class="card-title">&Eacute;l&egrave;ves</div>
-                    <div class="card-sub">Profils &amp; suivi</div>
-                </div>
-                <span class="card-arrow">&rsaquo;</span>
-            </a>
+        <!-- ── Section 1 : CAPTURE & CONTENU ── -->
+        <section class="mh-section">
+            <div class="mh-section-label">Capture &amp; contenu</div>
+            <div class="mh-stack mh-stagger">
+
+                <a class="mh-card mh-card-row mh-tool-card" href="/admin/transcripteur.html">
+                    <div class="mh-icon-box violet"><i class="ti ti-microphone" aria-hidden="true"></i></div>
+                    <div class="mh-card-body">
+                        <div class="mh-card-title">Transcripteur</div>
+                        <div class="mh-card-sub">Audio → texte → cours</div>
+                    </div>
+                    <i class="ti ti-chevron-right mh-chevron-right" aria-hidden="true"></i>
+                </a>
+
+                <a class="mh-card mh-card-row mh-tool-card" href="/admin/shorts.html">
+                    <div class="mh-icon-box gold"><i class="ti ti-scissors" aria-hidden="true"></i></div>
+                    <div class="mh-card-body">
+                        <div class="mh-card-title">Shorts</div>
+                        <div class="mh-card-sub">Passages postables Insta / TikTok</div>
+                    </div>
+                    <span class="mh-badge gold">New</span>
+                </a>
+
+            </div>
+        </section>
+
+        <!-- ── Section 2 : AUDIO & ANALYSE ── -->
+        <section class="mh-section">
+            <div class="mh-section-label">Audio &amp; analyse</div>
+            <div class="mh-stack mh-stagger">
+
+                <a class="mh-card mh-card-row mh-tool-card" href="/admin/stems.html">
+                    <div class="mh-icon-box teal"><i class="ti ti-waveform" aria-hidden="true"></i></div>
+                    <div class="mh-card-body">
+                        <div class="mh-card-title">Séparateur de pistes</div>
+                        <div class="mh-card-sub" id="stems-sub">Demucs · isole chant / batterie / basse</div>
+                    </div>
+                    <span class="mh-inline-stat" id="stems-inline-stat"></span>
+                    <i class="ti ti-chevron-right mh-chevron-right" aria-hidden="true"></i>
+                </a>
+
+                <a class="mh-card mh-card-row mh-tool-card" href="/admin/analyse.html">
+                    <div class="mh-icon-box violet"><i class="ti ti-movie" aria-hidden="true"></i></div>
+                    <div class="mh-card-body">
+                        <div class="mh-card-title">Analyse</div>
+                        <div class="mh-card-sub">Vidéos pédagogiques · EQ &amp; vitesse</div>
+                    </div>
+                    <i class="ti ti-chevron-right mh-chevron-right" aria-hidden="true"></i>
+                </a>
+
+                <a class="mh-card mh-card-row mh-tool-card" href="/admin/loops.html">
+                    <div class="mh-icon-box pink"><i class="ti ti-rhythm" aria-hidden="true"></i></div>
+                    <div class="mh-card-body">
+                        <div class="mh-card-title">Mes boucles</div>
+                        <div class="mh-card-sub">Bibliothèque cross-device</div>
+                    </div>
+                    <i class="ti ti-chevron-right mh-chevron-right" aria-hidden="true"></i>
+                </a>
+
+            </div>
+        </section>
+
+        <!-- ── Section 3 : PÉDAGOGIE ── -->
+        <section class="mh-section">
+            <div class="mh-section-label">Pédagogie</div>
+            <div class="mh-stack mh-stagger">
+
+                <a class="mh-card mh-card-row mh-tool-card" href="/admin/quiz.html">
+                    <div class="mh-icon-box gold"><i class="ti ti-music" aria-hidden="true"></i></div>
+                    <div class="mh-card-body">
+                        <div class="mh-card-title">Quiz</div>
+                        <div class="mh-card-sub">Sessions élèves &amp; statistiques</div>
+                    </div>
+                    <i class="ti ti-chevron-right mh-chevron-right" aria-hidden="true"></i>
+                </a>
+
+                <a class="mh-card mh-card-row mh-tool-card" href="/admin/eleves.html">
+                    <div class="mh-icon-box neutral"><i class="ti ti-users" aria-hidden="true"></i></div>
+                    <div class="mh-card-body">
+                        <div class="mh-card-title">Élèves</div>
+                        <div class="mh-card-sub">Profils &amp; suivi</div>
+                    </div>
+                    <span class="mh-inline-stat" id="eleves-inline-stat"></span>
+                    <i class="ti ti-chevron-right mh-chevron-right" aria-hidden="true"></i>
+                </a>
+
+            </div>
+        </section>
+
+        <div class="mh-footer-admin">
+            <span id="admin-identity">Admin connecté</span>
+            <button class="mh-link-muted" id="logout-btn" type="button">Se déconnecter</button>
         </div>
 
-        <button class="logout" id="logout-btn" type="button">Se d&eacute;connecter</button>
     </div>
 
     <script>
+    // ── Logout ──
     document.getElementById('logout-btn').addEventListener('click', function () {
         fetch('/api/admin/logout', { method: 'POST', credentials: 'same-origin' })
           .finally(function () { window.location.replace('/admin/login.html'); });
@@ -315,34 +253,66 @@
     </script>
 
     <script>
-    // ── Compteur stems mensuel — fail silently si pas de session admin ──
+    // ── Compteur stems mensuel (fail silently) ──
     (function () {
         var sub = document.getElementById('stems-sub');
-        if (!sub) return;
+        var inlineStat = document.getElementById('stems-inline-stat');
+        if (!sub || !inlineStat) return;
         fetch('/api/stems/stats', { credentials: 'same-origin' })
             .then(function (r) { return r.ok ? r.json() : null; })
             .then(function (j) {
                 if (!j || !j.ok) return;
                 var n = j.count || 0;
                 var cap = j.cap || 20;
-                var cost = (j.costEUR || 0).toLocaleString('fr-FR', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                });
-                var word = n === 1 ? 'séparation' : 'séparations';
-                sub.textContent = 'Ce mois : ' + n + ' / ' + cap + ' ' + word + ' · ~' + cost + ' €';
-                if (n >= cap) sub.style.color = '#e05c6b';
-                else if (n >= cap - 3) sub.style.color = '#f0b429';
+                inlineStat.textContent = n + ' / ' + cap;
+                if (n >= cap)            inlineStat.style.color = '#e05c6b';
+                else if (n >= cap - 3)   inlineStat.style.color = '#f0b429';
+                // sub conserve sa description par défaut ; le compteur est inline.
             })
-            .catch(function () { /* fail silently — sub reste sur defaultLabel */ });
+            .catch(function () { /* fail silently */ });
     })();
     </script>
 
     <script>
-    // ── Manifest PWA inline (scope /admin/, violet #8B6FE8) ──
+    // ── Compteur élèves actifs (fail silently) ──
+    (function () {
+        var stat = document.getElementById('eleves-inline-stat');
+        if (!stat) return;
+        fetch('/api/eleves', { credentials: 'same-origin' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) {
+                if (!j || !j.ok || !Array.isArray(j.eleves)) return;
+                var n = j.eleves.length;
+                stat.textContent = n + ' actif' + (n > 1 ? 's' : '');
+            })
+            .catch(function () { /* fail silently */ });
+    })();
+    </script>
+
+    <script>
+    // ── Identité admin (best-effort depuis le résultat de /api/admin/check) ──
+    (function () {
+        var slot = document.getElementById('admin-identity');
+        if (!slot) return;
+        // Petit polling : si __adminInfo est arrivé via le check du <head>, on l'utilise.
+        var tries = 0;
+        function setIdentity() {
+            var info = window.__adminInfo;
+            if (info && (info.email || info.name)) {
+                slot.textContent = info.email || info.name;
+                return;
+            }
+            if (tries++ < 20) setTimeout(setIdentity, 100);
+        }
+        setIdentity();
+    })();
+    </script>
+
+    <script>
+    // ── Manifest PWA inline (scope /admin/, gold #d5b048 sur la nouvelle palette) ──
     (function(){
         var iconSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72" width="192" height="192">'
-            + '<rect width="72" height="72" rx="16" fill="#8B6FE8"/>'
+            + '<rect width="72" height="72" rx="16" fill="#d5b048"/>'
             + '<circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="1.5"/>'
             + '<rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
             + '<rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>'
@@ -362,8 +332,8 @@
             start_url: "/admin/",
             scope: "/admin/",
             display: "standalone",
-            background_color: "#0f0f14",
-            theme_color: "#0f0f14",
+            background_color: "#0a0a0f",
+            theme_color: "#0a0a0f",
             icons: [
                 { src: iconUrl, sizes: "192x192", type: "image/svg+xml" },
                 { src: iconUrl, sizes: "512x512", type: "image/svg+xml" }
@@ -378,7 +348,7 @@
     </script>
 
     <script>
-    // ── Fond animé — touches piano flottantes (cohérent avec l'index élève) ──
+    // ── Fond animé — touches piano flottantes ──
     (function() {
         var canvas = document.getElementById("bg-canvas");
         var ctx = canvas.getContext("2d");
