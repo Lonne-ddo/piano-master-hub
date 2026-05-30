@@ -728,6 +728,95 @@
     .theory-label { font-size: 12px; color: var(--text2); line-height: 1.3; }
     .theory-item.done .theory-label { color: var(--text1); }
 
+    /* ── Répertoire (Library de référence) ─────────────────── */
+    .repertoire-head { justify-content: space-between; }
+    .repertoire-add-btn {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 11.5px; font-weight: 500;
+      letter-spacing: 0; text-transform: none;
+      padding: 5px 11px; border-radius: 8px;
+      background: var(--v-dim); color: var(--v);
+      border: 1px solid var(--borderv);
+      cursor: pointer; transition: background .15s, border-color .15s;
+    }
+    .repertoire-add-btn:hover { background: rgba(139,111,232,0.22); border-color: var(--v); }
+    .repertoire-list { display: flex; flex-direction: column; }
+    .repertoire-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 12px 2px;
+      border-top: 1px solid var(--border);
+    }
+    .repertoire-row:first-child { border-top: none; }
+    .repertoire-row-main { flex: 1; min-width: 0; }
+    .repertoire-row-title {
+      font-size: 14px; font-weight: 600; color: var(--text1); line-height: 1.3;
+    }
+    .repertoire-key { color: var(--text3); font-weight: 500; }
+    .repertoire-row-notes {
+      font-size: 12px; color: var(--text2); line-height: 1.45; margin-top: 3px;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .rep-badge {
+      flex-shrink: 0;
+      font-size: 9.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+      padding: 3px 9px; border-radius: 999px; line-height: 1.3; white-space: nowrap;
+    }
+    .rep-badge.en_cours { background: var(--mh-gold-glow);   color: var(--mh-gold);   }
+    .rep-badge.maitrise { background: var(--mh-teal-glow);   color: var(--mh-teal);   }
+    .rep-badge.bonus    { background: var(--mh-violet-glow); color: var(--mh-violet); }
+    .rep-row-actions { display: flex; gap: 2px; flex-shrink: 0; }
+    .rep-icon-btn {
+      background: none; border: none; color: var(--text3);
+      cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 6px;
+      line-height: 1; transition: color .15s, background .15s;
+    }
+    .rep-icon-btn:hover { color: var(--v); background: var(--bg2); }
+    .rep-icon-btn.del:hover { color: var(--red); }
+
+    /* ── Modal morceau (CRUD répertoire) ───────────────────── */
+    .rep-radio-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .rep-pill {
+      flex: 1; min-width: 90px;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 9px 10px; border-radius: 9px;
+      background: var(--bg2); border: 1px solid var(--border);
+      color: var(--text2); font-size: 12.5px; font-weight: 500;
+      cursor: pointer; transition: all .15s; user-select: none;
+    }
+    .rep-pill input { position: absolute; opacity: 0; pointer-events: none; }
+    .rep-pill.sel.en_cours { background: var(--mh-gold-glow);   border-color: var(--mh-gold-border);   color: var(--mh-gold);   }
+    .rep-pill.sel.maitrise { background: var(--mh-teal-glow);   border-color: var(--mh-teal);          color: var(--mh-teal);   }
+    .rep-pill.sel.bonus    { background: var(--mh-violet-glow); border-color: var(--mh-violet-border); color: var(--mh-violet); }
+    .rep-res-sep {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em;
+      color: var(--text3); margin: 6px 0 2px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .rep-res-sep::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .rep-stems-box {
+      max-height: 132px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 4px;
+      border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg2);
+    }
+    .rep-stems-row {
+      display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text1);
+      cursor: pointer; padding: 3px 4px; border-radius: 6px;
+    }
+    .rep-stems-row:hover { background: var(--bg1); }
+    .rep-stems-row .tag { font-size: 10px; color: var(--text3); }
+    .rep-grille-preview {
+      margin-top: 8px; max-height: 120px; border-radius: 8px; border: 1px solid var(--border);
+      display: none;
+    }
+    .rep-delete-btn {
+      background: transparent; border: 1px solid rgba(224,92,107,0.4); color: var(--red);
+      padding: 9px 14px; border-radius: 8px; cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 500; margin-right: auto;
+      transition: background .15s;
+    }
+    .rep-delete-btn:hover { background: rgba(224,92,107,0.12); }
+
     /* ── Link list (canaux + doc) ──────────────────────────── */
     .link-list { display: flex; flex-direction: column; gap: 6px; }
     .link-item {
@@ -1014,6 +1103,86 @@
   </div>
 </div>
 
+<!-- ═══ MODAL : Morceau (répertoire CRUD) ═══════════════════════ -->
+<div class="quick-modal-overlay" id="morceauOverlay" style="display:none">
+  <div class="quick-modal">
+    <h2 id="morceauModalTitle">Ajouter un morceau</h2>
+    <form id="morceauForm" autocomplete="off">
+      <input type="hidden" id="morceauId">
+      <input type="hidden" id="morceauSlug">
+
+      <div class="quick-field">
+        <label for="morceauTitre">Titre *</label>
+        <input type="text" id="morceauTitre" maxlength="200" required placeholder="ex : Amazing Grace">
+      </div>
+
+      <div class="quick-field">
+        <label for="morceauTonalite">Tonalit&eacute;</label>
+        <input type="text" id="morceauTonalite" maxlength="60" list="tonalitesList" placeholder="ex : F major">
+        <datalist id="tonalitesList">
+          <option value="C major"></option><option value="Db major"></option><option value="D major"></option>
+          <option value="Eb major"></option><option value="E major"></option><option value="F major"></option>
+          <option value="F# major"></option><option value="G major"></option><option value="Ab major"></option>
+          <option value="A major"></option><option value="Bb major"></option><option value="B major"></option>
+          <option value="C minor"></option><option value="C# minor"></option><option value="D minor"></option>
+          <option value="Eb minor"></option><option value="E minor"></option><option value="F minor"></option>
+          <option value="F# minor"></option><option value="G minor"></option><option value="G# minor"></option>
+          <option value="A minor"></option><option value="Bb minor"></option><option value="B minor"></option>
+        </datalist>
+      </div>
+
+      <div class="quick-field">
+        <label for="morceauDate">Date de d&eacute;but *</label>
+        <input type="date" id="morceauDate" required>
+      </div>
+
+      <div class="quick-field">
+        <label>Statut</label>
+        <div class="rep-radio-pills" id="morceauStatutPills">
+          <label class="rep-pill en_cours sel"><input type="radio" name="morceauStatut" value="en_cours" checked>🟡 En cours</label>
+          <label class="rep-pill maitrise"><input type="radio" name="morceauStatut" value="maitrise">🟢 Ma&icirc;tris&eacute;</label>
+          <label class="rep-pill bonus"><input type="radio" name="morceauStatut" value="bonus">🟣 Bonus</label>
+        </div>
+      </div>
+
+      <div class="quick-field">
+        <label for="morceauNotes">Notes</label>
+        <textarea id="morceauNotes" rows="3" placeholder="Travail sur drop 2, passing chords…"></textarea>
+      </div>
+
+      <div class="rep-res-sep">Ressources (optionnelles)</div>
+
+      <div class="quick-field">
+        <label for="morceauAnalyse">Analyse Master Hub</label>
+        <select id="morceauAnalyse"><option value="">Aucune</option></select>
+      </div>
+
+      <div class="quick-field">
+        <label>Stems / multitrack</label>
+        <div class="rep-stems-box" id="morceauStems"><span class="quick-hint">Chargement…</span></div>
+      </div>
+
+      <div class="quick-field">
+        <label for="morceauYoutube">Lien YouTube</label>
+        <input type="url" id="morceauYoutube" placeholder="https://youtu.be/…">
+      </div>
+
+      <div class="quick-field">
+        <label for="morceauGrille">Image grille (URL)</label>
+        <input type="url" id="morceauGrille" placeholder="https://…">
+        <img class="rep-grille-preview" id="morceauGrillePreview" alt="Aper&ccedil;u grille">
+      </div>
+
+      <div class="quick-error" id="morceauError"></div>
+      <div class="quick-actions">
+        <button type="button" class="rep-delete-btn" id="morceauDeleteBtn" style="display:none" onclick="deleteMorceauFromModal()">Supprimer</button>
+        <button type="button" class="hbtn" onclick="closeMorceauModal()">Annuler</button>
+        <button type="submit" class="mh-btn-primary" id="morceauSubmit" style="width:auto;padding:10px 18px;">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ═══ SCRIPTS ═══════════════════════════════════════════════ -->
 <script>
 // ─── App logic ─────────────────────────────────────────────────
@@ -1272,6 +1441,17 @@ function renderProfile(s) {
         </div>
       </div>
 
+      <!-- ══ CARD : RÉPERTOIRE (Library de référence) ══════════ -->
+      <div class="card repertoire-card" style="grid-column:1/-1">
+        <div class="card-title repertoire-head">
+          <span>🎼 Répertoire</span>
+          <button type="button" class="repertoire-add-btn" onclick="openMorceauModal('${s.id}')">+ Ajouter un morceau</button>
+        </div>
+        <div id="repertoire-list" data-slug="${s.id}">
+          <p class="empty-note">Chargement…</p>
+        </div>
+      </div>
+
       <!-- ══ CARD 3 : THÉORIE COUVERTE ═════════════════════════ -->
       <div class="card">
         <div class="card-title">📊 Théorie couverte</div>
@@ -1413,6 +1593,9 @@ function renderProfile(s) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); makeDateEditable(el, s.id, field, kind); }
     });
   });
+
+  // Répertoire (Library) : fetch séparé du profil (KV repertoire:{slug}).
+  loadRepertoire(s.id);
 }
 
 
@@ -2185,6 +2368,245 @@ init();
   link.rel = 'manifest';
   link.href = URL.createObjectURL(blob);
   document.head.appendChild(link);
+})();
+</script>
+
+<script>
+// ═══ Répertoire (Library de référence) — CRUD ═══════════════════
+// Source : KV repertoire:{slug} via /api/eleves/:slug/repertoire (lecture
+// publique) + /api/admin/eleves/:slug/repertoire (écriture admin).
+var _repertoireCache = {};        // slug -> [morceaux]
+var _morceauResCache = {};        // slug -> [items analyse] (cache fetch)
+var _morceauEditing = null;       // { slug, id } courant dans la modale
+
+function repStatutLabel(s) {
+  return s === 'maitrise' ? 'Maîtrisé' : s === 'bonus' ? 'Bonus' : 'En cours';
+}
+function repTodayIso() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+async function loadRepertoire(slug) {
+  var list = document.getElementById('repertoire-list');
+  if (!list || list.dataset.slug !== slug) return; // profil changé entre-temps
+  try {
+    var r = await fetch('/api/eleves/' + encodeURIComponent(slug) + '/repertoire', { credentials: 'same-origin' });
+    var j = await r.json();
+    var morceaux = (j && j.ok && Array.isArray(j.morceaux)) ? j.morceaux : [];
+    _repertoireCache[slug] = morceaux;
+    list = document.getElementById('repertoire-list');
+    if (!list || list.dataset.slug !== slug) return; // re-check après await
+    renderRepertoireList(slug, morceaux);
+  } catch (e) {
+    list = document.getElementById('repertoire-list');
+    if (list && list.dataset.slug === slug) list.innerHTML = '<p class="empty-note">Répertoire momentanément indisponible.</p>';
+  }
+}
+
+function renderRepertoireList(slug, morceaux) {
+  var list = document.getElementById('repertoire-list');
+  if (!list) return;
+  if (!morceaux.length) {
+    list.className = '';
+    list.innerHTML = '<p class="empty-note">Aucun morceau. Clique sur « + Ajouter un morceau ».</p>';
+    return;
+  }
+  list.className = 'repertoire-list';
+  list.innerHTML = morceaux.map(function (m) {
+    var key = m.tonalite ? ' <span class="repertoire-key">· ' + escapeHtml(m.tonalite) + '</span>' : '';
+    var notes = m.notes ? '<div class="repertoire-row-notes">' + escapeHtml(m.notes) + '</div>' : '';
+    return '<div class="repertoire-row">' +
+      '<div class="repertoire-row-main">' +
+        '<div class="repertoire-row-title">' + escapeHtml(m.titre) + key + '</div>' + notes +
+      '</div>' +
+      '<span class="rep-badge ' + escapeHtml(m.statut) + '">' + escapeHtml(repStatutLabel(m.statut)) + '</span>' +
+      '<div class="rep-row-actions">' +
+        '<button type="button" class="rep-icon-btn" title="Éditer" onclick="openMorceauModal(\'' + slug + '\',\'' + m.id + '\')">✎</button>' +
+        '<button type="button" class="rep-icon-btn del" title="Supprimer" onclick="deleteMorceauRow(\'' + slug + '\',\'' + m.id + '\')">🗑</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function setMorceauStatut(value) {
+  document.querySelectorAll('#morceauStatutPills .rep-pill').forEach(function (p) {
+    var input = p.querySelector('input');
+    var on = input.value === value;
+    input.checked = on;
+    p.classList.toggle('sel', on);
+  });
+}
+
+function updateGrillePreview() {
+  var url = document.getElementById('morceauGrille').value.trim();
+  var img = document.getElementById('morceauGrillePreview');
+  if (/^https?:\/\//i.test(url)) { img.src = url; img.style.display = 'block'; }
+  else { img.removeAttribute('src'); img.style.display = 'none'; }
+}
+
+async function openMorceauModal(slug, id) {
+  _morceauEditing = { slug: slug, id: id || null };
+  var editing = !!id;
+  document.getElementById('morceauModalTitle').textContent = editing ? 'Modifier le morceau' : 'Ajouter un morceau';
+  document.getElementById('morceauSlug').value = slug;
+  document.getElementById('morceauId').value = id || '';
+  document.getElementById('morceauError').textContent = '';
+  document.getElementById('morceauDeleteBtn').style.display = editing ? '' : 'none';
+
+  var m = editing ? (_repertoireCache[slug] || []).find(function (x) { return x.id === id; }) : null;
+  var res = (m && m.resources) ? m.resources : {};
+
+  document.getElementById('morceauTitre').value = m ? (m.titre || '') : '';
+  document.getElementById('morceauTonalite').value = m ? (m.tonalite || '') : '';
+  document.getElementById('morceauDate').value = (m && m.date_debut) ? m.date_debut : repTodayIso();
+  setMorceauStatut(m ? (m.statut || 'en_cours') : 'en_cours');
+  document.getElementById('morceauNotes').value = (m && m.notes) ? m.notes : '';
+  document.getElementById('morceauYoutube').value = res.youtube_url || '';
+  document.getElementById('morceauGrille').value = res.grille_image_url || '';
+  updateGrillePreview();
+
+  document.getElementById('morceauOverlay').style.display = 'flex';
+  await populateMorceauResources(slug, res.analyse_id || '', Array.isArray(res.stems_ids) ? res.stems_ids : []);
+}
+
+function closeMorceauModal() {
+  document.getElementById('morceauOverlay').style.display = 'none';
+  _morceauEditing = null;
+}
+
+async function populateMorceauResources(slug, selAnalyse, selStems) {
+  var sel = document.getElementById('morceauAnalyse');
+  var stemsBox = document.getElementById('morceauStems');
+  sel.innerHTML = '<option value="">Aucune</option>';
+  stemsBox.innerHTML = '<span class="quick-hint">Chargement…</span>';
+
+  var items = _morceauResCache[slug];
+  if (!items) {
+    try {
+      var r = await fetch('/api/eleves/' + encodeURIComponent(slug) + '/analyse', { credentials: 'same-origin' });
+      var j = await r.json();
+      items = (j && j.ok && Array.isArray(j.items)) ? j.items : [];
+      _morceauResCache[slug] = items;
+    } catch (e) { items = []; }
+  }
+  // Si l'utilisateur a fermé la modale ou changé d'élève pendant le fetch
+  if (!_morceauEditing || _morceauEditing.slug !== slug) return;
+
+  items.forEach(function (it) {
+    var o = document.createElement('option');
+    o.value = it.id;
+    o.textContent = it.title + (it.type === 'multitrack' ? ' · multitrack' : '') + (it.legacy ? ' (legacy)' : '');
+    if (it.id === selAnalyse) o.selected = true;
+    sel.appendChild(o);
+  });
+  if (selAnalyse && !items.some(function (it) { return it.id === selAnalyse; })) {
+    var o = document.createElement('option');
+    o.value = selAnalyse; o.textContent = selAnalyse + ' (introuvable)'; o.selected = true;
+    sel.appendChild(o);
+  }
+
+  var stemItems = items.filter(function (it) { return it.type === 'multitrack' || it.legacy; });
+  if (!stemItems.length) {
+    stemsBox.innerHTML = '<span class="quick-hint">Aucun record multitrack / legacy pour cet élève.</span>';
+  } else {
+    stemsBox.innerHTML = stemItems.map(function (it) {
+      var checked = selStems.indexOf(it.id) !== -1 ? 'checked' : '';
+      return '<label class="rep-stems-row"><input type="checkbox" value="' + escapeHtml(it.id) + '" ' + checked + '>' +
+        '<span>' + escapeHtml(it.title) + '</span>' +
+        '<span class="tag">' + (it.legacy ? 'legacy' : 'multitrack') + '</span></label>';
+    }).join('');
+  }
+}
+
+async function submitMorceau(e) {
+  e.preventDefault();
+  var slug = document.getElementById('morceauSlug').value;
+  var id = document.getElementById('morceauId').value;
+  var errEl = document.getElementById('morceauError');
+  errEl.textContent = '';
+
+  var statutInput = document.querySelector('#morceauStatutPills input:checked');
+  var stemIds = Array.prototype.slice.call(document.querySelectorAll('#morceauStems input:checked')).map(function (c) { return c.value; });
+  var payload = {
+    titre: document.getElementById('morceauTitre').value.trim(),
+    tonalite: document.getElementById('morceauTonalite').value.trim() || null,
+    date_debut: document.getElementById('morceauDate').value,
+    statut: statutInput ? statutInput.value : 'en_cours',
+    notes: document.getElementById('morceauNotes').value.trim() || null,
+    resources: {
+      analyse_id: document.getElementById('morceauAnalyse').value || null,
+      stems_ids: stemIds,
+      youtube_url: document.getElementById('morceauYoutube').value.trim() || null,
+      grille_image_url: document.getElementById('morceauGrille').value.trim() || null
+    }
+  };
+  if (!payload.titre) { errEl.textContent = 'Le titre est requis.'; return; }
+  if (!payload.date_debut) { errEl.textContent = 'La date de début est requise.'; return; }
+
+  var btn = document.getElementById('morceauSubmit');
+  btn.disabled = true;
+  try {
+    var url = id
+      ? '/api/admin/eleves/' + encodeURIComponent(slug) + '/repertoire/' + encodeURIComponent(id)
+      : '/api/admin/eleves/' + encodeURIComponent(slug) + '/repertoire';
+    var r = await fetch(url, {
+      method: id ? 'PATCH' : 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    var j = await r.json().catch(function () { return {}; });
+    if (!r.ok || !j.ok) { errEl.textContent = 'Erreur : ' + (j.error || r.status); btn.disabled = false; return; }
+    closeMorceauModal();
+    showToast(id ? 'Morceau modifié ✓' : 'Morceau ajouté ✓');
+    await loadRepertoire(slug);
+  } catch (e2) {
+    errEl.textContent = 'Erreur réseau, réessaie.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function deleteMorceauFromModal() {
+  if (_morceauEditing && _morceauEditing.id) {
+    deleteMorceauRow(_morceauEditing.slug, _morceauEditing.id, true);
+  }
+}
+
+async function deleteMorceauRow(slug, id, fromModal) {
+  var m = (_repertoireCache[slug] || []).find(function (x) { return x.id === id; });
+  var title = m ? m.titre : 'ce morceau';
+  if (!window.confirm('Supprimer « ' + title + ' » du répertoire ?')) return;
+  try {
+    var r = await fetch('/api/admin/eleves/' + encodeURIComponent(slug) + '/repertoire/' + encodeURIComponent(id), {
+      method: 'DELETE', credentials: 'same-origin'
+    });
+    var j = await r.json().catch(function () { return {}; });
+    if (!r.ok || !j.ok) { showToast('Erreur : ' + (j.error || r.status)); return; }
+    if (fromModal) closeMorceauModal();
+    showToast('Morceau supprimé ✓');
+    await loadRepertoire(slug);
+  } catch (e) { showToast('Erreur réseau, réessaie.'); }
+}
+
+window.openMorceauModal = openMorceauModal;
+window.closeMorceauModal = closeMorceauModal;
+window.deleteMorceauRow = deleteMorceauRow;
+window.deleteMorceauFromModal = deleteMorceauFromModal;
+
+// Init listeners de la modale morceau (markup présent au-dessus du script).
+(function initMorceauModal() {
+  var form = document.getElementById('morceauForm');
+  if (form) form.addEventListener('submit', submitMorceau);
+  var pills = document.getElementById('morceauStatutPills');
+  if (pills) pills.addEventListener('change', function (e) {
+    if (e.target && e.target.name === 'morceauStatut') setMorceauStatut(e.target.value);
+  });
+  var grille = document.getElementById('morceauGrille');
+  if (grille) grille.addEventListener('input', updateGrillePreview);
+  var overlay = document.getElementById('morceauOverlay');
+  if (overlay) overlay.addEventListener('click', function (e) { if (e.target === overlay) closeMorceauModal(); });
 })();
 </script>
 </body>
