@@ -377,6 +377,12 @@
             var j = await r.json();
             var items = Array.isArray(j.items) ? j.items : [];
             renderList(items);
+            // Auto-ouverture d'un record depuis ?open=ID (lien depuis le répertoire).
+            var openId = params.get('open');
+            if (openId) {
+                var target = items.find(function (x) { return x.id === openId; });
+                if (target) setTimeout(function () { openPlayer(target); }, 0);
+            }
         } catch (e) {
             renderError(e && e.message);
         }
