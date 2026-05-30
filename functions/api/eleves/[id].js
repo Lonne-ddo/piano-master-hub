@@ -58,6 +58,7 @@ const PROTECTED_FIELDS = [
   'doc_url',
   'canaux',
   'email',
+  'archived',
   '_patchedAt',
 ];
 
@@ -546,6 +547,17 @@ export async function onRequestPatch({ params, request, env }) {
       return jsonResponse({ error: 'nom invalide (1-80 chars)' }, 400);
     }
     updated.nom = nameInput.trim();
+  }
+
+  // ── Handle archived (admin archive/désarchive l'élève) ───────────
+  // body.archived = true|false. true → updated.archived = true ; false → champ supprimé
+  // (record sans champ = non archivé). L'espace élève reste accessible quoi qu'il arrive.
+  if (body.archived !== undefined) {
+    if (typeof body.archived !== 'boolean') {
+      return jsonResponse({ error: 'archived invalide (booléen attendu)' }, 400);
+    }
+    if (body.archived) updated.archived = true;
+    else delete updated.archived;
   }
 
   // ── Backwards-compat : permet PATCH de champs libres (notes, statut, programme) ──

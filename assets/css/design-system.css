@@ -370,6 +370,11 @@
   transition: width 400ms ease;
 }
 
+/* Programme terminé / prolongé (now > date_fin) : signal visuel violet. */
+.mh-progress-fill--over {
+  background: var(--mh-violet);
+}
+
 /* ════════════════════════════════════════════════════════════════
    Footer
    ════════════════════════════════════════════════════════════════ */

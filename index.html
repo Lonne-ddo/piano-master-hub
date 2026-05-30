@@ -472,6 +472,15 @@
         return d.innerHTML;
     }
 
+    // Parse une date ISO "YYYY-MM-DD" → timestamp ms (minuit local), ou null.
+    function parseIsoMs(iso) {
+        if (typeof iso !== 'string') return null;
+        var m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) return null;
+        var t = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)).getTime();
+        return isNaN(t) ? null : t;
+    }
+
     // ──────────────────────────────────────────────
     //  Init — auth magic link (Chantier C)
     //  Si URL = /?eleve={slug} → fetch /api/eleves/{slug}/public avec cookie
@@ -945,20 +954,28 @@
         var progressHtml = '';
         var headDateHtml = '';
         if (stats && stats.nb_cours != null) {
-            var total = (typeof stats.total_cours === 'number' && stats.total_cours > 0) ? stats.total_cours : 8;
-            var current = stats.nb_cours;
-            var overflow = current > total;
-            var pct = overflow
-                ? 100
-                : (typeof stats.progression_pct === 'number'
-                    ? Math.max(0, Math.min(100, stats.progression_pct))
-                    : Math.max(0, Math.min(100, Math.round((current / total) * 100))));
-            var label = overflow
-                ? 'Cours ' + current + ' · prolongation'
-                : 'Cours ' + current + ' sur ' + total;
+            // Label : juste "Cours N" (plus de "sur M" ni de "· prolongation").
+            var label = 'Cours ' + stats.nb_cours;
             titleHtml = '<h2 class="mh-title-hero mh-hero-title">' + escapeHtml(label) + '</h2>';
-            progressHtml = '<div class="mh-progress mh-hero-progress"><div class="mh-progress-fill" style="width:' + pct + '%"></div></div>';
-            // Date à droite : on n'a pas de "prochaine séance" exacte ; on affiche la borne de fin de programme.
+            // Progress bar = % de temps écoulé entre date_debut et date_fin du programme.
+            // Programme terminé/prolongé (now > date_fin) → bar pleine + couleur violet.
+            var startMs = parseIsoMs(stats.date_debut);
+            var endMs = parseIsoMs(stats.date_fin);
+            var pct = 0;
+            var over = false;
+            if (startMs != null && endMs != null && endMs > startMs) {
+                var totalMs = endMs - startMs;
+                var nowMs = Date.now();
+                over = nowMs > endMs;
+                var elapsedMs = Math.min(Math.max(nowMs - startMs, 0), totalMs);
+                pct = (elapsedMs / totalMs) * 100;
+            } else if (typeof stats.progression_pct === 'number') {
+                pct = Math.max(0, Math.min(100, stats.progression_pct));
+            }
+            if (over) pct = 100;
+            var fillClass = 'mh-progress-fill' + (over ? ' mh-progress-fill--over' : '');
+            progressHtml = '<div class="mh-progress mh-hero-progress"><div class="' + fillClass + '" style="width:' + pct + '%"></div></div>';
+            // Date à droite : borne de fin de programme.
             if (stats.date_fin_label) {
                 headDateHtml = '<span class="mh-hero-head-date">Jusqu\'au ' + escapeHtml(stats.date_fin_label) + '</span>';
             }

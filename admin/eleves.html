@@ -244,6 +244,26 @@
     }
     .delete-eleve-btn[disabled] { opacity: .5; cursor: wait; }
 
+    /* Archiver (gris discret) / Désarchiver (violet) */
+    .archive-eleve-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text2);
+      padding: 7px 13px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .archive-eleve-btn:hover { background: rgba(255,255,255,0.05); color: var(--text1); }
+    .archive-eleve-btn.unarchive {
+      border-color: var(--v);
+      color: var(--v);
+    }
+    .archive-eleve-btn.unarchive:hover { background: rgba(139,111,232,0.12); }
+
     @media (max-width: 500px) {
       .sync-btn .label { display: none; }
       .sync-btn { padding: 7px 9px; }
@@ -307,6 +327,35 @@
       color: var(--text1);
       font-weight: 600;
     }
+
+    /* Toggle « ⏷ N archivés » + groupe déroulé */
+    .archived-toggle {
+      flex-shrink: 0;
+      align-self: center;
+      margin-left: 4px;
+      background: none;
+      border: none;
+      color: var(--text2);
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 8px;
+      white-space: nowrap;
+      transition: color .15s, background .15s;
+    }
+    .archived-toggle:hover { color: var(--text1); background: rgba(255,255,255,0.05); }
+    .archived-toggle .caret { font-size: 10px; }
+    .tab-archived-group {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .tab-archived-group .tab-eleve { opacity: 0.5; transition: opacity .15s; }
+    .tab-archived-group .tab-eleve:hover,
+    .tab-archived-group .tab-eleve.active { opacity: 1; }
 
     @media (max-width: 768px) {
       .tab-circle { width: 56px; height: 56px; font-size: 20px; }
@@ -960,6 +1009,11 @@ let STUDENT_LIST = [
   { id: 'tara',   nom: 'Tara' }
 ];
 
+// Élèves archivés : { id, nom }[]. Alimenté par /api/eleves (champ `archived`).
+// Cache local — pas de refetch à chaque toggle d'affichage.
+let ARCHIVED_LIST = [];
+let showArchived = false;
+
 let activeId = null;
 let clientCache = {};
 
@@ -975,15 +1029,38 @@ function escapeHtml(s) {
 
 const MONTHS_SHORT = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
 
-function renderTabs() {
-  const bar = document.getElementById('tabBar');
-  bar.innerHTML = STUDENT_LIST.map(s => `
+function tabHtml(s) {
+  return `
     <button type="button" class="tab-eleve ${activeId === s.id ? 'active' : ''}" onclick="selectStudent('${s.id}')">
       <div class="tab-circle">${escapeHtml(s.nom[0])}</div>
       <div class="tab-name">${escapeHtml(s.nom)}</div>
     </button>
-  `).join('');
+  `;
 }
+
+function renderTabs() {
+  const bar = document.getElementById('tabBar');
+  // Cercles actifs (non-archivés) uniquement.
+  let html = STUDENT_LIST.map(tabHtml).join('');
+
+  // Toggle discret « ⏷ N archivés » → déroule les cercles archivés (opacity .5).
+  if (ARCHIVED_LIST.length) {
+    html += `
+      <button type="button" class="archived-toggle ${showArchived ? 'open' : ''}" onclick="toggleArchived()">
+        <span class="caret">${showArchived ? '⏶' : '⏷'}</span> ${ARCHIVED_LIST.length} archivé${ARCHIVED_LIST.length > 1 ? 's' : ''}
+      </button>`;
+    if (showArchived) {
+      html += `<div class="tab-archived-group">` + ARCHIVED_LIST.map(tabHtml).join('') + `</div>`;
+    }
+  }
+  bar.innerHTML = html;
+}
+
+function toggleArchived() {
+  showArchived = !showArchived;
+  renderTabs();
+}
+window.toggleArchived = toggleArchived;
 
 function triggerStalePulse() {
   const btn = document.getElementById('syncAllBtn');
@@ -1299,6 +1376,9 @@ function renderProfile(s) {
       </div>
     </div>
     <div class="delete-eleve-row">
+      ${s.archived
+        ? `<button type="button" class="archive-eleve-btn unarchive" onclick="archiveEleve('${s.id}','${escapeHtml(s.nom || s.id).replace(/'/g, "&#39;")}',false)">↩ Désarchiver</button>`
+        : `<button type="button" class="archive-eleve-btn" onclick="archiveEleve('${s.id}','${escapeHtml(s.nom || s.id).replace(/'/g, "&#39;")}',true)">📦 Archiver</button>`}
       <button type="button" class="delete-eleve-btn" onclick="deleteEleve('${s.id}','${escapeHtml(s.nom || s.id).replace(/'/g, "&#39;")}')">
         🗑 Supprimer cet élève
       </button>
@@ -1323,7 +1403,7 @@ async function selectStudent(id, forceSync = false) {
   activeId = id;
   renderTabs();
   if (typeof refreshHeaderImpersonateBtn === 'function') refreshHeaderImpersonateBtn();
-  const meta = STUDENT_LIST.find(s => s.id === id);
+  const meta = STUDENT_LIST.find(s => s.id === id) || ARCHIVED_LIST.find(s => s.id === id);
   if (!meta) return;
   const url = new URL(window.location);
   url.searchParams.set('eleve', id);
@@ -1894,15 +1974,18 @@ window.closeAddEleveModal = closeAddEleveModal;
 })();
 
 // Recharge STUDENT_LIST depuis /api/eleves (utilisé après création/suppression)
+const slugToMeta = slug => ({
+  id: String(slug).toLowerCase(),
+  nom: String(slug).charAt(0).toUpperCase() + String(slug).slice(1),
+});
+
 async function reloadStudentList() {
   try {
     const r = await fetch('/api/eleves');
     const j = await r.json();
-    if (j && j.ok && Array.isArray(j.eleves) && j.eleves.length) {
-      STUDENT_LIST = j.eleves.map(slug => ({
-        id: String(slug).toLowerCase(),
-        nom: String(slug).charAt(0).toUpperCase() + String(slug).slice(1),
-      }));
+    if (j && j.ok && Array.isArray(j.eleves)) {
+      STUDENT_LIST = j.eleves.map(slugToMeta);
+      ARCHIVED_LIST = Array.isArray(j.archived) ? j.archived.map(slugToMeta) : [];
       renderTabs();
     }
   } catch (e) { /* fallback : list inchangée */ }
@@ -1943,6 +2026,40 @@ async function deleteEleve(slug, displayName) {
   }
 }
 window.deleteEleve = deleteEleve;
+
+// ─── Archivage élève ──────────────────────────────────────────
+// PATCH /api/eleves/:slug { archived } → refresh sidebar immédiat.
+// L'espace élève reste accessible même archivé (lien direct toujours OK).
+async function archiveEleve(slug, displayName, archived) {
+  const ok = window.confirm(
+    (archived ? 'Archiver « ' : 'Désarchiver « ') + displayName + ' » ?'
+  );
+  if (!ok) return;
+
+  try {
+    const res = await fetch('/api/eleves/' + encodeURIComponent(slug), {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archived: !!archived }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !(j.ok || j.success)) {
+      showToast('Erreur : ' + (j.error || res.status));
+      return;
+    }
+    showToast(archived ? 'Élève archivé ✓' : 'Élève désarchivé ✓');
+    delete clientCache[slug];
+    if (archived) showArchived = true; // garde le groupe archivés ouvert pour voir où il atterrit
+    await reloadStudentList();
+    // Re-fetch léger (pas de sync LLM) → la fiche reflète le nouveau flag archived.
+    activeId = null;
+    selectStudent(slug, false);
+  } catch (e) {
+    showToast('Erreur réseau, réessaie.');
+  }
+}
+window.archiveEleve = archiveEleve;
 
 // ─── Impersonation : voir l'espace d'un élève sans magic link ─
 // POST /api/admin/impersonate/:slug → set cookie mh_session avec
@@ -1994,10 +2111,10 @@ async function init() {
     const r = await fetch('/api/eleves');
     const j = await r.json();
     if (j && j.ok && Array.isArray(j.eleves) && j.eleves.length) {
-      STUDENT_LIST = j.eleves.map(slug => ({
-        id: String(slug).toLowerCase(),
-        nom: String(slug).charAt(0).toUpperCase() + String(slug).slice(1),
-      }));
+      STUDENT_LIST = j.eleves.map(slugToMeta);
+    }
+    if (j && j.ok && Array.isArray(j.archived)) {
+      ARCHIVED_LIST = j.archived.map(slugToMeta);
     }
   } catch (e) { /* fallback hardcodé */ }
   renderTabs();

@@ -1,9 +1,12 @@
 // ─── /api/eleves ─────────────────────────────────────────────────
 // GET  : liste des slugs (public, source de vérité KV `eleves:list`)
+//        Par défaut, les élèves archivés (eleve:<slug>.archived === true) sont
+//        exclus de `eleves`. Ils restent listés dans `archived` (pour l'UI admin).
+//        ?include_archived=true → `eleves` contient tout le monde.
 // POST : création d'un élève (admin only) — slugify nom + unicité.
 //
 // Réponses :
-//   GET  → { ok: true, eleves: ['japhet','messon',...], source: 'kv'|'seeded'|'fallback' }
+//   GET  → { ok: true, eleves: ['japhet',...], archived: ['lea',...], source: 'kv'|'seeded'|'fallback' }
 //   POST → 201 { ok: true, slug, ...eleve } | 400 invalid_input | 409 already_exists | 401 unauthorized
 
 import { requireAdminPassword } from '../_lib/session.js';
@@ -44,19 +47,36 @@ export async function onRequestOptions() {
 }
 
 // ─── GET (public) ────────────────────────────────────────────────
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ request, env }) {
+  const url = new URL(request.url);
+  const includeArchived = url.searchParams.get('include_archived') === 'true';
   try {
     const raw = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
     if (Array.isArray(raw) && raw.length > 0) {
       const cleaned = raw.map(s => String(s).toLowerCase()).filter(Boolean);
-      return jsonResponse({ ok: true, eleves: cleaned, source: 'kv' });
+      // Lit chaque record pour déterminer le flag archived. Liste courte → coût négligeable.
+      // Record absent ou champ manquant → undefined === false (non archivé).
+      const flags = await Promise.all(cleaned.map(async (slug) => {
+        try {
+          const rec = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`, { type: 'json' });
+          return rec?.archived === true;
+        } catch { return false; }
+      }));
+      const active = cleaned.filter((_, i) => !flags[i]);
+      const archived = cleaned.filter((_, i) => flags[i]);
+      return jsonResponse({
+        ok: true,
+        eleves: includeArchived ? cleaned : active,
+        archived,
+        source: 'kv',
+      });
     }
     // Bootstrap : seed la clé eleves:list avec la liste par défaut (idempotent)
     await env.MASTERHUB_STUDENTS.put('eleves:list', JSON.stringify(DEFAULT_ELEVES));
-    return jsonResponse({ ok: true, eleves: DEFAULT_ELEVES, source: 'seeded' });
+    return jsonResponse({ ok: true, eleves: DEFAULT_ELEVES, archived: [], source: 'seeded' });
   } catch (e) {
     // KV down ou erreur de parse : fallback gracieux sans persistance
-    return jsonResponse({ ok: true, eleves: DEFAULT_ELEVES, source: 'fallback', error: e?.message || '' });
+    return jsonResponse({ ok: true, eleves: DEFAULT_ELEVES, archived: [], source: 'fallback', error: e?.message || '' });
   }
 }
 

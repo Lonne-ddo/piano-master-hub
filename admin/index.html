@@ -84,20 +84,6 @@
         }
         .mh-header .mh-logo { width: 56px; height: 56px; }
 
-        .mh-back-link {
-            align-self: flex-start;
-            color: var(--mh-text-tertiary);
-            font-family: var(--mh-font-sans);
-            font-size: 12.5px;
-            text-decoration: none;
-            padding: 4px 8px;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            transition: color 150ms ease;
-        }
-        .mh-back-link:hover { color: var(--mh-text-secondary); }
-
         /* ── Tool row card (override mh-card padding for denser layout) ── */
         .mh-tool-card {
             padding: 14px 16px;
@@ -130,11 +116,6 @@
     <canvas id="bg-canvas"></canvas>
 
     <div class="mh-container">
-        <a href="/" class="mh-back-link" aria-label="Retour à l'espace élève">
-            <i class="ti ti-chevron-left" aria-hidden="true"></i>
-            <span>Espace élève</span>
-        </a>
-
         <header class="mh-header mh-fade-in">
             <svg class="mh-logo" width="56" height="56" viewBox="0 0 72 72" aria-hidden="true">
                 <circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
