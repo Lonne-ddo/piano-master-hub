@@ -16,10 +16,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Master Hub — Transcripteur</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.30.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="../assets/css/style.css">
+  <!-- Design system Master Hub (chargé après style.css : seules les classes .mh-* utilitaires) -->
+  <link rel="stylesheet" href="/assets/css/design-system.css">
   <link rel="manifest" href="../manifest.json">
   <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjE5MiIgaGVpZ2h0PSIxOTIiPjxyZWN0IHdpZHRoPSI3MiIgaGVpZ2h0PSI3MiIgcng9IjE2IiBmaWxsPSIjMDgwODA4Ii8+PGNpcmNsZSBjeD0iMzYiIGN5PSIzNiIgcj0iMzQiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjcpIiBzdHJva2Utd2lkdGg9IjEuNSIvPjxyZWN0IHg9IjE2IiB5PSIxOSIgd2lkdGg9IjExLjUiIGhlaWdodD0iMzQiIHJ4PSIyIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjE5IiB3aWR0aD0iMTEuNSIgaGVpZ2h0PSIzNCIgcng9IjIiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSI0NCIgeT0iMTkiIHdpZHRoPSIxMS41IiBoZWlnaHQ9IjM0IiByeD0iMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjI0IiB5PSIxOSIgd2lkdGg9IjgiIGhlaWdodD0iMjEiIHJ4PSIxLjUiIGZpbGw9IiMwODA4MDgiLz48cmVjdCB4PSIzOCIgeT0iMTkiIHdpZHRoPSI4IiBoZWlnaHQ9IjIxIiByeD0iMS41IiBmaWxsPSIjMDgwODA4Ii8+PC9zdmc+">
-  <meta name="theme-color" content="#8B6FE8">
+  <meta name="theme-color" content="#0a0a0f">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PianoKey">
@@ -432,24 +439,57 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 16px 24px;
+      padding: 14px 24px;
       border-bottom: 1px solid var(--border);
       background: var(--bg0);
     }
+    .mh-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .mh-logo { width: 42px; height: 42px; flex-shrink: 0; display: grid; place-items: center; }
+    .mh-logo svg { width: 42px; height: 42px; display: block; }
+    .mh-brand-text { display: flex; flex-direction: column; line-height: 1.1; min-width: 0; }
+    .mh-header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     .mh-back {
       color: var(--text2);
       text-decoration: none;
-      font-size: 14px;
+      font-size: 13px;
       padding: 6px 12px;
       border-radius: 8px;
+      white-space: nowrap;
       transition: background 0.15s, color 0.15s;
     }
     .mh-back:hover { background: var(--bg2); color: var(--text1); }
     .mh-title {
       margin: 0;
-      font-size: 18px;
-      font-weight: 600;
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 21px;
+      font-weight: 500;
+      letter-spacing: -.01em;
       color: var(--text1);
+    }
+    .mh-brand-sub {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 10.5px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: var(--text3);
+      margin-top: 2px;
+    }
+
+    /* ── Harmonisation design system Premium A (override style.css) ── */
+    .ph-title {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 30px;
+      font-weight: 500;
+      letter-spacing: -.01em;
+    }
+    .card-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: var(--text3);
     }
     .mh-logout {
       background: none;
@@ -481,9 +521,26 @@
 
 <!-- ══ MINI-HEADER MASTER HUB ══════════════════════════════ -->
 <header class="mh-header">
-  <a href="/admin/" class="mh-back">&larr; Outils</a>
-  <h1 class="mh-title">Transcripteur</h1>
-  <button class="mh-logout" type="button" onclick="fetch('/api/admin/logout',{method:'POST',credentials:'same-origin'}).finally(function(){window.location.replace('/admin/login.html');});">Se d&eacute;connecter</button>
+  <div class="mh-brand">
+    <span class="mh-logo" aria-hidden="true">
+      <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+        <rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+        <rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+        <rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+        <rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+        <rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+      </svg>
+    </span>
+    <span class="mh-brand-text">
+      <span class="mh-title">Master Hub</span>
+      <span class="mh-brand-sub">Admin · Transcripteur</span>
+    </span>
+  </div>
+  <div class="mh-header-actions">
+    <a href="/admin/" class="mh-back">&larr; Outils</a>
+    <button class="mh-logout" type="button" onclick="fetch('/api/admin/logout',{method:'POST',credentials:'same-origin'}).finally(function(){window.location.replace('/admin/login.html');});">Se d&eacute;connecter</button>
+  </div>
 </header>
 
 <!-- ══ LAYOUT ══════════════════════════════════════════════ -->
