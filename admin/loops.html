@@ -16,9 +16,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Mes boucles — Master Hub Admin</title>
-  <meta name="theme-color" content="#0f0e18">
+  <meta name="theme-color" content="#0a0a0f">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.30.0/dist/tabler-icons.min.css">
+  <link rel="stylesheet" href="/assets/css/design-system.css">
   <!-- SoundTouchJS pour time-stretch (préserve le pitch) — ESM via Skypack -->
   <!-- SoundTouchJS 0.1.30 est ESM-only : le bundle UMD ne crée aucun global.
        Skypack prépare le package npm pour un import ESM browser-natif. -->
@@ -34,7 +38,8 @@
       --v:       #8B6FE8;
       --v-dim:   rgba(139,111,232,0.15);
       --v-soft:  #6b54c4;
-      --bg0:     #09090f;
+      --serif:   'Cormorant Garamond', Georgia, serif;
+      --bg0:     #0a0a0f;
       --bg1:     #0f0e18;
       --bg2:     #161524;
       --bg3:     #1e1c30;
@@ -61,17 +66,27 @@
     /* ── Mini-header ───────────────────────────────────────── */
     .mh-header {
       display: flex; align-items: center; justify-content: space-between;
-      gap: 12px; padding: 16px 24px;
+      gap: 12px; padding: 14px 24px;
       border-bottom: 1px solid var(--border);
       background: var(--bg0);
     }
+    .mh-brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .mh-logo { width: 42px; height: 42px; flex-shrink: 0; display: grid; place-items: center; }
+    .mh-logo svg { width: 42px; height: 42px; display: block; }
+    .mh-brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+    .mh-brand-sub {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 10.5px; font-weight: 500; text-transform: uppercase;
+      letter-spacing: .12em; color: var(--text3); margin-top: 2px;
+    }
+    .mh-header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     .mh-back {
-      color: var(--text2); text-decoration: none; font-size: 14px;
-      padding: 6px 12px; border-radius: 8px;
+      color: var(--text2); text-decoration: none; font-size: 13px;
+      padding: 6px 12px; border-radius: 8px; white-space: nowrap;
       transition: background .15s, color .15s;
     }
     .mh-back:hover { background: var(--bg2); color: var(--text1); }
-    .mh-title { margin: 0; font-size: 18px; font-weight: 600; color: var(--text1); }
+    .mh-title { margin: 0; font-family: var(--serif); font-size: 21px; font-weight: 500; letter-spacing: -.01em; color: var(--text1); }
     .mh-logout {
       background: none; border: 1px solid var(--border); color: var(--text2);
       padding: 6px 12px; border-radius: 8px; font-size: 13px; cursor: pointer;
@@ -435,7 +450,8 @@
       display: flex; flex-direction: column; gap: 14px;
     }
     .modal h2 {
-      font-size: 16px; font-weight: 600; color: var(--text1);
+      font-family: var(--serif);
+      font-size: 21px; font-weight: 500; letter-spacing: -.01em; color: var(--text1);
     }
     .modal .field { display: flex; flex-direction: column; gap: 6px; }
     .modal label {
@@ -542,9 +558,26 @@
 
 <!-- ═══ MINI-HEADER ════════════════════════════════════════════ -->
 <header class="mh-header">
-  <a href="/admin/" class="mh-back">&larr; Outils</a>
-  <h1 class="mh-title">Mes boucles</h1>
-  <button class="mh-logout" type="button" onclick="fetch('/api/admin/logout',{method:'POST',credentials:'same-origin'}).finally(function(){window.location.replace('/admin/login.html');});">Se d&eacute;connecter</button>
+  <div class="mh-brand">
+    <span class="mh-logo" aria-hidden="true">
+      <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="36" cy="36" r="34" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+        <rect x="16" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+        <rect x="30" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+        <rect x="44" y="19" width="11.5" height="34" rx="2" fill="#fff"/>
+        <rect x="24" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+        <rect x="38" y="19" width="8" height="21" rx="1.5" fill="#080808"/>
+      </svg>
+    </span>
+    <span class="mh-brand-text">
+      <span class="mh-title">Master Hub</span>
+      <span class="mh-brand-sub">Admin · Mes boucles</span>
+    </span>
+  </div>
+  <div class="mh-header-actions">
+    <a href="/admin/" class="mh-back">&larr; Outils</a>
+    <button class="mh-logout" type="button" onclick="fetch('/api/admin/logout',{method:'POST',credentials:'same-origin'}).finally(function(){window.location.replace('/admin/login.html');});">Se d&eacute;connecter</button>
+  </div>
 </header>
 
 <!-- ═══ APP ═══════════════════════════════════════════════════ -->
