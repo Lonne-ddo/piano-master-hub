@@ -666,7 +666,6 @@
             '<div id="impersonation-banner-host"></div>' +
             '<div class="mh-stack mh-stagger" style="margin-top:24px">' +
                 '<div id="hero-zone"></div>' +
-                '<div id="repertoire-zone"></div>' +
                 '<div id="resume-zone"></div>' +
                 '<div id="analyse-zone"></div>' +
             '</div>' +
@@ -683,50 +682,6 @@
         renderDynamicSkeleton();
         fetchDashboardData(eleve);
         loadAnalysesForEleve(eleve.slug);
-        loadRepertoirePreview(eleve);
-    }
-
-    // ──────────────────────────────────────────────
-    //  Répertoire — preview (3 morceaux récents) sur le dashboard.
-    //  Card masquée si répertoire vide (pas d'empty state côté élève).
-    // ──────────────────────────────────────────────
-    function loadRepertoirePreview(eleve) {
-        var zone = document.getElementById("repertoire-zone");
-        if (!zone) return;
-        fetch('/api/eleves/' + encodeURIComponent(eleve.slug) + '/repertoire', { credentials: 'same-origin' })
-            .then(function(r) { return r.ok ? r.json() : null; })
-            .then(function(j) {
-                var morceaux = (j && j.ok && Array.isArray(j.morceaux)) ? j.morceaux : [];
-                if (!morceaux.length) { zone.innerHTML = ''; return; }
-                var preview = morceaux.slice(0, 3);
-                var rows = preview.map(function(m) {
-                    var meta = m.tonalite ? escapeHtml(m.tonalite) : '';
-                    return '<button type="button" class="mh-rep-row" data-rep-id="' + escapeHtml(m.id) + '">' +
-                        '<div class="mh-rep-row-main">' +
-                            '<div class="mh-rep-row-title">' + escapeHtml(m.titre) + '</div>' +
-                            (meta ? '<div class="mh-rep-row-meta">' + meta + '</div>' : '') +
-                        '</div>' +
-                        '<span class="mh-rep-badge ' + escapeHtml(m.statut) + '">' + escapeHtml(MHRep.statutLabel(m.statut)) + '</span>' +
-                    '</button>';
-                }).join('');
-                var viewAll = morceaux.length > 3
-                    ? '<a class="mh-rep-viewall" href="/repertoire?eleve=' + encodeURIComponent(eleve.slug) + '">Voir tout (' + morceaux.length + ') →</a>'
-                    : '';
-                zone.innerHTML =
-                    '<div class="mh-card">' +
-                        '<div class="mh-section-label">Répertoire</div>' +
-                        rows +
-                        viewAll +
-                    '</div>';
-                zone.querySelectorAll('[data-rep-id]').forEach(function(btn) {
-                    btn.addEventListener('click', function() {
-                        var id = btn.getAttribute('data-rep-id');
-                        var m = morceaux.find(function(x) { return x.id === id; });
-                        if (m && window.MHRep) MHRep.openDetail(eleve.slug, m);
-                    });
-                });
-            })
-            .catch(function() { zone.innerHTML = ''; });
     }
 
     // Bandeau orange visible si la session courante est issue d'une
@@ -1199,7 +1154,6 @@
         var slug = eleve.slug;
 
         var docUrl = data && data.doc_url;
-        var driveUrl = data && data.links && data.links.drive;
         var telegramUrl = data && data.links && data.links.telegram;
 
         var html = '';
@@ -1208,11 +1162,7 @@
         if (docUrl) {
             html += resourceCardHtml(docUrl, 'ti-file-text', 'violet', 'Suivi', 'Google Doc', true);
         }
-        // 2. Ressources (Drive) — violet
-        if (driveUrl) {
-            html += resourceCardHtml(driveUrl, 'ti-folder', 'violet', 'Ressources', 'Partitions & audio', true);
-        }
-        // 3. Telegram — neutral
+        // 2. Telegram — neutral
         if (telegramUrl) {
             html += resourceCardHtml(telegramUrl, 'ti-brand-telegram', 'neutral', 'Telegram', 'Discussions avec Lonne', true);
         }
@@ -1403,7 +1353,6 @@
     })();
     </script>
 
-    <script src="/assets/js/repertoire.js"></script>
     <script src="/assets/js/stems-cache.js"></script>
     <script src="/assets/js/multitrack-player.js"></script>
     <script src="/assets/js/analyse-player.js"></script>
