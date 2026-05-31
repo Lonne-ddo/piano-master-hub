@@ -490,6 +490,19 @@
             100% { opacity: 0; transform: translateY(-72vh) translateX(var(--ob-dx, 0)); }
         }
 
+        /* Bouton « ? » replay dans le footer */
+        .mh-onboard-replay {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 22px; height: 22px; padding: 0;
+            border: 1px solid var(--mh-border-card, rgba(255,255,255,0.12));
+            border-radius: 50%;
+            background: none; color: var(--mh-text-tertiary, rgba(255,255,255,0.5));
+            font-family: var(--mh-font-sans, sans-serif); font-size: 12px; font-weight: 600;
+            line-height: 1; cursor: pointer; opacity: 0.4;
+            transition: opacity 150ms ease, border-color 150ms ease, color 150ms ease;
+        }
+        .mh-onboard-replay:hover { opacity: 0.8; color: var(--mh-text-secondary, rgba(255,255,255,0.75)); }
+
         @media (max-width: 380px) {
             .mh-onboard-name { font-size: 38px; }
             .mh-onboard-welcome { font-size: 24px; }
@@ -751,6 +764,7 @@
     //  Mode 2 — élève identifié : dashboard riche
     // ──────────────────────────────────────────────
     function renderEspaceEleve(eleve) {
+        _currentEleve = eleve; // mémorisé pour le bouton « ? » replay du footer
         // Animation de bienvenue (1ère visite). Non bloquant : l'overlay se
         // superpose au dashboard qui se construit derrière. Skip si déjà vu.
         maybePlayOnboarding(eleve);
@@ -785,6 +799,7 @@
     //  Onboarding — animation de bienvenue (1ère visite)
     // ──────────────────────────────────────────────
     var _obTimers = [];
+    var _currentEleve = null;
     function _obClearTimers() { _obTimers.forEach(clearTimeout); _obTimers = []; }
 
     // Clone le logo SVG du header (réutilisé, pas dupliqué) et tague ses
@@ -1493,8 +1508,13 @@
         var footer = document.getElementById("footer");
         footer.innerHTML =
             '<div class="mh-footer">' +
+                '<button type="button" id="onboard-replay-btn" class="mh-onboard-replay" aria-label="Revoir l\'animation de bienvenue" title="Revoir l\'animation de bienvenue">?</button>' +
                 '<button type="button" id="logout-btn" class="mh-link-muted">Se déconnecter</button>' +
             '</div>';
+        document.getElementById("onboard-replay-btn").addEventListener("click", function() {
+            // Replay manuel : ne touche pas au KV (markSeen falsy).
+            playOnboarding(_currentEleve ? _currentEleve.display : '');
+        });
         document.getElementById("logout-btn").addEventListener("click", function() {
             fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
                 .catch(function() {})

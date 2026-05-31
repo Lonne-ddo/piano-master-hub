@@ -1393,6 +1393,7 @@ function renderProfile(s) {
       </div>
     </div>
     <div class="delete-eleve-row">
+      <button type="button" class="archive-eleve-btn" onclick="resetOnboarding('${s.id}','${escapeHtml(s.nom || s.id).replace(/'/g, "&#39;")}')" title="L'élève reverra l'animation de bienvenue à son prochain accès">↺ Reset onboarding</button>
       ${s.archived
         ? `<button type="button" class="archive-eleve-btn unarchive" onclick="archiveEleve('${s.id}','${escapeHtml(s.nom || s.id).replace(/'/g, "&#39;")}',false)">↩ Désarchiver</button>`
         : `<button type="button" class="archive-eleve-btn" onclick="archiveEleve('${s.id}','${escapeHtml(s.nom || s.id).replace(/'/g, "&#39;")}',true)">📦 Archiver</button>`}
@@ -2077,6 +2078,28 @@ async function archiveEleve(slug, displayName, archived) {
   }
 }
 window.archiveEleve = archiveEleve;
+
+// ─── Reset onboarding ─────────────────────────────────────────
+// DELETE /api/eleves/:slug/onboarded → l'élève reverra l'animation
+// de bienvenue à son prochain accès (utile pour tester l'anim).
+async function resetOnboarding(slug, displayName) {
+  if (!window.confirm('Reset l\'onboarding de « ' + displayName + ' » ?\n\nIl reverra l\'animation de bienvenue à son prochain accès.')) return;
+  try {
+    const res = await fetch('/api/eleves/' + encodeURIComponent(slug) + '/onboarded', {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.ok) {
+      showToast('Erreur : ' + (j.error || res.status));
+      return;
+    }
+    showToast('Onboarding réinitialisé ✓');
+  } catch (e) {
+    showToast('Erreur réseau, réessaie.');
+  }
+}
+window.resetOnboarding = resetOnboarding;
 
 // ─── Impersonation : voir l'espace d'un élève sans magic link ─
 // POST /api/admin/impersonate/:slug → set cookie mh_session avec
