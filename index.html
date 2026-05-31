@@ -412,6 +412,99 @@
             .mh-container { padding: 22px 14px 32px; }
             .mh-card { padding: 1.1rem; }
         }
+
+        /* ════════════════════════════════════════════════════════
+           Onboarding splash (1ère visite — animation de bienvenue)
+           ════════════════════════════════════════════════════════ */
+        .mh-onboard {
+            position: fixed; inset: 0; z-index: 9999;
+            background: #0a0a0f;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+            opacity: 1;
+            transition: opacity 700ms ease-out;
+        }
+        .mh-onboard.mh-onboard--fade { opacity: 0; }
+        .mh-onboard.mh-onboard--fast { transition-duration: 200ms; }
+        .mh-onboard.mh-onboard--fade { pointer-events: none; }
+
+        .mh-onboard-inner {
+            position: relative; z-index: 1;
+            display: flex; flex-direction: column; align-items: center;
+            gap: 16px; text-align: center; padding: 24px;
+        }
+        .mh-onboard-logo, .mh-onboard-logo svg { width: 92px; height: 92px; display: block; }
+
+        /* Phase 1 — construction du logo (éléments masqués au départ) */
+        .mh-onboard-logo .ob-circle,
+        .mh-onboard-logo .ob-key { opacity: 0; }
+        .mh-onboard-logo .ob-key {
+            transform: translateY(-10px);
+            transform-box: fill-box; transform-origin: center;
+        }
+        .mh-onboard.play .ob-circle { animation: ob-fade 300ms ease-out forwards; }
+        .mh-onboard.play .ob-key    { animation: ob-drop 320ms ease-out forwards; }
+        .mh-onboard.play .ob-k1 { animation-delay: 300ms; }
+        .mh-onboard.play .ob-k2 { animation-delay: 380ms; }
+        .mh-onboard.play .ob-k3 { animation-delay: 460ms; }
+        .mh-onboard.play .ob-b1 { animation-delay: 540ms; }
+        .mh-onboard.play .ob-b2 { animation-delay: 600ms; }
+        @keyframes ob-fade { to { opacity: 1; } }
+        @keyframes ob-drop { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Phase 2 — "Bienvenue" */
+        .mh-onboard-welcome {
+            font-family: var(--mh-font-serif, 'Cormorant Garamond', Georgia, serif);
+            font-size: 28px; font-weight: 500; color: #f5f5f7; letter-spacing: -0.01em;
+            opacity: 0; transform: translateY(8px);
+        }
+        .mh-onboard.play .mh-onboard-welcome { animation: ob-rise 600ms ease-out 1200ms forwards; }
+        @keyframes ob-rise { to { opacity: 1; transform: translateY(0); } }
+
+        /* Phase 3 — prénom (typewriter piloté en JS) */
+        .mh-onboard-name {
+            font-family: var(--mh-font-serif, 'Cormorant Garamond', Georgia, serif);
+            font-size: 46px; font-weight: 600; color: var(--mh-gold, #d5b048);
+            line-height: 1.1; min-height: 1.1em; letter-spacing: -0.01em;
+            opacity: 0;
+        }
+        .mh-onboard-caret {
+            display: inline-block; width: 2px; height: 0.86em; margin-left: 3px;
+            background: var(--mh-gold, #d5b048); vertical-align: -0.04em;
+            animation: ob-blink 600ms step-end infinite;
+        }
+        @keyframes ob-blink { 50% { opacity: 0; } }
+
+        /* Phase 4 — particules ambient */
+        .mh-onboard-particles { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+        .ob-particle {
+            position: absolute; bottom: -24px;
+            color: var(--mh-gold, #d5b048); line-height: 1;
+            opacity: 0; will-change: transform, opacity;
+            animation: ob-float linear forwards;
+        }
+        @keyframes ob-float {
+            0%   { opacity: 0; transform: translateY(0) translateX(0); }
+            15%  { opacity: var(--ob-op, 0.5); }
+            85%  { opacity: var(--ob-op, 0.5); }
+            100% { opacity: 0; transform: translateY(-72vh) translateX(var(--ob-dx, 0)); }
+        }
+
+        @media (max-width: 380px) {
+            .mh-onboard-name { font-size: 38px; }
+            .mh-onboard-welcome { font-size: 24px; }
+        }
+
+        /* prefers-reduced-motion : pas d'effets, juste un fondu */
+        @media (prefers-reduced-motion: reduce) {
+            .mh-onboard .ob-circle,
+            .mh-onboard .ob-key,
+            .mh-onboard .mh-onboard-welcome {
+                opacity: 1 !important; transform: none !important; animation: none !important;
+            }
+            .mh-onboard .mh-onboard-name { opacity: 1 !important; }
+            .mh-onboard-caret, .ob-particle { display: none !important; }
+        }
     </style>
 </head>
 <body>
@@ -658,6 +751,10 @@
     //  Mode 2 — élève identifié : dashboard riche
     // ──────────────────────────────────────────────
     function renderEspaceEleve(eleve) {
+        // Animation de bienvenue (1ère visite). Non bloquant : l'overlay se
+        // superpose au dashboard qui se construit derrière. Skip si déjà vu.
+        maybePlayOnboarding(eleve);
+
         var greeting = document.getElementById("greeting");
         greeting.innerHTML = '<span class="mh-greeting">Bonjour ' + escapeHtml(eleve.display) + ' 👋</span>';
 
@@ -682,6 +779,154 @@
         renderDynamicSkeleton();
         fetchDashboardData(eleve);
         loadAnalysesForEleve(eleve.slug);
+    }
+
+    // ──────────────────────────────────────────────
+    //  Onboarding — animation de bienvenue (1ère visite)
+    // ──────────────────────────────────────────────
+    var _obTimers = [];
+    function _obClearTimers() { _obTimers.forEach(clearTimeout); _obTimers = []; }
+
+    // Clone le logo SVG du header (réutilisé, pas dupliqué) et tague ses
+    // éléments pour l'animation « construction touche par touche ».
+    function _obBuildLogo() {
+        var src = document.querySelector('.mh-header .mh-logo');
+        var svg = src ? src.cloneNode(true) : null;
+        if (!svg) return '';
+        svg.removeAttribute('class');
+        svg.removeAttribute('width');
+        svg.removeAttribute('height');
+        var circle = svg.querySelector('circle');
+        if (circle) circle.setAttribute('class', 'ob-circle');
+        var rects = svg.querySelectorAll('rect');
+        var keyClasses = ['ob-key ob-k1', 'ob-key ob-k2', 'ob-key ob-k3', 'ob-key ob-b1', 'ob-key ob-b2'];
+        for (var i = 0; i < rects.length; i++) {
+            rects[i].setAttribute('class', keyClasses[i] || 'ob-key');
+        }
+        return svg.outerHTML;
+    }
+
+    // Vérifie le statut onboarded (fetch < 500ms sinon skip) puis joue l'anim.
+    function maybePlayOnboarding(eleve) {
+        if (!eleve || !eleve.slug) return;
+        var settled = false;
+        var ctrl = (typeof AbortController === 'function') ? new AbortController() : null;
+        var timeout = setTimeout(function () { if (!settled && ctrl) { try { ctrl.abort(); } catch (e) {} } }, 500);
+        fetch('/api/eleves/' + encodeURIComponent(eleve.slug) + '/onboarded',
+              { credentials: 'same-origin', signal: ctrl ? ctrl.signal : undefined })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (j) {
+                settled = true; clearTimeout(timeout);
+                if (j && j.seen === false) {
+                    playOnboarding(eleve.display, { markSeen: true, slug: eleve.slug });
+                }
+            })
+            .catch(function () { settled = true; clearTimeout(timeout); /* skip silencieux */ });
+    }
+
+    // Joue l'animation. opts.markSeen = true → POST onboarded à la fin
+    // (1ère visite). Replay manuel : markSeen falsy → ne touche pas le KV.
+    function playOnboarding(displayName, opts) {
+        opts = opts || {};
+        var name = (typeof displayName === 'string' ? displayName.trim() : '') || 'à toi';
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        var existing = document.getElementById('mh-onboard');
+        if (existing) existing.remove();
+        _obClearTimers();
+
+        var ov = document.createElement('div');
+        ov.id = 'mh-onboard';
+        ov.className = 'mh-onboard';
+        ov.setAttribute('role', 'dialog');
+        ov.setAttribute('aria-label', 'Animation de bienvenue');
+        ov.innerHTML =
+            '<div class="mh-onboard-particles" aria-hidden="true"></div>' +
+            '<div class="mh-onboard-inner">' +
+                '<span class="mh-onboard-logo" aria-hidden="true">' + _obBuildLogo() + '</span>' +
+                '<div class="mh-onboard-welcome">Bienvenue</div>' +
+                '<div class="mh-onboard-name"></div>' +
+            '</div>';
+        document.body.appendChild(ov);
+
+        var nameEl = ov.querySelector('.mh-onboard-name');
+        var finished = false;
+
+        function cleanup(fast) {
+            if (finished) return;
+            finished = true;
+            _obClearTimers();
+            document.removeEventListener('keydown', onKey);
+            ov.removeEventListener('click', onSkip);
+            if (fast) ov.classList.add('mh-onboard--fast');
+            ov.classList.add('mh-onboard--fade');
+            setTimeout(function () { if (ov && ov.parentNode) ov.parentNode.removeChild(ov); }, (fast ? 200 : 700) + 80);
+            if (opts.markSeen && opts.slug) {
+                fetch('/api/eleves/' + encodeURIComponent(opts.slug) + '/onboarded',
+                      { method: 'POST', credentials: 'same-origin' }).catch(function () {});
+            }
+        }
+        function onSkip() { cleanup(true); }
+        function onKey(e) { if (e.key === 'Escape') cleanup(true); }
+        ov.addEventListener('click', onSkip);
+        document.addEventListener('keydown', onKey);
+
+        if (reduce) {
+            // Réduit : pas d'effets, juste "Bienvenue {prénom}" + fondu.
+            ov.classList.add('play');
+            nameEl.textContent = name;
+            _obTimers.push(setTimeout(function () { cleanup(false); }, 1400));
+            return;
+        }
+
+        requestAnimationFrame(function () { ov.classList.add('play'); });
+        // Phase 3 — typewriter du prénom à 2s.
+        _obTimers.push(setTimeout(function () {
+            nameEl.style.opacity = '1';
+            _obTypewrite(nameEl, name, 60);
+        }, 2000));
+        // Phase 4 — particules à 3.5s.
+        _obTimers.push(setTimeout(function () {
+            _obSpawnParticles(ov.querySelector('.mh-onboard-particles'));
+        }, 3500));
+        // Fade-out global à 4.5s (cleanup gère le retrait à ~5.2s).
+        _obTimers.push(setTimeout(function () { cleanup(false); }, 4500));
+    }
+    window.playOnboarding = playOnboarding;
+
+    function _obTypewrite(el, text, speedMs) {
+        el.textContent = '';
+        var caret = document.createElement('span');
+        caret.className = 'mh-onboard-caret';
+        el.appendChild(caret);
+        var i = 0;
+        function step() {
+            if (i >= text.length) {
+                _obTimers.push(setTimeout(function () { if (caret.parentNode) caret.remove(); }, 700));
+                return;
+            }
+            caret.insertAdjacentText('beforebegin', text.charAt(i));
+            i++;
+            _obTimers.push(setTimeout(step, speedMs));
+        }
+        step();
+    }
+
+    function _obSpawnParticles(host) {
+        if (!host) return;
+        var glyphs = ['♪', '♫', '•'];
+        for (var i = 0; i < 10; i++) {
+            var p = document.createElement('span');
+            p.className = 'ob-particle';
+            p.textContent = glyphs[i % glyphs.length];
+            p.style.left = (Math.random() * 100).toFixed(1) + '%';
+            p.style.fontSize = (12 + Math.random() * 8).toFixed(0) + 'px';
+            p.style.setProperty('--ob-op', (0.25 + Math.random() * 0.4).toFixed(2));
+            p.style.setProperty('--ob-dx', ((Math.random() - 0.5) * 60).toFixed(0) + 'px');
+            p.style.animationDuration = (3 + Math.random() * 1.5).toFixed(2) + 's';
+            p.style.animationDelay = (Math.random() * 0.8).toFixed(2) + 's';
+            host.appendChild(p);
+        }
     }
 
     // Bandeau orange visible si la session courante est issue d'une
