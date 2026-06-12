@@ -149,6 +149,8 @@
   MultitrackPlayer.prototype.destroy = function () {
     if (this._destroyed) return;
     this._destroyed = true;
+    // Libère le registre des raccourcis clavier s'il pointe sur ce player.
+    if (global.__mhActivePlayer === this) global.__mhActivePlayer = null;
     if (this.rafId != null) cancelAnimationFrame(this.rafId);
     this.rafId = null;
     if (this._preloadTimeoutId) {
@@ -280,13 +282,10 @@
     root.appendChild(tracksWrap);
     root.appendChild(transport);
 
-    // Esc pour fermer
+    // Esc pour fermer. L'Espace + ← sont gérés par keyboard-shortcuts.js via
+    // le registre window.__mhActivePlayer (déclaré actif ci-dessous).
     this._onKey = function (e) {
       if (e.key === 'Escape') self.destroy();
-      else if (e.key === ' ' && e.target === document.body) {
-        e.preventDefault();
-        self._togglePlay();
-      }
     };
     document.addEventListener('keydown', this._onKey);
 
@@ -295,6 +294,10 @@
     this.playBtn = playBtn;
     this.timeEl = timeEl;
     this.seekBar = seekBar;
+
+    // Player modal exclusif : il devient le player actif pour les raccourcis
+    // clavier dès l'ouverture (Espace toggle le master). Libéré au destroy.
+    global.__mhActivePlayer = this;
 
     // Mount + lock body scroll
     (this.opts.container || document.body).appendChild(root);
@@ -669,6 +672,16 @@
   MultitrackPlayer.prototype._togglePlay = function () {
     if (this.isPlaying) this._pauseAll();
     else this._playAll();
+  };
+
+  // ─── Interface raccourcis clavier (keyboard-shortcuts.js) ──────
+  // Espace toggle le MASTER (toutes les pistes ensemble), pas une piste seule.
+  MultitrackPlayer.prototype.togglePlayPause = function () {
+    this._togglePlay();
+  };
+  MultitrackPlayer.prototype.seekBy = function (delta) {
+    if (!this.duration) return;
+    this._seekAll(this._currentTime() + delta); // _seekAll clamp [0, duration]
   };
 
   // Play sériel (await chaque audio.play()) avec compensation de timing.

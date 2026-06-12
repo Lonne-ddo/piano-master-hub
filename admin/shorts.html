@@ -537,6 +537,7 @@
     .sh-toast.success { border-color: rgba(94,203,139,0.45); color: var(--green); }
     .sh-toast.error { border-color: rgba(224,92,107,0.55); color: var(--red); }
   </style>
+  <script src="/assets/js/keyboard-shortcuts.js" defer></script>
 </head>
 <body>
 <div class="app">
@@ -1074,7 +1075,45 @@ document.addEventListener('click', () => {
   document.querySelectorAll('.passage-menu.show').forEach((m) => m.classList.remove('show'));
 });
 
+// ─── Adapter raccourcis clavier (keyboard-shortcuts.js) ──────────
+// Espace = play/pause de la card active, ← = recule de 2 s. Le registre
+// window.__mhActivePlayer pointe sur cet adapter dès qu'une card joue ; il
+// pilote toujours l'activeAudio courant (1 seule lecture à la fois), donc le
+// switch de card se fait tout seul. Pause = vraie pause (on garde currentTime),
+// contrairement à stopAudio() qui détruit l'élément.
+const mhShorts = {
+  get isPlaying() { return !!(activeAudio && !activeAudio.paused); },
+  togglePlayPause() {
+    if (!activeAudio) return;
+    const icon = activeAudioBtn ? activeAudioBtn.querySelector('.tc-icon') : null;
+    if (activeAudio.paused) {
+      activeAudio.play().catch(() => {});
+      if (icon) icon.textContent = '⏸';
+      // Recale le filet de sécurité sur le temps restant jusqu'à la fin du passage.
+      const b = activeAudio._mhBounds;
+      if (b) {
+        if (activeAudioStopTimer) clearTimeout(activeAudioStopTimer);
+        const remainMs = Math.max(0, (b.endSec - activeAudio.currentTime + 0.3) * 1000);
+        activeAudioStopTimer = setTimeout(() => { stopAudio(); }, remainMs);
+      }
+    } else {
+      activeAudio.pause();
+      if (icon) icon.textContent = '▶';
+      if (activeAudioStopTimer) { clearTimeout(activeAudioStopTimer); activeAudioStopTimer = null; }
+    }
+  },
+  seekBy(delta) {
+    if (!activeAudio) return;
+    const b = activeAudio._mhBounds;
+    let t = activeAudio.currentTime + delta;
+    if (b) t = Math.max(b.offsetSec, Math.min(t, b.endSec));
+    else t = Math.max(0, t);
+    try { activeAudio.currentTime = t; } catch {}
+  },
+};
+
 function stopAudio() {
+  if (window.__mhActivePlayer === mhShorts) window.__mhActivePlayer = null;
   if (activeAudio) {
     try { activeAudio.pause(); } catch {}
     activeAudio.removeAttribute('src');
@@ -1138,11 +1177,14 @@ function playPassage(idx, btn) {
   audio.preload = 'auto';
   const offsetSec = Math.max(0, (p.start_ms - (part.offsetMs || 0)) / 1000);
   const durationSec = Math.max(0, (p.end_ms - p.start_ms) / 1000);
+  // Bornes du passage pour les raccourcis clavier (clamp du seek + filet resume).
+  audio._mhBounds = { offsetSec, endSec: offsetSec + durationSec };
 
   activeAudio = audio;
   activeAudioPartIdx = partIdx;
   activeAudioBtn = btn;
   activeAudioCardIdx = idx;
+  window.__mhActivePlayer = mhShorts; // cette card devient le player actif
 
   btn.classList.add('playing');
   const icon = btn.querySelector('.tc-icon');

@@ -553,6 +553,7 @@
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   </style>
+  <script src="/assets/js/keyboard-shortcuts.js" defer></script>
 </head>
 <body>
 
@@ -690,6 +691,7 @@ let activeFilter = 'all'; // 'all' ou nom de catégorie
 let audioCtx = null;
 const audioBufferCache = {}; // { loopId: AudioBuffer }
 let activePlayback = null;   // { loopId, source, gain, startTime, rate, rafId }
+let mhLastLoopId = null;     // dernier loop joué — pour resume clavier après pause
 
 // Upload pending
 let pendingUploadFiles = [];
@@ -1101,6 +1103,10 @@ async function togglePlay(loopId) {
 
     activePlayback = { loopId, shifter, gain: gainNode, rafId: null, startRatio };
 
+    // Raccourcis clavier : ce loop devient le player actif (Espace/←).
+    mhLastLoopId = loopId;
+    window.__mhActivePlayer = mhLoops;
+
     // Lance la boucle RAF qui anime le curseur waveform
     startCursorLoop(loopId);
 
@@ -1115,6 +1121,52 @@ async function togglePlay(loopId) {
     }, 60);
   }
 }
+
+// ─── Adapter raccourcis clavier (keyboard-shortcuts.js) ──────────
+// Espace = play/pause du loop actif, ← = recule de 2 s. SoundTouchJS slice le
+// buffer au démarrage, donc un seek = stop + restart à la nouvelle position
+// (lastPositions[loopId]), exactement comme le drag waveform. Après une pause,
+// activePlayback est null mais mhLastLoopId garde le loop pour le resume.
+const mhLoops = {
+  get isPlaying() { return !!activePlayback; },
+  togglePlayPause() {
+    if (activePlayback) togglePlay(activePlayback.loopId);   // pause
+    else if (mhLastLoopId != null) togglePlay(mhLastLoopId); // resume
+  },
+  seekBy(delta) {
+    const loopId = activePlayback ? activePlayback.loopId : mhLastLoopId;
+    if (loopId == null) return;
+    const buf = audioBufferCache[loopId];
+    if (!buf || !buf.duration) return;
+
+    // Position absolue courante (ratio 0..1) : depuis le shifter si en lecture,
+    // sinon depuis la dernière position mémorisée.
+    let ratio;
+    const playing = activePlayback && activePlayback.loopId === loopId;
+    if (playing && activePlayback.shifter
+        && typeof activePlayback.shifter.percentagePlayed === 'number'
+        && Number.isFinite(activePlayback.shifter.percentagePlayed)) {
+      const sr = activePlayback.startRatio || 0;
+      const sp = Math.min(1, Math.max(0, activePlayback.shifter.percentagePlayed / 100));
+      ratio = sr + (1 - sr) * sp;
+    } else {
+      ratio = lastPositions[loopId] || 0;
+    }
+
+    let newRatio = ratio + (delta / buf.duration);
+    newRatio = Math.min(1, Math.max(0, newRatio));
+
+    if (playing) {
+      stopPlayback();                  // capture + libère le shifter courant
+      lastPositions[loopId] = newRatio; // override la position capturée
+      togglePlay(loopId);              // restart à la nouvelle position
+    } else {
+      lastPositions[loopId] = newRatio;
+      const cursor = document.querySelector(`.waveform-cursor[data-id="${loopId}"]`);
+      if (cursor) cursor.style.left = (newRatio * 100) + '%';
+    }
+  },
+};
 
 // ─── Interaction waveform (clic / drag pour seek) ──────────────
 // Les events mousemove/mouseup/touchmove/touchend sont globaux (document)
