@@ -382,7 +382,7 @@
     <div class="upload-card">
       <div class="upload-row">
         <label for="vid-title">Titre</label>
-        <input id="vid-title" type="text" class="title-input" maxlength="200" placeholder="Ex : Hallelujah — analyse motif gauche" />
+        <input id="vid-title" type="text" class="title-input" maxlength="200" placeholder="Optionnel — sinon nom du fichier" />
       </div>
       <label class="upload-row" style="cursor:pointer;">
         <input type="checkbox" id="vid-piano-solo" style="width:18px;height:18px;accent-color:var(--v);cursor:pointer;" />
@@ -806,13 +806,12 @@ fileInput.addEventListener('change', () => {
 });
 
 async function handleFile(file) {
-  const title = titleInput.value.trim();
+  let title = titleInput.value.trim();
   if (!title) {
-    toast('Saisis un titre avant d\'uploader.', 'error');
-    titleInput.focus();
-    fileInput.value = '';
-    return;
+    // Titre optionnel : on retombe sur le nom du fichier (sans extension)
+    title = file.name.replace(/\.[^.]+$/, '').trim();
   }
+  if (!title) title = 'Analyse sans titre';
   if (!ALLOWED_MIME.has(file.type)) {
     toast('Type non supporté : ' + (file.type || 'inconnu'), 'error');
     fileInput.value = '';
