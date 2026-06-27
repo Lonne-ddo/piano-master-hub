@@ -12,7 +12,7 @@
 //       Le client doit ensuite poller /api/analyse?action=status&id=<>&predictionId=<>
 //       qui finalise les stems R2 + update KV à 'success' quand Replicate termine.
 
-import { requireAdminPassword } from '../_lib/session.js';
+import { requireAdminPassword, signReplicateToken } from '../_lib/session.js';
 import {
   MIME_TYPES_ALLOWED, EXTENSION_BY_MIME, MAX_SIZE_BYTES, MAX_DURATION_S,
   MONTHLY_CAP, REPLICATE_VERSION, DEMUCS_MODEL, COST_EUR_PER_RUN,
@@ -141,16 +141,13 @@ export async function onRequestPost({ request, env }) {
     return jsonResponse({ error: 'replicate_token_missing' }, 502);
   }
 
-  // Replicate accepte une URL https publique OU un dataURL. On lui passe une
-  // URL signée temporaire... ou plus simplement, on génère un dataURL depuis
-  // le fichier que l'admin a uploadé. Pour rester compatible avec l'ancien
-  // pattern /api/stems (qui passait audio en dataURL), on encode ici.
-  // Coût : 1 passage en mémoire (jusqu'à 100MB).
-  const buf = await file.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  const dataURL = `data:${mimeType};base64,${btoa(bin)}`;
+  // Replicate télécharge l'audio source via une URL https publique signée
+  // (token HMAC court vers l'original R2 déjà uploadé). On évite ainsi
+  // d'encoder le fichier entier en dataURL base64 en mémoire (OOM possible
+  // sur les gros multitrack, jusqu'à 100MB).
+  const token = await signReplicateToken(env, id, 30 * 60);
+  const origin = new URL(request.url).origin;
+  const audioUrl = `${origin}/api/analyse/${id}/stream?t=${encodeURIComponent(token)}`;
 
   let replicateResp, replicateData;
   try {
@@ -163,7 +160,7 @@ export async function onRequestPost({ request, env }) {
       body: JSON.stringify({
         version: REPLICATE_VERSION,
         input: {
-          audio: dataURL,
+          audio: audioUrl,
           model: DEMUCS_MODEL,
           output_format: 'mp3',
           mp3_bitrate: 320,

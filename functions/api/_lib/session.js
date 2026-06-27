@@ -141,6 +141,33 @@ export function checkAdminPassword(candidate, env) {
   return constantTimeStrEq(candidate, getAdminPassword(env));
 }
 
+// ─── Token signé pour Replicate (accès one-shot à l'original R2) ──────
+// Replicate doit télécharger l'audio source via une URL publique. Plutôt
+// que d'encoder le fichier entier en dataURL base64 en mémoire (risque OOM
+// sur les gros multitrack), on signe un token HMAC court qui autorise
+// /api/analyse/<id>/stream pendant un TTL borné. Même clé que le cookie
+// admin (dérive de ADMIN_PASSWORD), pas de secret supplémentaire.
+
+const REPLICATE_TOKEN_PREFIX = 'rpl';
+
+export async function signReplicateToken(env, id, ttlSeconds = 1800) {
+  const expiresAt = String(Date.now() + ttlSeconds * 1000);
+  const sig = await hmacSha256(getAdminPassword(env), `${REPLICATE_TOKEN_PREFIX}.${id}.${expiresAt}`);
+  return `${expiresAt}.${sig}`;
+}
+
+export async function verifyReplicateToken(env, id, token) {
+  if (typeof token !== 'string') return false;
+  const dot = token.indexOf('.');
+  if (dot < 1) return false;
+  const expiresAt = token.slice(0, dot);
+  const sig = token.slice(dot + 1);
+  const exp = Number(expiresAt);
+  if (!Number.isFinite(exp) || Date.now() > exp) return false;
+  const expected = await hmacSha256(getAdminPassword(env), `${REPLICATE_TOKEN_PREFIX}.${id}.${expiresAt}`);
+  return constantTimeStrEq(sig, expected);
+}
+
 // ─── Helper auth pour endpoints élève ─────────────────────────────
 // Vérifie que la requête a le droit d'accéder aux ressources d'un slug donné :
 //   - admin (cookie mh_admin_pw signé) → passe-droit (peut consulter tout slug)

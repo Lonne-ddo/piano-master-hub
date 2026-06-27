@@ -9,7 +9,7 @@
 //   - 206 Partial Content si Range parsable, avec Content-Range
 //   - 416 Range Not Satisfiable si Range out-of-bounds
 
-import { requireAdminPassword, getSessionFromRequest } from '../../_lib/session.js';
+import { requireAdminPassword, getSessionFromRequest, verifyReplicateToken } from '../../_lib/session.js';
 import { isValidId, CORS } from '../_helpers.js';
 
 const STREAM_CORS = {
@@ -42,13 +42,20 @@ export async function onRequestGet({ params, request, env }) {
   const r2KeyOrig = record?.r2KeyOriginal || record?.r2Key;
   if (!record || !r2KeyOrig) return errorResponse('not_found', 404);
 
-  // ── Auth : admin OU élève assigné ──
-  const isAdmin = await requireAdminPassword(request, env);
-  if (!isAdmin) {
-    const session = await getSessionFromRequest(request, env);
-    if (!session?.slug) return errorResponse('unauthorized', 401);
-    const assigned = Array.isArray(record.assignedTo) ? record.assignedTo : [];
-    if (!assigned.includes(session.slug)) return errorResponse('forbidden', 403);
+  // ── Auth : token Replicate signé (one-shot) OU admin OU élève assigné ──
+  // Replicate télécharge l'original via ?t=<token> sans cookie : on accepte
+  // un token HMAC court et valide pour cet id, sinon on retombe sur l'auth
+  // admin/élève habituelle.
+  const tokenParam = new URL(request.url).searchParams.get('t');
+  const tokenOk = tokenParam ? await verifyReplicateToken(env, id, tokenParam) : false;
+  if (!tokenOk) {
+    const isAdmin = await requireAdminPassword(request, env);
+    if (!isAdmin) {
+      const session = await getSessionFromRequest(request, env);
+      if (!session?.slug) return errorResponse('unauthorized', 401);
+      const assigned = Array.isArray(record.assignedTo) ? record.assignedTo : [];
+      if (!assigned.includes(session.slug)) return errorResponse('forbidden', 403);
+    }
   }
 
   // ── Range parsing ──
