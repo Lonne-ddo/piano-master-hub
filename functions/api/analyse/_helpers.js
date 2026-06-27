@@ -73,6 +73,78 @@ export function normalizeReplicateOutput(output) {
   return {};
 }
 
+// ─── Finalisation séparation multitrack (succeeded) ──────────────
+// Fetch les stems Replicate → R2 → update KV status='success'.
+// Partagé entre status.js (polling client) et webhook.js (server-side).
+// Mute le record passé et le persiste en KV. Retourne :
+//   { ok:true, status:'success', record }      — stems uploadés, KV à jour
+//   { ok:true, status:'failed', detail }        — empty_output | output_expired
+//   { ok:true, status:'pending', detail }       — transitoire (R2/KV), à retry
+export async function finalizeSeparation(env, id, record, replicateData) {
+  const stemUrls = normalizeReplicateOutput(replicateData?.output);
+  const presentKeys = STEM_KEYS.filter((k) => stemUrls[k]);
+
+  if (!presentKeys.length) {
+    record.status = 'failed';
+    record.errorCode = 'empty_output';
+    record.costEUR = 0;
+    try { await env.MASTERHUB_ANALYSE.put(`analyse:${id}`, JSON.stringify(record)); } catch (e) { /* non-bloquant */ }
+    return { ok: true, status: 'failed', detail: 'empty_output' };
+  }
+
+  const r2KeysStems = {};
+  try {
+    await Promise.all(presentKeys.map(async (stem) => {
+      const stemUrl = stemUrls[stem];
+      const r2Key = `analyse/${id}/stems/${stem}.mp3`;
+      const fetchResp = await fetch(stemUrl);
+      if (!fetchResp.ok) {
+        // 404/410 = output Replicate expiré (finalisation > 1h après le run).
+        // Zombie définitif : on marque failed plutôt que de boucler en pending.
+        if (fetchResp.status === 404 || fetchResp.status === 410) {
+          const err = new Error('output_expired');
+          err.expired = true;
+          throw err;
+        }
+        throw new Error(`fetch_${stem}_${fetchResp.status}`);
+      }
+      await env.ANALYSE_R2.put(r2Key, fetchResp.body, {
+        httpMetadata: { contentType: 'audio/mpeg' },
+      });
+      r2KeysStems[stem] = r2Key;
+    }));
+  } catch (e) {
+    if (e && e.expired) {
+      record.status = 'failed';
+      record.errorCode = 'output_expired';
+      record.costEUR = 0;
+      try { await env.MASTERHUB_ANALYSE.put(`analyse:${id}`, JSON.stringify(record)); } catch (e2) { /* non-bloquant */ }
+      return { ok: true, status: 'failed', detail: 'output_expired' };
+    }
+    // Transitoire (R2 put / réseau) : laisser pending, le prochain poll/webhook réessaiera.
+    console.warn('[analyse/finalize] stem upload failed:', e?.message || e);
+    return { ok: true, status: 'pending', detail: 'r2_upload_in_progress' };
+  }
+
+  record.status = 'success';
+  record.r2KeysStems = r2KeysStems;
+  record.outputShape = {
+    rawType: Array.isArray(replicateData.output) ? 'array' : typeof replicateData.output,
+    rawLength: Array.isArray(replicateData.output) ? replicateData.output.length : null,
+    normalizedKeys: Object.keys(stemUrls).sort(),
+    uploadedKeys: presentKeys.slice().sort(),
+  };
+
+  try {
+    await env.MASTERHUB_ANALYSE.put(`analyse:${id}`, JSON.stringify(record));
+  } catch (e) {
+    console.warn('[analyse/finalize] KV success put failed:', e?.message || e);
+    return { ok: true, status: 'pending', detail: 'kv_write_in_progress' };
+  }
+
+  return { ok: true, status: 'success', record };
+}
+
 // ─── ID generation + validation ──────────────────────────────────
 // Nouveau format : nanoid 12 chars, alphabet [A-Za-z0-9_-].
 export function genId() {

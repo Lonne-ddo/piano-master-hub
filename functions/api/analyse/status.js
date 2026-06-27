@@ -7,7 +7,7 @@
 
 import { requireAdminPassword } from '../_lib/session.js';
 import {
-  STEM_KEYS, normalizeReplicateOutput, isValidId, jsonResponse, CORS,
+  finalizeSeparation, isValidId, jsonResponse, CORS,
 } from './_helpers.js';
 
 export async function onRequestOptions() {
@@ -84,59 +84,15 @@ export async function onRequestGet({ request, env }) {
     return jsonResponse({ ok: true, status: 'pending', replicateStatus: data?.status });
   }
 
-  // ── Succeeded : fetch stems → upload R2 → update KV ──
-  const stemUrls = normalizeReplicateOutput(data.output);
-  const presentKeys = STEM_KEYS.filter((k) => stemUrls[k]);
-
-  if (!presentKeys.length) {
-    record.status = 'failed';
-    record.errorCode = 'empty_output';
-    record.costEUR = 0;
-    try {
-      await env.MASTERHUB_ANALYSE.put(`analyse:${id}`, JSON.stringify(record));
-    } catch (e) { /* non-bloquant */ }
-    return jsonResponse({ ok: true, status: 'failed', detail: 'empty_output' });
+  // ── Succeeded : finalisation partagée (stems → R2 → KV) ──
+  // Même logique que le webhook server-side. Sur output_expired → 'failed'
+  // (plus de boucle pending infinie quand l'output Replicate a expiré).
+  const result = await finalizeSeparation(env, id, record, data);
+  if (result.status === 'success') {
+    return jsonResponse({ ok: true, status: 'success', record: result.record });
   }
-
-  const r2KeysStems = {};
-  try {
-    await Promise.all(presentKeys.map(async (stem) => {
-      const stemUrl = stemUrls[stem];
-      const r2Key = `analyse/${id}/stems/${stem}.mp3`;
-      const fetchResp = await fetch(stemUrl);
-      if (!fetchResp.ok) throw new Error(`fetch_${stem}_${fetchResp.status}`);
-      await env.ANALYSE_R2.put(r2Key, fetchResp.body, {
-        httpMetadata: { contentType: 'audio/mpeg' },
-      });
-      r2KeysStems[stem] = r2Key;
-    }));
-  } catch (e) {
-    console.warn('[analyse/status] R2 upload failed:', e?.message || e);
-    // On ne marque pas failed — le retry au prochain poll réessaiera.
-    return jsonResponse({
-      ok: true, status: 'pending',
-      detail: 'r2_upload_in_progress',
-    });
+  if (result.status === 'failed') {
+    return jsonResponse({ ok: true, status: 'failed', detail: result.detail });
   }
-
-  record.status = 'success';
-  record.r2KeysStems = r2KeysStems;
-  record.outputShape = {
-    rawType: Array.isArray(data.output) ? 'array' : typeof data.output,
-    rawLength: Array.isArray(data.output) ? data.output.length : null,
-    normalizedKeys: Object.keys(stemUrls).sort(),
-    uploadedKeys: presentKeys.slice().sort(),
-  };
-
-  try {
-    await env.MASTERHUB_ANALYSE.put(`analyse:${id}`, JSON.stringify(record));
-  } catch (e) {
-    console.warn('[analyse/status] KV success put failed:', e?.message || e);
-    return jsonResponse({
-      ok: true, status: 'pending',
-      detail: 'kv_write_in_progress',
-    });
-  }
-
-  return jsonResponse({ ok: true, status: 'success', record });
+  return jsonResponse({ ok: true, status: 'pending', detail: result.detail });
 }

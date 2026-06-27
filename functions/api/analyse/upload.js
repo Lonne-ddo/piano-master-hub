@@ -148,6 +148,11 @@ export async function onRequestPost({ request, env }) {
   const token = await signReplicateToken(env, id, 30 * 60);
   const origin = new URL(request.url).origin;
   const audioUrl = `${origin}/api/analyse/${id}/stream?t=${encodeURIComponent(token)}`;
+  // Webhook server-side : finalise la séparation même si l'onglet admin est
+  // fermé. TTL 2h (un run Demucs dure quelques minutes, large marge). Le
+  // polling client reste actif comme fallback / UI de progression.
+  const webhookToken = await signReplicateToken(env, id, 2 * 60 * 60);
+  const webhookUrl = `${origin}/api/analyse/webhook?id=${id}&t=${encodeURIComponent(webhookToken)}`;
 
   let replicateResp, replicateData;
   try {
@@ -165,6 +170,8 @@ export async function onRequestPost({ request, env }) {
           output_format: 'mp3',
           mp3_bitrate: 320,
         },
+        webhook: webhookUrl,
+        webhook_events_filter: ['completed'],
       }),
     });
     replicateData = await replicateResp.json();
