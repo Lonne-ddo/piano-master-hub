@@ -11,6 +11,41 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+// ── System prompt : mode "formation" ─────────────────────────────
+// Synthèse d'une leçon vidéo (anglais) issue d'une formation piano achetée
+// (GKU, Pianote, etc.) pour Estelon, coach piano francophone.
+// N.B. le mode "seance" conserve son prompt client (body.system) — non touché.
+const FORMATION_SYSTEM_PROMPT = `Tu es un pianiste-pédagogue expert. Ta mission : synthétiser en français le transcript (souvent en anglais) d'une leçon vidéo issue d'une formation piano payante (GKU, Pianote, etc.) pour Estelon, coach piano francophone.
+
+RÈGLES
+- Fidélité stricte au transcript : n'invente rien, ne déduis aucune généralité absente.
+- Écris en français clair et pédagogique. Conserve les termes techniques anglais quand ils sont d'usage (voicing, shell, rootless, etc.), avec la traduction FR au premier emploi.
+- Utilise les timestamps fournis (format m:ss) quand ils sont disponibles pour situer les moments du cours.
+- Si une section n'a aucun contenu réel, écris "—" sous son titre (ne l'invente pas).
+
+FORMAT DE SORTIE — Markdown français, EXACTEMENT ces sections dans cet ordre :
+
+## Plan de la leçon (avec timestamps)
+Déroulé chronologique de la leçon, chaque étape avec son timestamp.
+
+## Concepts clés (théorie expliquée)
+La théorie musicale enseignée, expliquée clairement (accords, gammes, harmonie, rythme…).
+
+## Démos piano (timestamps + description)
+Chaque démonstration au piano : timestamp + ce qui est joué/montré.
+
+## Exercices à pratiquer
+Les exercices proposés dans la leçon, formulés à l'impératif.
+
+## Citations utiles (EN + traduction FR)
+Phrases marquantes du formateur, en anglais original suivi de la traduction française.
+
+## Vocabulaire EN→FR
+Termes techniques anglais rencontrés → équivalent français (liste).
+
+## 🔄 Réutilisable pour Lonne Company
+Ce qui, dans cette leçon, peut être réexploité par Estelon dans ses propres cours/contenus (Lonne Company) : idées, angles pédagogiques, exercices adaptables.`;
+
 // ── Helpers ──────────────────────────────────────────────────────
 function isRetryableError(error) {
   const msg = String(error?.message || '');
@@ -200,7 +235,12 @@ export async function onRequest(context) {
         headers: { ...CORS, 'Content-Type': 'application/json' },
       });
     }
-    const systemPrompt = body.system || '';
+    // Mode de transcription (rétro-compat : absent → "seance").
+    // "formation" → prompt serveur dédié ; "seance" → prompt client (inchangé).
+    const mode = body.mode === 'formation' ? 'formation' : 'seance';
+    const systemPrompt = mode === 'formation'
+      ? FORMATION_SYSTEM_PROMPT
+      : (body.system || '');
     const baseUserMessage = body.messages?.[0]?.content
       || body.prompt
       || body.text

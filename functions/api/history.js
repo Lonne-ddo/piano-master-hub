@@ -53,6 +53,10 @@ async function handlePost(request, env) {
     return Response.json({ error: 'invalid_data', detail: 'must be a plain object' }, { status: 400, headers: CORS_HEADERS })
   }
 
+  // Type de transcription (rétro-compat : tout ce qui n'est pas "formation"
+  // — y compris absent ou anciennes entrées — vaut "seance").
+  data.type = data.type === 'formation' ? 'formation' : 'seance'
+
   let serialized
   try {
     serialized = JSON.stringify(data)

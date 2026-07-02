@@ -33,6 +33,39 @@
   <link rel="apple-touch-icon" href="../assets/icons/icon-192.svg">
   <style>
 
+    /* ── Toggle mode (Séance élève / Formation externe) ── */
+    .mode-toggle {
+      display: inline-flex;
+      gap: 4px;
+      padding: 4px;
+      margin-bottom: 16px;
+      background: var(--bg3);
+      border: 1px solid var(--border1);
+      border-radius: 12px;
+    }
+    .mode-opt {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      color: var(--text3);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 7px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .18s, color .18s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .mode-opt:hover { color: var(--text1); }
+    .mode-opt.is-active {
+      background: var(--v);
+      color: #fff;
+    }
+    .mode-emoji { font-size: 14px; line-height: 1; }
+
     /* ── Zone de dépôt ── */
     .drop-zone {
       border: 2px dashed var(--border2);
@@ -561,6 +594,18 @@
       </p>
     </div>
 
+    <!-- ── Mode de transcription : Séance élève / Formation externe ── -->
+    <div class="mode-toggle" id="mode-toggle" role="tablist" aria-label="Type de transcription">
+      <button type="button" class="mode-opt is-active" data-mode="seance"
+              role="tab" aria-selected="true" onclick="setMode('seance')">
+        <span class="mode-emoji">🎹</span> Séance élève
+      </button>
+      <button type="button" class="mode-opt" data-mode="formation"
+              role="tab" aria-selected="false" onclick="setMode('formation')">
+        <span class="mode-emoji">🎓</span> Formation externe
+      </button>
+    </div>
+
     <!-- ── Zone de dépôt ───────────────────────────────── -->
     <div class="card" id="upload-card" style="margin-bottom:16px;">
       <div class="card-title">
@@ -818,7 +863,20 @@ let resultRaw       = ''     // Texte pour copie/DL
 let resultName      = ''     // Nom fichier courant
 let currentHistoryKey = null
 let renderMeta      = null   // { partsCount, partsNames, totalDurationSec, transcript }
+let currentMode     = 'seance' // 'seance' | 'formation' — type de transcription actif (toggle)
 const historyRegistry = {}
+
+// ── Toggle mode (Séance élève / Formation externe) ────────────
+// Bascule l'état + l'UI. Envoyé ensuite à /api/claude (champ "mode") et
+// stocké dans l'historique (champ "type").
+function setMode(mode) {
+  currentMode = (mode === 'formation') ? 'formation' : 'seance'
+  document.querySelectorAll('#mode-toggle .mode-opt').forEach(btn => {
+    const active = btn.dataset.mode === currentMode
+    btn.classList.toggle('is-active', active)
+    btn.setAttribute('aria-selected', active ? 'true' : 'false')
+  })
+}
 
 // ── MIME ─────────────────────────────────────────────────────
 const MIMES = {
@@ -1497,6 +1555,7 @@ async function startJob() {
     let analysisResult
     try {
       analysisResult = await streamClaude({
+        mode: currentMode,
         system: `Tu es un assistant qui structure le transcript d'un cours de piano d'Estelon, coach piano.
 
 ────────────────────────────────────────────
@@ -1878,6 +1937,7 @@ async function saveToHistory(filename, summary, raw, meta) {
   const title = document.getElementById('res-title').value.trim()
   const payload = {
     date: new Date().toISOString(),
+    type: currentMode,   // 'seance' | 'formation' — mode actif au moment de la génération
     filename,
     title,
     summary,
