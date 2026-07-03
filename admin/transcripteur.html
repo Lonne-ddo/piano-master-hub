@@ -66,6 +66,90 @@
     }
     .mode-emoji { font-size: 14px; line-height: 1; }
 
+    /* ── Historique : dossiers de classement ── */
+    .hist-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 10px;
+    }
+    .hist-newfolder {
+      appearance: none;
+      border: 1px solid var(--border1);
+      background: var(--bg3);
+      color: var(--text1);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .hist-newfolder:hover {
+      border-color: var(--v);
+      background: var(--vg);
+      color: var(--v);
+    }
+    .hist-folder { margin-bottom: 14px; }
+    .hist-folder-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      padding: 0 2px;
+    }
+    .hist-folder-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text1);
+      letter-spacing: .02em;
+    }
+    .hist-folder-count {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+    }
+    .hist-folder-edit {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      font-size: 12px;
+      opacity: .5;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: opacity .15s, background .15s;
+    }
+    .hist-folder-edit:hover { opacity: 1; background: var(--vg); }
+    .hist-folder-input {
+      font: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text1);
+      background: var(--bg3);
+      border: 1px solid var(--v);
+      border-radius: 6px;
+      padding: 2px 8px;
+      outline: none;
+    }
+    .hist-folder-empty {
+      font-size: 12px;
+      color: var(--text3);
+      padding: 4px 2px 2px;
+    }
+    .hist-move {
+      appearance: none;
+      font: inherit;
+      font-size: 11px;
+      color: var(--text3);
+      background: var(--bg3);
+      border: 1px solid var(--border1);
+      border-radius: 6px;
+      padding: 4px 8px;
+      cursor: pointer;
+    }
+    .hist-move:hover { border-color: var(--v); }
+
     /* ── Zone de dépôt ── */
     .drop-zone {
       border: 2px dashed var(--border2);
@@ -772,7 +856,7 @@
           <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/>
           <path d="M7 4.5V7l2 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
         </svg>
-        Historique
+        Historique<span id="history-mode-label" style="color:var(--text3);font-weight:400;"></span>
       </div>
       <div id="history-list">
         <p style="color:var(--text3);font-size:13px;">Chargement…</p>
@@ -864,6 +948,8 @@ let resultName      = ''     // Nom fichier courant
 let currentHistoryKey = null
 let renderMeta      = null   // { partsCount, partsNames, totalDurationSec, transcript }
 let currentMode     = 'seance' // 'seance' | 'formation' — type de transcription actif (toggle)
+let folders         = []     // registre dossiers [{id,name,type}] (tous modes confondus)
+let historyItems    = []     // dernières entrées brutes renvoyées par /api/history (cache)
 const historyRegistry = {}
 
 // ── Toggle mode (Séance élève / Formation externe) ────────────
@@ -876,6 +962,8 @@ function setMode(mode) {
     btn.classList.toggle('is-active', active)
     btn.setAttribute('aria-selected', active ? 'true' : 'false')
   })
+  // L'historique affiché suit le mode : re-filtre depuis le cache
+  refreshHistoryView()
 }
 
 // ── MIME ─────────────────────────────────────────────────────
@@ -1989,38 +2077,68 @@ async function saveToHistory(filename, summary, raw, meta) {
   }
 }
 
+// ── Dossiers (registre KV sous clé réservée "__folders__") ────
+async function loadFolders() {
+  try {
+    const res = await fetch('/api/history?resource=folders', { credentials: 'same-origin' })
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    const data = await res.json()
+    folders = Array.isArray(data) ? data : []
+  } catch(e) {
+    console.warn('Dossiers non chargés:', e)
+    folders = []
+  }
+}
+
+// Type d'une entrée (rétro-compat : absent → seance)
+function entryType(d) {
+  return d && d.type === 'formation' ? 'formation' : 'seance'
+}
+// Dossiers appartenant au mode courant
+function currentModeFolders() {
+  return folders.filter(f => (f.type === 'formation' ? 'formation' : 'seance') === currentMode)
+}
+
 async function loadHistory() {
   try {
-    const res = await fetch('/api/history', {
-      credentials: 'same-origin'
-    })
-    if (!res.ok) throw new Error('HTTP ' + res.status)
-    const items = await res.json()
-    renderHistory(items)
+    const [itemsRes] = await Promise.all([
+      fetch('/api/history', { credentials: 'same-origin' }),
+      loadFolders(),
+    ])
+    if (!itemsRes.ok) throw new Error('HTTP ' + itemsRes.status)
+    historyItems = await itemsRes.json()
+    if (!Array.isArray(historyItems)) historyItems = []
+    refreshHistoryView()
   } catch(e) {
     document.getElementById('history-list').innerHTML =
       `<p style="color:var(--text3);font-size:13px;">Impossible de charger l'historique.</p>`
   }
 }
 
-function renderHistory(items) {
-  const container = document.getElementById('history-list')
-  if (!items || !items.length) {
-    container.innerHTML = '<p style="color:var(--text3);font-size:13px;">Aucun historique pour l\'instant.</p>'
-    return
-  }
-  container.innerHTML = items.map(item => {
-    const d    = item.data || {}
-    const date = d.date ? new Date(d.date).toLocaleString('fr-FR', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    }) : '—'
-    const safeKey = (item.key || '').replace(/'/g, "\\'")
-    historyRegistry[item.key] = d
-    // Titre + badge multi-parts
-    const baseTitle = d.title || d.filename || '—'
-    const multiSuffix = (d.partsCount && d.partsCount > 1) ? ` (multi-parts, ${d.partsCount})` : ''
-    return `
+// Re-rend l'historique depuis le cache + met à jour le titre selon le mode
+function refreshHistoryView() {
+  renderHistory(historyItems)
+  const lbl = document.getElementById('history-mode-label')
+  if (lbl) lbl.textContent = currentMode === 'formation'
+    ? ' — Formation externe' : ' — Séance élève'
+}
+
+// Carte d'une entrée + menu « Déplacer vers… »
+function renderEntryCard(item, modeFolders) {
+  const d = item.data || {}
+  const date = d.date ? new Date(d.date).toLocaleString('fr-FR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  }) : '—'
+  const safeKey = (item.key || '').replace(/'/g, "\\'")
+  const baseTitle = d.title || d.filename || '—'
+  const multiSuffix = (d.partsCount && d.partsCount > 1) ? ` (multi-parts, ${d.partsCount})` : ''
+  const folderOpts = modeFolders
+    .filter(f => f.id !== d.folderId)
+    .map(f => `<option value="${esc(f.id)}">${esc(f.name)}</option>`)
+    .join('')
+  const noneOpt = d.folderId ? '<option value="__none__">Sans dossier</option>' : ''
+  return `
 <div class="hist-entry" style="border:1px solid var(--border1);border-radius:8px;margin-bottom:8px;overflow:hidden;">
   <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:var(--bg2);"
        onclick="loadFromHistory('${safeKey}')">
@@ -2028,12 +2146,149 @@ function renderHistory(items) {
     <span style="font-size:13px;color:var(--text1);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(baseTitle)}${esc(multiSuffix)}</span>
     <span style="font-size:11px;color:var(--v);">Charger ↗</span>
   </div>
-  <div style="display:flex;gap:8px;padding:6px 12px 10px;border-top:1px solid var(--border1);background:var(--bg2);">
+  <div style="display:flex;gap:8px;align-items:center;padding:6px 12px 10px;border-top:1px solid var(--border1);background:var(--bg2);">
+    <select class="hist-move" onchange="moveEntry('${safeKey}', this.value); this.value=''" title="Déplacer vers un dossier">
+      <option value="">Déplacer vers…</option>
+      ${noneOpt}${folderOpts}
+    </select>
+    <div style="flex:1;"></div>
     <button class="btn-secondary" onclick="deleteHistory('${safeKey}')" style="font-size:11px;padding:4px 10px;">🗑️ Supprimer</button>
   </div>
 </div>`
-  }).join('')
 }
+
+function renderHistory(items) {
+  if (items) historyItems = items
+  items = historyItems || []
+  const container = document.getElementById('history-list')
+  if (!container) return
+
+  // Enregistre TOUTES les entrées (tous modes) pour loadFromHistory
+  items.forEach(it => { if (it && it.key) historyRegistry[it.key] = it.data || {} })
+
+  const modeItems   = items.filter(it => entryType(it.data) === currentMode)
+  const modeFolders = currentModeFolders()
+  const folderIds   = new Set(modeFolders.map(f => f.id))
+
+  // Groupement : entrées sans dossier + par dossier du mode courant.
+  // Un folderId pointant vers un dossier absent/autre mode → « Sans dossier ».
+  const noFolder = []
+  const byFolder = {}
+  modeFolders.forEach(f => { byFolder[f.id] = [] })
+  modeItems.forEach(it => {
+    const fid = it.data && it.data.folderId
+    if (fid && folderIds.has(fid)) byFolder[fid].push(it)
+    else noFolder.push(it)
+  })
+
+  const toolbar = `<div class="hist-toolbar"><button class="hist-newfolder" onclick="createFolder()">+ Nouveau dossier</button></div>`
+
+  if (!modeItems.length && !modeFolders.length) {
+    container.innerHTML = toolbar +
+      `<p style="color:var(--text3);font-size:13px;">Aucun historique pour l'instant.</p>`
+    return
+  }
+
+  let html = toolbar
+  // « Sans dossier » en premier (si non vide)
+  if (noFolder.length) {
+    html += `<div class="hist-folder">
+      <div class="hist-folder-head">
+        <span class="hist-folder-name">📂 Sans dossier</span>
+        <span class="hist-folder-count">${noFolder.length}</span>
+      </div>
+      <div class="hist-folder-body">${noFolder.map(it => renderEntryCard(it, modeFolders)).join('')}</div>
+    </div>`
+  }
+  // Dossiers du mode courant (affichés même vides)
+  modeFolders.forEach(f => {
+    const entries = byFolder[f.id]
+    const body = entries.length
+      ? entries.map(it => renderEntryCard(it, modeFolders)).join('')
+      : `<div class="hist-folder-empty">Aucune entrée — utilise « Déplacer vers… » sur une entrée.</div>`
+    html += `<div class="hist-folder">
+      <div class="hist-folder-head">
+        <span class="hist-folder-name" id="fname-${esc(f.id)}">📁 ${esc(f.name)}</span>
+        <button class="hist-folder-edit" title="Renommer" onclick="startFolderRename('${esc(f.id)}')">✏️</button>
+        <span class="hist-folder-count">${entries.length}</span>
+      </div>
+      <div class="hist-folder-body">${body}</div>
+    </div>`
+  })
+  container.innerHTML = html
+}
+
+// ── Actions dossiers ──────────────────────────────────────────
+async function createFolder() {
+  const name = prompt('Nom du nouveau dossier :')
+  if (name == null) return
+  const trimmed = name.trim()
+  if (!trimmed) return
+  try {
+    const res = await fetch('/api/history?resource=folders', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: trimmed, type: currentMode })
+    })
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    await loadFolders()
+    refreshHistoryView()
+  } catch(e) { alert('Création du dossier échouée.') }
+}
+window.createFolder = createFolder
+
+// Renommage inline : remplace le nom par un input (Entrée = valider, Échap = annuler)
+function startFolderRename(id) {
+  const span = document.getElementById('fname-' + id)
+  if (!span) return
+  const current = (folders.find(f => f.id === id) || {}).name || ''
+  const input = document.createElement('input')
+  input.type = 'text'
+  input.value = current
+  input.maxLength = 60
+  input.className = 'hist-folder-input'
+  span.replaceWith(input)
+  input.focus(); input.select()
+  let done = false
+  const commit = async () => {
+    if (done) return
+    done = true
+    const name = input.value.trim()
+    if (name && name !== current) await renameFolder(id, name)
+    else refreshHistoryView()
+  }
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); input.blur() }
+    if (e.key === 'Escape') { done = true; refreshHistoryView() }
+  })
+  input.addEventListener('blur', commit)
+}
+window.startFolderRename = startFolderRename
+
+// Renomme UNIQUEMENT le registre (les entrées et leur folderId sont intacts)
+async function renameFolder(id, name) {
+  try {
+    const res = await fetch('/api/history?resource=folders', {
+      method: 'PATCH', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, name })
+    })
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    await loadFolders()
+    refreshHistoryView()
+  } catch(e) { alert('Renommage échoué.'); refreshHistoryView() }
+}
+
+// Déplace une entrée vers un dossier (ou « Sans dossier ») via PATCH générique
+async function moveEntry(key, val) {
+  if (val === '') return
+  const folderId = val === '__none__' ? null : val
+  try {
+    await patchHistoryWithRetry(key, { folderId })
+    await loadHistory()
+  } catch(e) { alert('Déplacement échoué.') }
+}
+window.moveEntry = moveEntry
 
 async function loadFromHistory(key) {
   const d = historyRegistry[key]

@@ -15,6 +15,13 @@ const KEY_RE = /^[a-zA-Z0-9:_\-.]{1,100}$/
 // transcriptions multi-parts longues (1h30+ avec transcript brut + sections).
 const MAX_VALUE_BYTES = 1 * 1024 * 1024 // 1 MB
 
+// Registre des dossiers de classement : un seul record KV sous une clé
+// réservée (hors préfixe "history:", donc jamais listé comme entrée).
+// Format : [{ id, name, type }] où type = "seance" | "formation".
+const FOLDERS_KEY = '__folders__'
+const MAX_FOLDERS = 200
+const FOLDER_NAME_MAX = 60
+
 // ── GET /api/history ─ Lister les 20 dernières entrées ───────
 async function handleGet(env) {
   const list = await env.MASTERHUB_HISTORY.list({ prefix: 'history:', limit: 20 })
@@ -153,6 +160,93 @@ async function handleDelete(request, env) {
   return Response.json({ success: true }, { headers: CORS_HEADERS })
 }
 
+// ── Dossiers ─ registre unique sous FOLDERS_KEY ──────────────
+// Sous-ressource de /api/history via ?resource=folders (pas de nouvel
+// endpoint). Le déplacement d'une entrée se fait via le PATCH d'entrée
+// générique ({ key, data:{ folderId } }) : rien de spécifique ici.
+async function readFolders(env) {
+  const raw = await env.MASTERHUB_HISTORY.get(FOLDERS_KEY)
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
+}
+
+// GET ?resource=folders ─ Lister tous les dossiers (tous modes)
+async function handleFoldersGet(env) {
+  return Response.json(await readFolders(env), { headers: CORS_HEADERS })
+}
+
+// POST ?resource=folders ─ Créer un dossier { name, type }
+async function handleFoldersPost(request, env) {
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return Response.json({ error: 'invalid_json' }, { status: 400, headers: CORS_HEADERS })
+  }
+  const name = typeof body?.name === 'string' ? body.name.trim() : ''
+  const type = body?.type === 'formation' ? 'formation' : 'seance'
+  if (!name) {
+    return Response.json({ error: 'invalid_data', detail: 'name required' }, { status: 400, headers: CORS_HEADERS })
+  }
+  if (name.length > FOLDER_NAME_MAX) {
+    return Response.json({ error: 'invalid_data', detail: `name max ${FOLDER_NAME_MAX} chars` }, { status: 400, headers: CORS_HEADERS })
+  }
+
+  const folders = await readFolders(env)
+  if (folders.length >= MAX_FOLDERS) {
+    return Response.json({ error: 'too_many_folders', detail: `max ${MAX_FOLDERS}` }, { status: 400, headers: CORS_HEADERS })
+  }
+
+  const folder = { id: crypto.randomUUID(), name, type }
+  folders.push(folder)
+  try {
+    await env.MASTERHUB_HISTORY.put(FOLDERS_KEY, JSON.stringify(folders))
+  } catch (e) {
+    console.error('[history] folders POST put failed:', e?.message || e)
+    return Response.json({ error: 'kv_put_failed' }, { status: 500, headers: CORS_HEADERS })
+  }
+  return Response.json(folder, { headers: CORS_HEADERS })
+}
+
+// PATCH ?resource=folders ─ Renommer un dossier { id, name }
+// N'affecte QUE le registre : les entrées (folderId) restent inchangées.
+async function handleFoldersPatch(request, env) {
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return Response.json({ error: 'invalid_json' }, { status: 400, headers: CORS_HEADERS })
+  }
+  const id   = typeof body?.id === 'string' ? body.id : ''
+  const name = typeof body?.name === 'string' ? body.name.trim() : ''
+  if (!id || !name) {
+    return Response.json({ error: 'invalid_data', detail: 'id and name required' }, { status: 400, headers: CORS_HEADERS })
+  }
+  if (name.length > FOLDER_NAME_MAX) {
+    return Response.json({ error: 'invalid_data', detail: `name max ${FOLDER_NAME_MAX} chars` }, { status: 400, headers: CORS_HEADERS })
+  }
+
+  const folders = await readFolders(env)
+  const folder = folders.find(f => f.id === id)
+  if (!folder) {
+    return Response.json({ error: 'not_found' }, { status: 404, headers: CORS_HEADERS })
+  }
+
+  folder.name = name
+  try {
+    await env.MASTERHUB_HISTORY.put(FOLDERS_KEY, JSON.stringify(folders))
+  } catch (e) {
+    console.error('[history] folders PATCH put failed:', e?.message || e)
+    return Response.json({ error: 'kv_put_failed' }, { status: 500, headers: CORS_HEADERS })
+  }
+  return Response.json(folder, { headers: CORS_HEADERS })
+}
+
 // ── Dispatcher principal ──────────────────────────────────────
 export async function onRequest(context) {
   const { request, env } = context
@@ -166,6 +260,15 @@ export async function onRequest(context) {
   }
 
   const method = request.method.toUpperCase()
+
+  // Sous-ressource dossiers : /api/history?resource=folders
+  const resource = new URL(request.url).searchParams.get('resource')
+  if (resource === 'folders') {
+    if (method === 'GET')   return handleFoldersGet(env)
+    if (method === 'POST')  return handleFoldersPost(request, env)
+    if (method === 'PATCH') return handleFoldersPatch(request, env)
+    return Response.json({ error: 'Méthode non supportée' }, { status: 405, headers: CORS_HEADERS })
+  }
 
   if (method === 'GET')    return handleGet(env)
   if (method === 'POST')   return handlePost(request, env)
