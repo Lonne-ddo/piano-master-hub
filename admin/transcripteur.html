@@ -1083,6 +1083,7 @@ async function transcribeFile(file, onProgress = () => {}) {
   formData.append('model', 'whisper-large-v3')
   formData.append('response_format', 'verbose_json')
   formData.append('language', 'fr')
+  formData.append('mode', currentMode) // séance → prompt FR ; formation → prompt neutre + auto-détection
   return await transcribeWithFallback(formData, onProgress)
 }
 
@@ -1466,6 +1467,21 @@ async function retryFile(idx) {
 }
 window.retryFile = retryFile
 
+// ── Transcript horodaté (mode formation) ─────────────────────
+// Construit un texte "[MM:SS] texte" par segment verbose_json. offsetSec
+// décale les timestamps pour les parts multi-fichiers (offset cumulé).
+// Retourne '' si aucun segment (ex : fallback AssemblyAI) → l'appelant
+// retombe alors sur le texte plat.
+function segmentsToTimestamped(segments, offsetSec = 0) {
+  if (!Array.isArray(segments) || !segments.length) return ''
+  return segments.map(s => {
+    const t  = Math.max(0, Math.floor((s.start || 0) + offsetSec))
+    const mm = String(Math.floor(t / 60)).padStart(2, '0')
+    const ss = String(t % 60).padStart(2, '0')
+    return `[${mm}:${ss}] ${(s.text || '').trim()}`
+  }).join('\n')
+}
+
 // ── Job principal ─────────────────────────────────────────────
 async function startJob() {
   if (!selectedFiles.length) return
@@ -1541,7 +1557,18 @@ async function startJob() {
       throw new Error('Toutes les transcriptions sont vides.')
     }
     const sep = totalFiles > 1 ? '\n\n[— part suivante —]\n\n' : '\n\n'
-    const fullTranscript = texts.filter(t => t && t.trim()).join(sep)
+    // Séance : texte plat (inchangé). Formation : transcript horodaté
+    // [MM:SS] par segment, offset multi-parts appliqué, fallback texte plat.
+    let fullTranscript
+    if (currentMode === 'formation') {
+      fullTranscript = results
+        .filter(r => r.result && (r.result.text || '').trim())
+        .map(r => segmentsToTimestamped(r.result.segments, fileOffsets[r.idx] || 0)
+                  || (r.result.text || '').trim())
+        .join(sep)
+    } else {
+      fullTranscript = texts.filter(t => t && t.trim()).join(sep)
+    }
 
     step('transcribe', 'ok', totalFiles > 1
       ? `${totalFiles} fichiers transcrits ✓`
@@ -1721,7 +1748,9 @@ Mapping key → title + émoji :
 ⚠️ Ne PAS générer de section "observations" (retirée du périmètre — toute observation sur l'élève doit être omise ou reformulée comme conseil/devoir/enseignement selon ce qui est pertinent).`,
         messages: [{
           role: 'user',
-          content: `Voici la transcription de la séance :\n\n${fullTranscript}`
+          content: `${currentMode === 'formation'
+            ? 'Voici la transcription horodatée de la leçon vidéo (chaque ligne : [MM:SS] texte) :'
+            : 'Voici la transcription de la séance :'}\n\n${fullTranscript}`
         }],
         temperature: 0.2,
         max_tokens: 8000

@@ -71,6 +71,11 @@ export async function onRequest(context) {
     });
   }
 
+  // Mode de transcription (rétro-compat : absent → "seance").
+  // seance   → prompt musical FR (biais français, inchangé).
+  // formation → prompt musical neutre/EN (contenu anglais des formations).
+  const mode = formData.get("mode") === "formation" ? "formation" : "seance";
+
   // Préparation de la requête Groq Whisper — verbose_json pour récupérer
   // les segments avec leurs timestamps (start/end en secondes).
   const groqForm = new FormData();
@@ -78,12 +83,13 @@ export async function onRequest(context) {
   groqForm.append("model", MODEL);
   groqForm.append("response_format", "verbose_json");
   groqForm.append("timestamp_granularities[]", "segment");
-  // Prompt initial pour biaiser Whisper vers le vocabulaire musical des cours Estelon
-  groqForm.append(
-    "prompt",
-    "Cours de piano en français avec Estelon, coach piano. Vocabulaire technique : accords (majeur, mineur, maj7, min7, min9, maj9, dim, sus2, sus4), voicings, renversements, tritons, tensions et résolutions, degrés (I II V I), gammes (majeure, mineure, harmonique, mélodique, pentatonique), tonalités, modulations, arpèges, ear training, tonedear, métronome, répertoire : Amazing Grace, Abrite-moi, Can't Help Falling in Love."
-  );
-  // Pas de 'language' : détection automatique (meilleur pour contenu mixte)
+  // Prompt initial pour biaiser Whisper vers le vocabulaire musical.
+  // seance : français (cours Estelon). formation : anglais/neutre (formations EN).
+  const SEANCE_PROMPT = "Cours de piano en français avec Estelon, coach piano. Vocabulaire technique : accords (majeur, mineur, maj7, min7, min9, maj9, dim, sus2, sus4), voicings, renversements, tritons, tensions et résolutions, degrés (I II V I), gammes (majeure, mineure, harmonique, mélodique, pentatonique), tonalités, modulations, arpèges, ear training, tonedear, métronome, répertoire : Amazing Grace, Abrite-moi, Can't Help Falling in Love.";
+  const FORMATION_PROMPT = "Piano lesson. Musical vocabulary: chords (major, minor, maj7, min7, dominant 7, sus2, sus4, diminished, augmented), voicings, inversions, tensions and resolutions, scale degrees (I ii V I), scales (major, minor, harmonic minor, melodic minor, pentatonic), modes, key signatures, modulations, arpeggios, progressions, ear training, metronome.";
+  groqForm.append("prompt", mode === "formation" ? FORMATION_PROMPT : SEANCE_PROMPT);
+  // Pas de 'language' : détection automatique (FR biaisé par le prompt en séance,
+  // EN détecté naturellement en formation grâce au prompt neutre)
 
   // ── Réponse en streaming SSE avec heartbeats ──
   // Groq Whisper ne stream pas sa réponse (un seul JSON à la fin), donc on
