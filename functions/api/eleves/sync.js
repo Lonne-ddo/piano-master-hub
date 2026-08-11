@@ -3,17 +3,21 @@
 //  1. Fetch Google Doc (export plain text)
 //  2. Calcul stats globales par regex (nb_cours, date_debut, date_fin_prevue,
 //     progression_pct) — indépendant du LLM
-//  3. Cascade LLM avec mode JSON natif pour extraire `derniere_seance` :
+//  3. Sélection DÉTERMINISTE de la séance la plus récente (date MAX) via
+//     _lib/latest-session.js — le LLM ne choisit plus la séance. Puis cascade
+//     LLM (JSON natif) sur CE bloc uniquement pour extraire titre/résumé/devoirs :
 //       Gemini 2.5 Flash (responseMimeType=application/json)
 //     → Groq Llama 3.3 (response_format=json_object)
 //     → Claude Sonnet 4.6 (si ANTHROPIC_API_KEY dispo, sinon skip)
 //     → cache KV stale (si présent) ou 503 avec détails
+//     Si aucun heading daté : on préserve l'existant (pas d'appel LLM).
 //  4. Merge avec KV existant. Dates (premier_cours/fin_prevue) override par le
 //     calcul regex SAUF si existing.manualDates === true (édition manuelle).
 // Auth : admin via cookie mh_admin_pw (HMAC).
 
 import { requireAdminPassword } from '../_lib/session.js';
 import { fetchAndParseDevoirs } from '../_lib/devoirs-parser.js';
+import { selectLatestSession } from '../_lib/latest-session.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -280,9 +284,13 @@ function validateParsedSeance(parsed) {
 }
 
 // ─── Cascade LLM : Gemini → Groq → Claude ────────────────────────
-async function extractLatestSession(docText, eleveId, studentName, env) {
+// `sessionBlock` = UNIQUEMENT le bloc de la séance la plus récente (déjà
+// sélectionné déterministiquement par selectLatestSession). `sessionDate` =
+// date ISO déterministe qui écrase toute date renvoyée par le LLM (le LLM
+// n'intervient plus dans le tri des séances).
+async function extractLatestSession(sessionBlock, sessionDate, eleveId, studentName, env) {
   const { system, buildUser } = buildPrompt(studentName);
-  const userMessage = buildUser(docText);
+  const userMessage = buildUser(sessionBlock);
   const opts = { maxTokens: 4000, temperature: 0.2 };
   const tried = [];
   const errors = [];
@@ -298,6 +306,7 @@ async function extractLatestSession(docText, eleveId, studentName, env) {
       console.log(`[sync.js] eleve=${eleveId} provider=gemini raw_response_first200="${raw.slice(0, 200).replace(/\s+/g, ' ')}"`);
       const parsed = extractJSON(raw);
       validateParsedSeance(parsed);
+      parsed.date = sessionDate; // date déterministe (helper) prioritaire sur le LLM
       console.log(`[sync.js] eleve=${eleveId} provider=gemini parse=ok duration=${Date.now()-t0}ms`);
       return { parsed, provider: 'gemini-2.5-flash' };
     } catch (e) {
@@ -318,6 +327,7 @@ async function extractLatestSession(docText, eleveId, studentName, env) {
       console.log(`[sync.js] eleve=${eleveId} provider=groq raw_response_first200="${raw.slice(0, 200).replace(/\s+/g, ' ')}"`);
       const parsed = extractJSON(raw);
       validateParsedSeance(parsed);
+      parsed.date = sessionDate; // date déterministe (helper) prioritaire sur le LLM
       console.log(`[sync.js] eleve=${eleveId} provider=groq parse=ok duration=${Date.now()-t0}ms`);
       return { parsed, provider: 'groq-llama-3.3' };
     } catch (e) {
@@ -338,6 +348,7 @@ async function extractLatestSession(docText, eleveId, studentName, env) {
       console.log(`[sync.js] eleve=${eleveId} provider=claude raw_response_first200="${raw.slice(0, 200).replace(/\s+/g, ' ')}"`);
       const parsed = extractJSON(raw);
       validateParsedSeance(parsed);
+      parsed.date = sessionDate; // date déterministe (helper) prioritaire sur le LLM
       console.log(`[sync.js] eleve=${eleveId} provider=claude parse=ok duration=${Date.now()-t0}ms`);
       return { parsed, provider: 'claude-sonnet-4-6' };
     } catch (e) {
@@ -384,17 +395,41 @@ export async function onRequestPost(context) {
       const statsAutoRaw = computeAutoStats(sessionTitles);
       console.log(`[sync.js] eleve=${name} step=stats_auto nb_cours=${statsAutoRaw.nb_cours} debut=${statsAutoRaw.date_debut} fin=${statsAutoRaw.date_fin_prevue}`);
 
-      // 3. LLM cascade pour derniere_seance uniquement (Gemini → Groq → Claude).
-      //    Skip si l'admin a édité manuellement la séance (manualEdit === true) :
-      //    on évite l'appel LLM pour économiser et préserver le contenu admin.
+      // 3. Sélection déterministe de la séance la plus récente (date MAX), puis
+      //    cascade LLM sur CE bloc uniquement (Gemini → Groq → Claude) pour en
+      //    extraire titre/résumé/devoirs. Skip si l'admin a édité manuellement la
+      //    séance (manualEdit === true) : on évite l'appel LLM pour économiser et
+      //    préserver le contenu admin.
       const cacheKey = `eleve:${name}`;
       const existing = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'json' }) || {};
       const keepManualSeance = existing.derniere_seance?.manualEdit === true;
 
       let extracted = null;
-      if (!keepManualSeance) {
+      if (keepManualSeance) {
+        console.log(`[sync.js] eleve=${name} step=llm_cascade status=skipped reason=manualEdit`);
+      } else {
+        // Sélection déterministe (helper partagé, tri par date MAX).
+        const latest = selectLatestSession(docText);
+        if (!latest.block) {
+          // Requirement : aucun heading de séance daté → NE PAS écraser le KV
+          //  existant ni sélectionner un bloc arbitraire. On préserve et logge.
+          llmFailed.push({
+            eleve: name,
+            providers_tried: [],
+            errors: [{ provider: 'session-select', message: latest.error || 'no_dated_heading' }],
+            has_stale_cache: !!existing.derniere_seance,
+          });
+          results[name] = {
+            ok: false,
+            error: `session_select_failed: ${latest.error || 'no_dated_heading'}`,
+            stale_cache_available: !!existing.derniere_seance,
+          };
+          console.error(`[sync.js] eleve=${name} step=session_select status=${latest.error || 'no_dated_heading'} stale=${!!existing.derniere_seance}`);
+          continue;
+        }
+        console.log(`[sync.js] eleve=${name} step=session_select date=${latest.date} heading="${latest.headingRaw}"`);
         try {
-          extracted = await extractLatestSession(docText, name, capitalize(name), env);
+          extracted = await extractLatestSession(latest.block, latest.date, name, capitalize(name), env);
         } catch (llmErr) {
           // Tous les LLM ont échoué → ne pas toucher le cache existant (stale préservé)
           llmFailed.push({
@@ -412,8 +447,6 @@ export async function onRequestPost(context) {
           console.error(`[sync.js] eleve=${name} step=llm_cascade status=all_failed providers=${(llmErr.tried || []).join(',')} stale=${!!existing}`);
           continue;
         }
-      } else {
-        console.log(`[sync.js] eleve=${name} step=llm_cascade status=skipped reason=manualEdit`);
       }
 
       // 4. Merge avec KV existant + override prioritaire
@@ -482,13 +515,31 @@ export async function onRequestPost(context) {
     Object.entries(DOCS).map(async ([slug, docId]) => {
       if (!docId) return { slug, status: 'no_url' };
       const result = await fetchAndParseDevoirs(docId);
-      const payload = {
-        bullets: result.bullets,
-        lastFetchedAt: Date.now(),
-        sourceDocId: result.docId,
-        fetchStatus: result.status,
-      };
-      if (result.error) payload.lastError = result.error;
+      let payload;
+      if (result.status !== 'ok') {
+        // Stale-while-error : fetch KO / doc sans séance datée (no_session) →
+        // préserver les bullets existants, ne pas écraser avec du vide. Logge
+        // l'erreur explicite dans le payload (lastError).
+        let existingDevoirs = null;
+        try {
+          existingDevoirs = await env.MASTERHUB_STUDENTS.get(`devoirs:${slug}`, { type: 'json' });
+        } catch { /* pas de cache → payload vide ci-dessous */ }
+        payload = {
+          ...(existingDevoirs && Array.isArray(existingDevoirs.bullets)
+            ? existingDevoirs
+            : { bullets: [], sourceDocId: result.docId }),
+          lastFetchedAt: Date.now(),
+          fetchStatus: result.status,
+          lastError: result.error || result.status,
+        };
+      } else {
+        payload = {
+          bullets: result.bullets,
+          lastFetchedAt: Date.now(),
+          sourceDocId: result.docId,
+          fetchStatus: 'ok',
+        };
+      }
       try {
         await env.MASTERHUB_STUDENTS.put(`devoirs:${slug}`, JSON.stringify(payload));
       } catch (e) {

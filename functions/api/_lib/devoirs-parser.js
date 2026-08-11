@@ -3,10 +3,16 @@
 // d'un Google Doc de suivi élève (convention : `# DD/MM` en heading H1
 // pour chaque séance, sous-sections gras **Devoirs** ou **À faire**).
 //
+// La sélection "quelle séance est la plus récente" est déléguée à
+// _lib/latest-session.js (source unique de vérité, tri par date MAX — pas par
+// ordre d'apparition). Ici on ne fait plus qu'extraire les bullets devoirs du
+// bloc sélectionné.
+//
 // Indépendant du sync LLM (sync.js → derniere_seance.devoirs). Plus rapide,
 // pas de coût provider, mais plus fragile aux variations de formatage.
 
-const SEANCE_HEADING_RE = /^# (\d{1,2}\/\d{1,2})\s*$/gm;
+import { selectLatestSession } from './latest-session.js';
+
 const DEVOIRS_LABEL_RE = /\*\*\s*(?:✅\s*)?(?:Devoirs|À\s*faire|A\s*faire)\s*\*\*/i;
 const BULLET_RE = /^\s*[-*]\s+(.+)$/gm;
 const NEXT_BOLD_SECTION_RE = /^\*\*[^*\n]+\*\*/m;
@@ -32,29 +38,25 @@ function cleanBullet(raw) {
   return s.trim();
 }
 
-// Parse le markdown brut et retourne les bullets devoirs de la dernière séance.
-// Retourne [] si aucune séance, aucune section devoirs, ou aucun bullet valide.
+// Parse le markdown brut et retourne les devoirs de la séance la plus récente.
+// Retour : { bullets: string[], sessionDate: string|null, headingRaw: string|null,
+//            found: boolean }.
+//   - found=false → aucun heading de séance daté (ou doc vide). L'appelant DOIT
+//     préserver l'existant (ne pas écraser avec des bullets vides).
+//   - found=true, bullets=[] → séance trouvée mais sans section devoirs (légitime).
 export function parseDevoirsFromDoc(md) {
-  if (typeof md !== 'string' || !md.length) return [];
+  const empty = { bullets: [], sessionDate: null, headingRaw: null, found: false };
+  if (typeof md !== 'string' || !md.length) return empty;
 
-  // 1. Localise tous les headings de séance `# DD/MM` (avec leur offset).
-  const matches = [];
-  let m;
-  SEANCE_HEADING_RE.lastIndex = 0;
-  while ((m = SEANCE_HEADING_RE.exec(md)) !== null) {
-    matches.push({ index: m.index, label: m[1] });
-  }
-  if (!matches.length) return [];
-
-  // 2. Prendre la DERNIÈRE séance (ordre d'apparition, Lonne ajoute en bas).
-  const last = matches[matches.length - 1];
-  const blockStart = last.index;
-  const blockEnd = md.length;
-  const block = md.slice(blockStart, blockEnd);
+  // 1-2. Sélection de la séance la plus récente (date MAX) — helper partagé.
+  const latest = selectLatestSession(md);
+  if (!latest.block) return empty; // no_dated_heading / empty_doc
+  const block = latest.block;
+  const found = { sessionDate: latest.date, headingRaw: latest.headingRaw, found: true };
 
   // 3. Localise la section devoirs dans ce bloc.
   const devLabelMatch = DEVOIRS_LABEL_RE.exec(block);
-  if (!devLabelMatch) return [];
+  if (!devLabelMatch) return { bullets: [], ...found };
   const devStart = devLabelMatch.index + devLabelMatch[0].length;
 
   // 4. Détermine la fin de la section : prochaine section gras OU prochain
@@ -75,7 +77,7 @@ export function parseDevoirsFromDoc(md) {
     const cleaned = cleanBullet(b[1]);
     if (cleaned.length >= 3) bullets.push(cleaned);
   }
-  return bullets;
+  return { bullets, ...found };
 }
 
 // Extrait l'ID Google Doc d'une URL.
@@ -91,7 +93,10 @@ export function extractDocId(urlOrId) {
 }
 
 // Fetch le Google Doc en markdown + parse devoirs.
-// Timeout 8s. Retourne { bullets: string[], docId: string|null, status: 'ok'|'error'|'no_doc_id', error?: string }.
+// Timeout 8s. Retourne { bullets: string[], docId: string|null,
+//   status: 'ok'|'error'|'no_doc_id'|'no_session', sessionDate?: string, error?: string }.
+//   - status='no_session' : doc récupéré mais aucun heading de séance daté →
+//     l'appelant préserve l'existant (stale-while-error), comme pour 'error'.
 export async function fetchAndParseDevoirs(urlOrId) {
   const docId = extractDocId(urlOrId);
   if (!docId) {
@@ -107,8 +112,11 @@ export async function fetchAndParseDevoirs(urlOrId) {
       return { bullets: [], docId, status: 'error', error: `HTTP ${resp.status}` };
     }
     const md = await resp.text();
-    const bullets = parseDevoirsFromDoc(md);
-    return { bullets, docId, status: 'ok' };
+    const parsed = parseDevoirsFromDoc(md);
+    if (!parsed.found) {
+      return { bullets: [], docId, status: 'no_session', error: 'no_dated_heading' };
+    }
+    return { bullets: parsed.bullets, docId, status: 'ok', sessionDate: parsed.sessionDate };
   } catch (e) {
     clearTimeout(tid);
     return { bullets: [], docId, status: 'error', error: e?.message || 'fetch_failed' };
