@@ -709,6 +709,35 @@ function openPreview(id) {
     separationId: id,
     tracks,
     readOnly: false,
+    onDownload: async (trackId, btn) => {
+      if (btn.classList.contains('loading')) return;
+      btn.classList.add('loading');
+      try {
+        const resp = await fetch(
+          '/api/analyse/' + encodeURIComponent(id) + '/stream/' + encodeURIComponent(trackId),
+          { credentials: 'same-origin' }
+        );
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const label = STEM_LABELS_FR[trackId] || trackId;
+        const base = (v.title || id)
+          .replace(/[\/\\?%*:|"<>]/g, '')
+          .replace(/\s+/g, ' ').trim()
+          .slice(0, 80) || id;
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = objUrl;
+        a.download = base + ' - ' + label + '.mp3';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(objUrl);
+      } catch (e) {
+        toast('Téléchargement échoué : ' + (e.message || e), 'error');
+      } finally {
+        btn.classList.remove('loading');
+      }
+    },
   });
   activePlayer.open();
 }
