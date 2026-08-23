@@ -107,7 +107,7 @@
 /* ── Track row (desktop = horizontal ; mobile = card) ─────── */
 .mtp-track {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 248px 1fr;
   align-items: center;
   gap: 16px;
   padding: 12px 0;

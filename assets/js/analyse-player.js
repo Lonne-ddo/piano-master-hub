@@ -429,7 +429,7 @@
         if (dlBtn.classList.contains('loading')) return;
         self.opts.onDownload(track.id, dlBtn);
       });
-      ctrls.appendChild(dlBtn);
+      btnRow.appendChild(dlBtn);
     }
 
     // Waveform col (right) — canvas + overlay playhead
