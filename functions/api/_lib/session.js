@@ -41,13 +41,14 @@ export function generateToken(bytes = 32) {
 // ─── Auth admin par mot de passe (cookie mh_admin_pw HMAC stateless) ────
 //
 // Le cookie a la forme `<expiresAtMs>.<base64url(HMAC-SHA256(secret, expiresAtMs))>`
-// avec `secret = env.ADMIN_PASSWORD` (throw si var non configurée).
+// avec `secret = env.SESSION_HMAC_KEY` (repli sur env.ADMIN_PASSWORD si la
+// variable est absente, avec console.warn).
 //
 // Avantages de cette approche :
 //   - Stateless : pas de KV write/read sur chaque requête
-//   - Pas de var SESSION_SECRET supplémentaire — la clé HMAC dérive du mdp
-//     admin lui-même (changer le mdp invalide tous les cookies en cours)
-//   - Forge impossible sans connaître le mdp
+//   - Clé HMAC distincte du mot de passe : une fuite d'un cookie ou d'un token
+//     ne donne aucune prise sur le mot de passe, et inversement
+//   - Changer SESSION_HMAC_KEY invalide tous les cookies admin en cours
 //   - Expiration auto-vérifiable côté serveur
 
 const ADMIN_COOKIE_NAME = 'mh_admin_pw';
@@ -57,6 +58,16 @@ function getAdminPassword(env) {
   const pw = env && env.ADMIN_PASSWORD;
   if (!pw) throw new Error('ADMIN_PASSWORD env var not configured');
   return pw;
+}
+
+let warnedHmacFallback = false;
+function getHmacKey(env) {
+  if (env && env.SESSION_HMAC_KEY) return env.SESSION_HMAC_KEY;
+  if (!warnedHmacFallback) {
+    warnedHmacFallback = true;
+    console.warn('[session] SESSION_HMAC_KEY absente : repli sur ADMIN_PASSWORD comme clé HMAC');
+  }
+  return getAdminPassword(env);
 }
 
 function base64urlEncode(bytes) {
@@ -90,8 +101,7 @@ function constantTimeStrEq(a, b) {
 // Construit la valeur du cookie admin signée pour un TTL en secondes.
 export async function buildAdminPasswordCookieValue(env, ttlSeconds = ADMIN_COOKIE_TTL_S) {
   const expiresAt = String(Date.now() + ttlSeconds * 1000);
-  const secret = getAdminPassword(env);
-  const sig = await hmacSha256(secret, expiresAt);
+  const sig = await hmacSha256(getHmacKey(env), expiresAt);
   return `${expiresAt}.${sig}`;
 }
 
@@ -108,7 +118,7 @@ export function buildAdminPasswordClearCookie() {
 
 // Lit le cookie admin et vérifie expiration + signature HMAC.
 // Retourne true si cookie valide non expiré, false sinon.
-// Throw si env.ADMIN_PASSWORD n'est pas configuré (CF Pages 500).
+// Throw si ni SESSION_HMAC_KEY ni ADMIN_PASSWORD ne sont configurés (CF Pages 500).
 export async function requireAdminPassword(request, env) {
   const cookie = request.headers.get('cookie') || '';
   const match = cookie.match(/(?:^|;\s*)mh_admin_pw=([^;]+)/);
@@ -124,7 +134,7 @@ export async function requireAdminPassword(request, env) {
   const expiresAt = parseInt(expiresAtStr, 10);
   if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) return false;
 
-  const secret = getAdminPassword(env);
+  const secret = getHmacKey(env);
   let expectedSig;
   try {
     expectedSig = await hmacSha256(secret, expiresAtStr);
@@ -145,14 +155,14 @@ export function checkAdminPassword(candidate, env) {
 // Replicate doit télécharger l'audio source via une URL publique. Plutôt
 // que d'encoder le fichier entier en dataURL base64 en mémoire (risque OOM
 // sur les gros multitrack), on signe un token HMAC court qui autorise
-// /api/analyse/<id>/stream pendant un TTL borné. Même clé que le cookie
-// admin (dérive de ADMIN_PASSWORD), pas de secret supplémentaire.
+// /api/analyse/<id>/stream pendant un TTL borné. Même clé HMAC que le
+// cookie admin (SESSION_HMAC_KEY, repli ADMIN_PASSWORD).
 
 const REPLICATE_TOKEN_PREFIX = 'rpl';
 
 export async function signReplicateToken(env, id, ttlSeconds = 1800) {
   const expiresAt = String(Date.now() + ttlSeconds * 1000);
-  const sig = await hmacSha256(getAdminPassword(env), `${REPLICATE_TOKEN_PREFIX}.${id}.${expiresAt}`);
+  const sig = await hmacSha256(getHmacKey(env), `${REPLICATE_TOKEN_PREFIX}.${id}.${expiresAt}`);
   return `${expiresAt}.${sig}`;
 }
 
@@ -164,7 +174,7 @@ export async function verifyReplicateToken(env, id, token) {
   const sig = token.slice(dot + 1);
   const exp = Number(expiresAt);
   if (!Number.isFinite(exp) || Date.now() > exp) return false;
-  const expected = await hmacSha256(getAdminPassword(env), `${REPLICATE_TOKEN_PREFIX}.${id}.${expiresAt}`);
+  const expected = await hmacSha256(getHmacKey(env), `${REPLICATE_TOKEN_PREFIX}.${id}.${expiresAt}`);
   return constantTimeStrEq(sig, expected);
 }
 

@@ -1,9 +1,8 @@
 // ─── POST /api/admin/login ───────────────────────────────────────
 // Body : { password: string }
-// Compare avec env.ADMIN_PASSWORD (fallback '4697' tant que la var n'est
-// pas configurée sur CF Pages — voir TODO dans _lib/session.js).
+// Compare avec env.ADMIN_PASSWORD (500 si la variable n'est pas configurée).
 //
-// En cas de match : pose le cookie HttpOnly mh_admin_pw signé (HMAC-SHA256),
+// En cas de match : pose le cookie HttpOnly mh_admin_pw signé (HMAC-SHA256, clé SESSION_HMAC_KEY),
 // TTL 90 jours, Path=/. Réponse { ok: true }.
 //
 // En cas de mismatch : 401 + délai artificiel ~500ms.
