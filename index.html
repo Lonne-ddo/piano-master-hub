@@ -572,10 +572,14 @@
         return { slug: key, display: ELEVES_WHITELIST[key].display };
     }
 
+    // Échappe aussi " et ' : la fonction sert dans des attributs (href, title…).
     function escapeHtml(str) {
-        var d = document.createElement("div");
-        d.textContent = str;
-        return d.innerHTML;
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     // Parse une date ISO "YYYY-MM-DD" → timestamp ms (minuit local), ou null.
