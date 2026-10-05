@@ -65,8 +65,7 @@ export async function onRequestPost({ request, env }) {
   let foundSlug = null;
 
   // Lookup primaire O(1) via l'index inverse `email:<email>` → { slug }.
-  // Cet index est maintenu par le PATCH email dans eleves/[id].js et par
-  // l'endpoint admin migrate-email-index.
+  // Cet index est maintenu par le PATCH email dans eleves/[id].js.
   try {
     const idx = await env.MASTERHUB_STUDENTS.get(`email:${email}`, { type: 'json' });
     if (idx && typeof idx.slug === 'string') foundSlug = idx.slug;
@@ -74,9 +73,8 @@ export async function onRequestPost({ request, env }) {
     /* ignore — fallback scan ci-dessous */
   }
 
-  // Fallback scan O(n) : couvre la transition (eleve:<slug>.email peuplé
-  // sans index inverse correspondant). À retirer une fois la migration KV
-  // terminée et stable (cf /api/eleves/admin/migrate-email-index).
+  // Fallback scan O(n) : couvre un eleve:<slug>.email peuplé sans index
+  // inverse correspondant (élèves antérieurs à l'index).
   if (!foundSlug) {
     let slugs;
     try {

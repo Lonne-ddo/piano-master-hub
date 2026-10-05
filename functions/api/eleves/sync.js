@@ -38,7 +38,7 @@ function jsonResponse(data, status = 200) {
 
 // Source primaire : KV (`eleves:list` + `eleve:<slug>.doc_id`).
 // FALLBACK_DOCS ne sert qu'en dégradation gracieuse (KV down ou clés absentes
-// avant le bootstrap GET /api/eleves + POST seed-doc-ids).
+// avant le bootstrap GET /api/eleves).
 const FALLBACK_DOCS = {
   japhet: '19xGdQoE2k2tSFYp_MykzDL-7vxIz5HYr4DR3wRuQ3TM',
   messon: '1LovxCWAtCaJeLjBvLVsnG-jz-PGRETNfdm8C4BZRqJI',
