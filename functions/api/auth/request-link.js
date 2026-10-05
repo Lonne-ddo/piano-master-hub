@@ -6,8 +6,14 @@
 // Anti-énumération : retourne TOUJOURS { ok: true } si l'email a un format
 // valide, qu'il existe ou non en KV. Aucun moyen pour un attaquant de savoir
 // quels emails sont enregistrés.
+//
+// Limitation : 10 demandes / heure / IP et 3 / heure / email → 429 (même
+// réponse que l'email existe ou non : pas d'énumération).
 
 import { generateToken } from '../_lib/session.js';
+import { clientIp, consumeRateLimit } from '../_lib/rate-limit.js';
+
+const HOUR_S = 3600;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -15,11 +21,15 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-function jsonResponse(data, status = 200) {
+function jsonResponse(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json', ...extraHeaders },
   });
+}
+
+function tooMany(retryAfter) {
+  return jsonResponse({ error: 'too_many_requests' }, 429, { 'Retry-After': String(retryAfter) });
 }
 
 export async function onRequestOptions() {
@@ -34,6 +44,9 @@ export async function onRequestPost({ request, env }) {
     return jsonResponse({ error: 'email_not_configured' }, 500);
   }
 
+  const ipRl = await consumeRateLimit(env, 'request-link-ip', clientIp(request), 10, HOUR_S);
+  if (ipRl.limited) return tooMany(ipRl.retryAfter);
+
   let body;
   try { body = await request.json(); }
   catch { return jsonResponse({ error: 'invalid_json' }, 400); }
@@ -42,6 +55,9 @@ export async function onRequestPost({ request, env }) {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return jsonResponse({ error: 'invalid_email' }, 400);
   }
+
+  const emailRl = await consumeRateLimit(env, 'request-link-email', email, 3, HOUR_S);
+  if (emailRl.limited) return tooMany(emailRl.retryAfter);
 
   // Magic link = ÉLÈVES UNIQUEMENT depuis la séparation admin/élève.
   // Aucune branche admin ici : l'admin se logue via mot de passe sur
