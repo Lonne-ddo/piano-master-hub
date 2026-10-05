@@ -19,7 +19,8 @@ import { execFileSync } from 'node:child_process';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = process.env.SONDAGE_BASE || 'https://piano-master-hub.pages.dev';
 const ADMIN_PW = process.env.ADMIN_PW || null;
-const SLUGS = ['japhet', 'messon', 'dexter', 'tara'];
+// Élèves testés : liste active réelle lue par la catégorie A (repli si l'API ne répond pas)
+let SLUGS = ['japhet', 'messon', 'dexter', 'tara'];
 const TMP = mkdtempSync(join(tmpdir(), 'sondage-'));
 
 // ─── Collecte des résultats ────────────────────────────────────────
@@ -101,9 +102,9 @@ async function categoryA() {
   const C = 'A. Endpoints publics';
   // Liste élèves
   const list = await http('/api/eleves');
-  if (list.status === 200 && list.body?.ok && Array.isArray(list.body.eleves) &&
-      SLUGS.every(s => list.body.eleves.includes(s))) {
-    ok(C, 'GET /api/eleves (liste)', `${list.body.eleves.length} élèves`);
+  if (list.status === 200 && list.body?.ok && Array.isArray(list.body.eleves) && list.body.eleves.length) {
+    SLUGS = list.body.eleves.map(String);
+    ok(C, 'GET /api/eleves (liste)', `${list.body.eleves.length} élèves actifs`);
   } else ko(C, 'GET /api/eleves (liste)', `status ${list.status}`);
   // Archivés : jamais exposés sans cookie admin, même avec ?include_archived=true
   const listAll = await http('/api/eleves?include_archived=true');
