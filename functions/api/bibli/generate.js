@@ -16,9 +16,11 @@
 //   { ok: true, type: 'suggestions', message,
 //     suggestions: [{ titre, artiste, raison }] }
 //
-// Pas d'auth (page élève publique avec slug whitelist côté frontend).
+// Session élève valide ou admin (appel LLM payant : pas d'accès anonyme).
 // Pas de palette d'accords contrainte : le LLM utilise la notation jazz complète,
 // le frontend simplifie via le mode toggle (Original/Simplifié).
+
+import { requireAnySessionOrAdmin } from '../_lib/session.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -119,6 +121,9 @@ export async function onRequestOptions() {
 }
 
 export async function onRequestPost({ request, env }) {
+  const auth = await requireAnySessionOrAdmin(request, env);
+  if (!auth.ok) return json({ error: auth.error }, auth.status);
+
   let body;
   try { body = await request.json(); }
   catch { return json({ error: 'invalid_json' }, 400); }

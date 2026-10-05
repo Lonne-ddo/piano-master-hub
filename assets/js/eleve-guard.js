@@ -1,12 +1,12 @@
 // ─── Eleve guard (vanilla JS, à inclure via <script> dans chaque page outil)
 //
 // Expose window.requireValidEleve(slug) → Promise<boolean>.
-//   - Si slug absent ou invalide → window.location.replace('/') et return false
-//   - Si slug valide selon /api/eleves (ou fallback hardcodé en cas de panne) → return true
+//   - true si la session élève (GET /api/auth/whoami) porte ce slug,
+//     ou si l'admin est connecté (GET /api/admin/check)
+//   - sinon window.location.replace('/') (écran de connexion) et false
 //
-// Source de vérité : GET /api/eleves (qui lit KV `eleves:list`). Fallback
-// hardcodé sur les 4 élèves originaux pour le cas /api/eleves down (KV/DNS/etc.) :
-// les anciens élèves marchent toujours en mode dégradé.
+// La liste publique /api/eleves ne suffit plus : sans session, les API
+// élève répondent 401/403 de toute façon.
 //
 // Usage :
 //   <script src="/assets/js/eleve-guard.js"></script>
@@ -21,29 +21,25 @@
 (function (global) {
   'use strict';
 
-  var FALLBACK = ['japhet', 'tara', 'dexter', 'messon'];
+  async function getJson(url) {
+    try {
+      var r = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+      if (!r.ok) return null;
+      return await r.json();
+    } catch (e) {
+      return null;
+    }
+  }
 
   global.requireValidEleve = async function (slug) {
     var s = slug ? String(slug).toLowerCase().trim() : '';
-    if (!s) {
-      window.location.replace('/');
-      return false;
+    if (s) {
+      var who = await getJson('/api/auth/whoami');
+      if (who && who.ok && String(who.slug || '').toLowerCase() === s) return true;
+      var admin = await getJson('/api/admin/check');
+      if (admin && admin.ok) return true;
     }
-    var valid = null;
-    try {
-      var r = await fetch('/api/eleves', { credentials: 'same-origin' });
-      if (r.ok) {
-        var j = await r.json();
-        if (j && Array.isArray(j.eleves) && j.eleves.length) {
-          valid = j.eleves.map(function (x) { return String(x).toLowerCase(); });
-        }
-      }
-    } catch (e) { /* fallback */ }
-    if (!valid) valid = FALLBACK;
-    if (valid.indexOf(s) < 0) {
-      window.location.replace('/');
-      return false;
-    }
-    return true;
+    window.location.replace('/');
+    return false;
   };
 })(window);

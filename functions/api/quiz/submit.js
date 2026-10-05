@@ -1,5 +1,5 @@
 // ─── POST /api/quiz/submit ───────────────────────────────────────
-// Endpoint PUBLIC (pas d'auth) — la whitelist slug fait office de garde-fou.
+// Réservé à l'élève connecté (session.slug === slug soumis) ou à l'admin.
 // Stocke chaque session dans KV MASTERHUB_QUIZ_HISTORY sous la clé
 // `quiz:<slug>:<timestamp>`.
 //
@@ -13,6 +13,8 @@
 //   duration_ms: int > 0,
 //   questions: [{ asked, asked_name, given, correct: bool }, …] (10 entrées)
 // }
+
+import { requireEleveOrAdmin } from '../_lib/session.js';
 
 // Source primaire : KV `eleves:list`. FALLBACK pour dégradation gracieuse.
 const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
@@ -54,6 +56,8 @@ export async function onRequestPost({ request, env }) {
 
   // Validation stricte
   const slug = String(data.slug || '').toLowerCase();
+  const auth = await requireEleveOrAdmin(slug, request, env);
+  if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
   if (!await isValidSlug(slug, env)) {
     return json({ ok: false, error: 'invalid_slug' }, 400);
   }

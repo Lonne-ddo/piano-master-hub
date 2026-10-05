@@ -168,6 +168,18 @@ export async function verifyReplicateToken(env, id, token) {
   return constantTimeStrEq(sig, expected);
 }
 
+// ─── Helper auth : n'importe quelle session élève valide, ou admin ──
+// Pour les outils (générateurs LLM) qui ne sont pas liés à un slug précis.
+// Retourne { ok: true, role, session? } ou { ok: false, status: 401, error }.
+export async function requireAnySessionOrAdmin(request, env) {
+  if (await requireAdminPassword(request, env)) {
+    return { ok: true, role: 'admin' };
+  }
+  const session = await getSessionFromRequest(request, env);
+  if (session && session.slug) return { ok: true, role: 'eleve', session };
+  return { ok: false, status: 401, error: 'unauthorized' };
+}
+
 // ─── Helper auth pour endpoints élève ─────────────────────────────
 // Vérifie que la requête a le droit d'accéder aux ressources d'un slug donné :
 //   - admin (cookie mh_admin_pw signé) → passe-droit (peut consulter tout slug)

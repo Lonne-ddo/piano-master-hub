@@ -4,11 +4,13 @@
 //
 // Body : { types: ['min7','7','maj7'] }
 //   - 1+ types depuis MhTheory (whitelist 22 entries)
-//   - Pas d'auth (page élève publique avec slug whitelist côté frontend)
+//   - Session élève valide ou admin (appel LLM payant : pas d'accès anonyme)
 //
 // Response : { ok: true, progressions: [{ key, key_label_fr, chords[], degrees[] }] }
 //   - 5 progressions max, 4 ou 8 accords chacune
 //   - Tonalités différentes parmi les 24 (12 majeures + 12 mineures)
+
+import { requireAnySessionOrAdmin } from '../_lib/session.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -75,6 +77,9 @@ export async function onRequestOptions() {
 }
 
 export async function onRequestPost({ request, env }) {
+  const auth = await requireAnySessionOrAdmin(request, env);
+  if (!auth.ok) return json({ error: auth.error }, auth.status);
+
   let body;
   try {
     body = await request.json();

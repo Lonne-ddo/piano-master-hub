@@ -1,12 +1,12 @@
 // ─── /api/eleves ─────────────────────────────────────────────────
-// GET  : liste des slugs (public, source de vérité KV `eleves:list`)
-//        Par défaut, les élèves archivés (eleve:<slug>.archived === true) sont
-//        exclus de `eleves`. Ils restent listés dans `archived` (pour l'UI admin).
-//        ?include_archived=true → `eleves` contient tout le monde.
+// GET  : liste des slugs (source de vérité KV `eleves:list`)
+//        Public : uniquement les élèves actifs (archived === true exclus), `archived` vide.
+//        Admin (cookie mh_admin_pw) : `archived` renseigné, et ?include_archived=true
+//        → `eleves` contient tout le monde.
 // POST : création d'un élève (admin only) — slugify nom + unicité.
 //
 // Réponses :
-//   GET  → { ok: true, eleves: ['japhet',...], archived: ['lea',...], source: 'kv'|'seeded'|'fallback' }
+//   GET  → { ok: true, eleves: ['japhet',...], archived: ['lea',...] (admin) | [], source: 'kv'|'seeded'|'fallback' }
 //   POST → 201 { ok: true, slug, ...eleve } | 400 invalid_input | 409 already_exists | 401 unauthorized
 
 import { requireAdminPassword } from '../_lib/session.js';
@@ -46,10 +46,11 @@ export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
-// ─── GET (public) ────────────────────────────────────────────────
+// ─── GET (public : actifs seulement ; admin : + archivés) ────────
 export async function onRequestGet({ request, env }) {
   const url = new URL(request.url);
-  const includeArchived = url.searchParams.get('include_archived') === 'true';
+  const isAdmin = await requireAdminPassword(request, env);
+  const includeArchived = isAdmin && url.searchParams.get('include_archived') === 'true';
   try {
     const raw = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
     if (Array.isArray(raw) && raw.length > 0) {
@@ -67,7 +68,7 @@ export async function onRequestGet({ request, env }) {
       return jsonResponse({
         ok: true,
         eleves: includeArchived ? cleaned : active,
-        archived,
+        archived: isAdmin ? archived : [],
         source: 'kv',
       });
     }

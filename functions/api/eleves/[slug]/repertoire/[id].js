@@ -1,9 +1,10 @@
 // ─── GET /api/eleves/:slug/repertoire/:id ────────────────────────
-// Lecture publique (pas d'auth) d'un morceau précis du répertoire.
+// Lecture réservée à l'élève concerné (session) ou à l'admin.
 // Réponse : { ok, morceau } ou 404.
 
 import { CORS_PUBLIC } from '../../../_lib/cors.js';
 import { isValidSlug, readRepertoire } from '../../../_lib/repertoire.js';
+import { requireEleveOrAdmin } from '../../../_lib/session.js';
 
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -16,9 +17,11 @@ export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS_PUBLIC });
 }
 
-export async function onRequestGet({ params, env }) {
+export async function onRequestGet({ params, request, env }) {
   const slug = String(params?.slug || '').toLowerCase();
   const id = String(params?.id || '');
+  const auth = await requireEleveOrAdmin(slug, request, env);
+  if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status);
   if (!(await isValidSlug(slug, env))) return jsonResponse({ error: 'invalid_slug' }, 400);
 
   const morceaux = await readRepertoire(env, slug);

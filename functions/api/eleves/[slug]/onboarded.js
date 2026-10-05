@@ -5,14 +5,14 @@
 // Stockage : MASTERHUB_HISTORY, clé `onboarded:<slug>`, valeur
 //   { firstSeenAt: number_ms }.
 //
-// GET  : lecture publique → { seen: boolean, firstSeenAt: number|null }
-// POST : écriture idempotente publique → { seen: true, firstSeenAt }
+// GET  : élève concerné ou admin → { seen: boolean, firstSeenAt: number|null }
+// POST : élève concerné ou admin, idempotent → { seen: true, firstSeenAt }
 //        (si déjà vu, renvoie le record existant sans le modifier).
 //
 // Slug invalide → 404 (le front skippe l'animation dans ce cas).
 
 import { CORS_PUBLIC } from '../../_lib/cors.js';
-import { requireAdminPassword } from '../../_lib/session.js';
+import { requireAdminPassword, requireEleveOrAdmin } from '../../_lib/session.js';
 
 const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
 
@@ -50,9 +50,11 @@ export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS_PUBLIC });
 }
 
-// ─── GET (public) ────────────────────────────────────────────────
-export async function onRequestGet({ params, env }) {
+// ─── GET (élève ou admin) ───────────────────────────────────────
+export async function onRequestGet({ params, request, env }) {
   const slug = String(params?.slug || '').toLowerCase();
+  const auth = await requireEleveOrAdmin(slug, request, env);
+  if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status);
   if (!(await isValidSlug(slug, env))) return jsonResponse({ error: 'not_found' }, 404);
 
   const rec = await readRecord(env, slug);
@@ -60,9 +62,11 @@ export async function onRequestGet({ params, env }) {
   return jsonResponse({ seen: firstSeenAt !== null, firstSeenAt });
 }
 
-// ─── POST (public, idempotent) ───────────────────────────────────
-export async function onRequestPost({ params, env }) {
+// ─── POST (élève ou admin, idempotent) ──────────────────────────
+export async function onRequestPost({ params, request, env }) {
   const slug = String(params?.slug || '').toLowerCase();
+  const auth = await requireEleveOrAdmin(slug, request, env);
+  if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status);
   if (!(await isValidSlug(slug, env))) return jsonResponse({ error: 'not_found' }, 404);
   if (!env.MASTERHUB_HISTORY) return jsonResponse({ error: 'kv_not_bound' }, 500);
 
