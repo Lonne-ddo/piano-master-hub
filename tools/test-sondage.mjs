@@ -4,8 +4,9 @@
 //   node tools/test-sondage.mjs
 //   SONDAGE_BASE=https://...  override l'URL de prod
 //   ADMIN_PW=...              active les tests admin (cat. B) si fourni
+//   RL_LOGIN_TEST=1           teste aussi le 429 du login admin (bloque l'IP 15 min !)
 //
-// Couvre : A endpoints publics · B admin (si creds) · C audit statique
+// Couvre : A endpoints publics + routes protégées sans cookie · B admin (si creds) · C audit statique
 // HTML · D modules JS · E shorts smoke · F cohérence KV publique.
 // Exit code : 0 si aucun KO bloquant, 1 sinon.
 // ═══════════════════════════════════════════════════════════════════
@@ -40,6 +41,8 @@ const skip = (c, l, d) => rec(c, 'skip', l, d);
 // ─── Helpers ───────────────────────────────────────────────────────
 function rd(rel) { return readFileSync(join(ROOT, rel), 'utf8'); }
 function exists(rel) { return existsSync(join(ROOT, rel)); }
+
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 async function http(path, opts = {}) {
   const ctrl = new AbortController();
@@ -98,26 +101,55 @@ async function categoryA() {
       SLUGS.every(s => list.body.eleves.includes(s))) {
     ok(C, 'GET /api/eleves (liste)', `${list.body.eleves.length} élèves`);
   } else ko(C, 'GET /api/eleves (liste)', `status ${list.status}`);
+  // Archivés : jamais exposés sans cookie admin, même avec ?include_archived=true
+  const listAll = await http('/api/eleves?include_archived=true');
+  const archivedLeak = (list.body?.archived || []).length || (listAll.body?.archived || []).length ||
+    (listAll.body?.eleves || []).length !== (list.body?.eleves || []).length;
+  if (listAll.status === 200 && !archivedLeak) ok(C, 'GET /api/eleves sans admin → archivés masqués', '');
+  else ko(C, 'GET /api/eleves sans admin → archivés masqués', `archived exposés ou include_archived honoré`);
 
-  // Bad slug → 404
-  const bad = await http('/api/eleves/__nope__/onboarded');
-  if (bad.status === 404) ok(C, 'GET onboarded slug invalide → 404', '');
-  else warn(C, 'GET onboarded slug invalide', `attendu 404, reçu ${bad.status}`);
+  // ── Routes protégées : sans cookie → 401/403 ──
+  const denied = (r) => r.status === 401 || r.status === 403;
+  const s0 = SLUGS[0];
+  const quizBody = { slug: s0, mode: 'notes', level: 'debutant', score: 1, total: 1, duration_ms: 1000,
+                     questions: [{ asked: 'C', given: 'C', correct: true }] };
+  const protectedRoutes = [
+    ['GET', '/api/eleves/__nope__/onboarded'],
+    ['POST', '/api/quiz/submit', quizBody],
+    ['POST', '/api/grilles/generate', { types: ['maj'] }],
+    ['POST', '/api/bibli/generate', { titre: 'Amazing Grace' }],
+  ];
+  for (const s of SLUGS) {
+    protectedRoutes.push(['GET', `/api/eleves/${s}/onboarded`], ['POST', `/api/eleves/${s}/onboarded`, {}],
+                         ['GET', `/api/eleves/${s}/repertoire`], ['GET', `/api/eleves/${s}/repertoire/x`]);
+  }
+  for (const [method, path, body] of protectedRoutes) {
+    const r = await http(path, body ? { method, headers: JSON_HEADERS, body: JSON.stringify(body) } : { method });
+    if (denied(r)) ok(C, `${method} ${path} sans cookie`, `${r.status}`);
+    else ko(C, `${method} ${path} sans cookie`, `attendu 401/403, reçu ${r.status}`);
+  }
+
+  // ── Endpoints temporaires supprimés : plus de réponse JSON de la Function ──
+  for (const path of ['/api/debug-doc', '/api/debug-eleve', '/api/eleves/admin/seed-doc-ids',
+                      '/api/eleves/admin/migrate-email-index', '/api/quiz/admin/migrate-chord-ids',
+                      '/api/stems/x/raw']) {
+    const r = await http(path);
+    const isFnJson = r.status === 200 && r.body && typeof r.body === 'object';
+    if (!isFnJson) ok(C, `${path} supprimé`, `${r.status}`);
+    else ko(C, `${path} supprimé`, `répond encore 200 JSON`);
+  }
+
+  // ── Limitation request-link : 3 / heure / email → la 4e demande est refusée ──
+  const fakeEmail = `sondage-${Date.now()}@example.invalid`;
+  let got429 = false;
+  for (let i = 0; i < 4 && !got429; i++) {
+    const r = await http('/api/auth/request-link', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ email: fakeEmail }) });
+    if (r.status === 429) got429 = true;
+  }
+  if (got429) ok(C, 'POST /api/auth/request-link → 429 à la 4e demande', '');
+  else ko(C, 'POST /api/auth/request-link → 429 à la 4e demande', 'aucun 429');
 
   for (const s of SLUGS) {
-    // onboarded (public, success vérifiable)
-    const ob = await http(`/api/eleves/${s}/onboarded`);
-    if (ob.status === 200 && typeof ob.body?.seen === 'boolean' &&
-        (ob.body.firstSeenAt === null || typeof ob.body.firstSeenAt === 'number')) {
-      ok(C, `[${s}] GET /onboarded`, `seen=${ob.body.seen}`);
-    } else ko(C, `[${s}] GET /onboarded`, `status ${ob.status} body ${JSON.stringify(ob.body)}`);
-
-    // repertoire (public dormant, success vérifiable)
-    const rp = await http(`/api/eleves/${s}/repertoire`);
-    if (rp.status === 200 && rp.body?.ok && Array.isArray(rp.body.morceaux)) {
-      ok(C, `[${s}] GET /repertoire (dormant)`, `${rp.body.morceaux.length} morceaux`);
-    } else ko(C, `[${s}] GET /repertoire (dormant)`, `status ${rp.status}`);
-
     // auth-gated : on vérifie que l'auth est BIEN exigée (401), body non vérifiable
     for (const [ep, lbl] of [['', 'GET /api/eleves/:slug'], ['/public', 'GET /public'],
                              ['/devoirs', 'GET /devoirs'], ['/analyse', 'GET /analyse']]) {
@@ -135,13 +167,48 @@ async function categoryA() {
 async function categoryB() {
   const C = 'B. Endpoints admin';
   if (!ADMIN_PW) {
-    for (const l of ['POST /devoirs/refresh', 'POST /onboarded (idempotent)',
-                     'DELETE+restore /onboarded', 'POST /api/eleves/sync'])
+    for (const l of ['GET avec cookie admin (liste, onboarded, répertoire)'])
       skip(C, l, 'ADMIN_PW non fourni dans cet environnement → non testable');
-    return;
+  } else {
+    // Login → cookie mh_admin_pw ; uniquement des lectures ensuite
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 15000);
+    let cookie = null;
+    try {
+      const r = await fetch(BASE + '/api/admin/login', { method: 'POST', headers: JSON_HEADERS,
+        body: JSON.stringify({ password: ADMIN_PW }), signal: ctrl.signal });
+      const m = (r.headers.get('set-cookie') || '').match(/mh_admin_pw=[^;]+/);
+      if (r.status === 200 && m) cookie = m[0];
+      else ko(C, 'POST /api/admin/login', `status ${r.status}`);
+    } catch (e) { ko(C, 'POST /api/admin/login', e.message); }
+    finally { clearTimeout(t); }
+    if (cookie) {
+      ok(C, 'POST /api/admin/login', 'cookie posé');
+      const H = { headers: { cookie } };
+      const list = await http('/api/eleves?include_archived=true', H);
+      if (list.status === 200 && Array.isArray(list.body?.archived)) ok(C, 'GET /api/eleves (admin)', `${list.body.eleves.length} élèves dont ${list.body.archived.length} archivés`);
+      else ko(C, 'GET /api/eleves (admin)', `status ${list.status}`);
+      for (const s of SLUGS) {
+        const ob = await http(`/api/eleves/${s}/onboarded`, H);
+        if (ob.status === 200 && typeof ob.body?.seen === 'boolean') ok(C, `[${s}] GET /onboarded (admin)`, `seen=${ob.body.seen}`);
+        else ko(C, `[${s}] GET /onboarded (admin)`, `status ${ob.status}`);
+        const rp = await http(`/api/eleves/${s}/repertoire`, H);
+        if (rp.status === 200 && Array.isArray(rp.body?.morceaux)) ok(C, `[${s}] GET /repertoire (admin)`, `${rp.body.morceaux.length} morceaux`);
+        else ko(C, `[${s}] GET /repertoire (admin)`, `status ${rp.status}`);
+      }
+    }
   }
-  // (Auth admin = cookie mh_admin_pw signé HMAC ; un login serait nécessaire.)
-  skip(C, 'admin suite', 'ADMIN_PW fourni mais flux login non implémenté dans ce harness');
+
+  // Limitation du login admin : 5 échecs / 15 min / IP. Opt-in : bloque ensuite l'IP.
+  if (process.env.RL_LOGIN_TEST === '1') {
+    let got429 = false;
+    for (let i = 0; i < 6 && !got429; i++) {
+      const r = await http('/api/admin/login', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ password: 'sondage-wrong-' + i }) });
+      if (r.status === 429) got429 = true;
+    }
+    if (got429) ok(C, 'POST /api/admin/login → 429 au 6e échec', '');
+    else ko(C, 'POST /api/admin/login → 429 au 6e échec', 'aucun 429');
+  } else skip(C, 'POST /api/admin/login → 429', 'RL_LOGIN_TEST=1 pour tester (bloque l’IP 15 min)');
 }
 
 // ═══════════════════════════════════════════════════════════════════
