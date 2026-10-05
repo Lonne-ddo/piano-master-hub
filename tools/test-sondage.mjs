@@ -43,6 +43,10 @@ function rd(rel) { return readFileSync(join(ROOT, rel), 'utf8'); }
 function exists(rel) { return existsSync(join(ROOT, rel)); }
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
+// Les previews Cloudflare de ce projet n'ont ni KV ni ADMIN_PASSWORD liés :
+// les tests qui en dépendent y sont « skip », et KO sur la prod.
+const IS_PROD = BASE === 'https://piano-master-hub.pages.dev';
+let ADMIN_COOKIE = null;  // posé par la catégorie B si ADMIN_PW fourni
 
 async function http(path, opts = {}) {
   const ctrl = new AbortController();
@@ -141,13 +145,16 @@ async function categoryA() {
 
   // ── Limitation request-link : 3 / heure / email → la 4e demande est refusée ──
   const fakeEmail = `sondage-${Date.now()}@example.invalid`;
-  let got429 = false;
-  for (let i = 0; i < 4 && !got429; i++) {
+  const statuses = [];
+  for (let i = 0; i < 4 && !statuses.includes(429); i++) {
     const r = await http('/api/auth/request-link', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify({ email: fakeEmail }) });
-    if (r.status === 429) got429 = true;
+    statuses.push(r.status);
+    if (r.status === 500 && !IS_PROD) break;
   }
-  if (got429) ok(C, 'POST /api/auth/request-link → 429 à la 4e demande', '');
-  else ko(C, 'POST /api/auth/request-link → 429 à la 4e demande', 'aucun 429');
+  const rlLabel = 'POST /api/auth/request-link → 429 à la 4e demande';
+  if (statuses.includes(429)) ok(C, rlLabel, statuses.join(','));
+  else if (!IS_PROD && statuses.includes(500)) skip(C, rlLabel, 'KV/Resend non liés sur cette preview → vérifié sur la prod');
+  else ko(C, rlLabel, `statuts ${statuses.join(',')}`);
 
   for (const s of SLUGS) {
     // auth-gated : on vérifie que l'auth est BIEN exigée (401), body non vérifiable
@@ -179,10 +186,12 @@ async function categoryB() {
         body: JSON.stringify({ password: ADMIN_PW }), signal: ctrl.signal });
       const m = (r.headers.get('set-cookie') || '').match(/mh_admin_pw=[^;]+/);
       if (r.status === 200 && m) cookie = m[0];
+      else if (r.status >= 500 && !IS_PROD) skip(C, 'POST /api/admin/login', `${r.status} : ADMIN_PASSWORD non configuré sur cette preview → vérifié sur la prod`);
       else ko(C, 'POST /api/admin/login', `status ${r.status}`);
     } catch (e) { ko(C, 'POST /api/admin/login', e.message); }
     finally { clearTimeout(t); }
     if (cookie) {
+      ADMIN_COOKIE = cookie;
       ok(C, 'POST /api/admin/login', 'cookie posé');
       const H = { headers: { cookie } };
       const list = await http('/api/eleves?include_archived=true', H);
@@ -384,8 +393,13 @@ function categoryE() {
 // ═══════════════════════════════════════════════════════════════════
 async function categoryF() {
   const C = 'F. Cohérence KV';
+  if (!ADMIN_COOKIE) {
+    skip(C, 'onboarded / répertoire', 'routes réservées élève/admin : cookie admin requis (ADMIN_PW)');
+    return;
+  }
+  const H = { headers: { cookie: ADMIN_COOKIE } };
   for (const s of SLUGS) {
-    const ob = await http(`/api/eleves/${s}/onboarded`);
+    const ob = await http(`/api/eleves/${s}/onboarded`, H);
     if (ob.status === 200) {
       if (ob.body.seen) {
         const ts = ob.body.firstSeenAt;
@@ -396,8 +410,8 @@ async function categoryF() {
     } else ko(C, `[${s}] onboarded`, `status ${ob.status}`);
 
     // re-fetch repertoire pour cohérence (double lecture)
-    const r1 = await http(`/api/eleves/${s}/repertoire`);
-    const r2 = await http(`/api/eleves/${s}/repertoire`);
+    const r1 = await http(`/api/eleves/${s}/repertoire`, H);
+    const r2 = await http(`/api/eleves/${s}/repertoire`, H);
     if (r1.status === 200 && r2.status === 200 &&
         JSON.stringify(r1.body?.morceaux) === JSON.stringify(r2.body?.morceaux))
       ok(C, `[${s}] repertoire stable (2 lectures)`, `${r1.body.morceaux.length} morceaux`);
