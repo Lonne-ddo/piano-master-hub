@@ -874,7 +874,7 @@
 // Architecture : chunking client → /api/transcribe → /api/claude
 // ─────────────────────────────────────────────────────────────
 
-const CHUNK_SIZE = 24 * 1024 * 1024   // 24 Mo (limite Groq : 25 Mo)
+const CHUNK_SIZE = 24 * 1024 * 1024   // 24 Mo (limite Groq : 25 Mo) — taille max d'un morceau envoyé
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 // ── Appel /api/claude — gère SSE streaming (Groq) et JSON (Gemini fallback) ──
@@ -1138,7 +1138,7 @@ function checkReady() {
 // La clé Groq est lue côté serveur depuis env.GROQ_API_KEY (Cloudflare).
 // Ne jamais écrire la clé ici — tout appel audio passe par le proxy Worker.
 
-async function transcribeFile(file, onProgress = () => {}) {
+async function transcribeFile(file, onProgress = () => {}, signal) {
   const ext = file.name.split('.').pop().toLowerCase()
   const validExts = ['mp3', 'mp4', 'm4a', 'wav', 'ogg', 'webm']
   if (!validExts.includes(ext)) {
@@ -1148,39 +1148,75 @@ async function transcribeFile(file, onProgress = () => {}) {
     throw new Error('Fichier trop grand (max 200 MB).')
   }
   onProgress(10, 'Préparation…')
-  let audioFile = file
-  // Si MP4 ou webm → extraire l'audio en WAV via Web Audio API
-  if (ext === 'mp4' || ext === 'webm') {
-    try {
-      onProgress(25, 'Extraction audio…')
-      audioFile = await extractAudioFromVideo(file)
-    } catch(e) {
-      throw new Error('Impossible d\'extraire l\'audio : ' + e.message)
+
+  // Audio léger : envoyé tel quel. Vidéo (MP4/WebM) ou audio > CHUNK_SIZE :
+  // décodage en mono 16 kHz puis découpe en morceaux WAV < 24 Mo.
+  const needsDecode = ext === 'mp4' || ext === 'webm' || file.size > CHUNK_SIZE
+  if (!needsDecode) return await transcribeChunkWithRetry(file, onProgress, signal)
+
+  let audio
+  try {
+    onProgress(20, 'Extraction audio (mono 16 kHz)…')
+    audio = await extractMono16k(file)
+  } catch(e) {
+    throw new Error('Impossible d\'extraire l\'audio : ' + e.message)
+  }
+  throwIfAborted(signal)
+
+  const samplesPerChunk = Math.floor((CHUNK_SIZE - 44) / 2) // PCM 16 bits mono
+  const nChunks = Math.max(1, Math.ceil(audio.samples.length / samplesPerChunk))
+  const baseName = file.name.replace(/\.[^.]+$/, '')
+  const texts = []
+  const segments = []
+  for (let i = 0; i < nChunks; i++) {
+    const start = i * samplesPerChunk
+    const slice = audio.samples.subarray(start, Math.min(start + samplesPerChunk, audio.samples.length))
+    const offsetSec = start / audio.sampleRate
+    const part = new File([pcm16Wav(slice, audio.sampleRate)],
+      nChunks > 1 ? `${baseName}_part${i + 1}.wav` : `${baseName}.wav`,
+      { type: 'audio/wav' })
+    const sub = nChunks > 1
+      ? (p, s) => onProgress(25 + Math.round((i + p / 100) / nChunks * 70), `Morceau ${i + 1}/${nChunks} — ${s}`)
+      : onProgress
+    const r = await transcribeChunkWithRetry(part, sub, signal)
+    const text = (r.text || '').trim()
+    if (text) texts.push(text)
+    if (Array.isArray(r.segments) && r.segments.length) {
+      for (const s of r.segments) {
+        segments.push({ ...s, start: (s.start || 0) + offsetSec, end: (s.end || 0) + offsetSec })
+      }
+    } else if (text) {
+      // Pas de segments (fallback AssemblyAI) : un segment couvrant le morceau,
+      // pour que le transcript horodaté (mode formation) ne perde pas ce texte.
+      segments.push({ start: offsetSec, end: offsetSec + slice.length / audio.sampleRate, text })
     }
   }
-  // Vérifier taille après extraction
-  if (audioFile.size > 25 * 1024 * 1024) {
-    throw new Error(
-      'Audio trop long (max ~90 min). Découpe en parties plus courtes.'
-    )
-  }
+  return { text: texts.join(' '), segments }
+}
+
+// Envoie un fichier audio (< 25 Mo) à /api/transcribe (fallback AssemblyAI).
+async function transcribeChunk(audioFile, onProgress, signal) {
   onProgress(50, 'Transcription Groq…')
   const formData = new FormData()
-  formData.append('file', audioFile,
-    audioFile.name || file.name.replace(/\.[^.]+$/, '.wav'))
+  formData.append('file', audioFile, audioFile.name)
   formData.append('model', 'whisper-large-v3')
   formData.append('response_format', 'verbose_json')
   formData.append('language', 'fr')
   formData.append('mode', currentMode) // séance → prompt FR ; formation → prompt neutre + auto-détection
-  return await transcribeWithFallback(formData, onProgress)
+  return await transcribeWithFallback(formData, onProgress, signal)
 }
 
-// Wrapper avec retry 2× + backoff 3s/6s avant de propager l'erreur.
+function throwIfAborted(signal) {
+  if (signal && signal.aborted) throw new DOMException('aborted', 'AbortError')
+}
+
+// Retry 2× + backoff 3s/6s par morceau avant de propager l'erreur.
 // Le fallback AssemblyAI (dans transcribeWithFallback) gère 429 sans retry.
-async function transcribeFileWithRetry(file, onProgress) {
+async function transcribeChunkWithRetry(audioFile, onProgress, signal) {
   for (let attempt = 1; attempt <= 3; attempt++) {
+    throwIfAborted(signal)
     try {
-      return await transcribeFile(file, onProgress)
+      return await transcribeChunk(audioFile, onProgress, signal)
     } catch (err) {
       if (err.name === 'AbortError') throw err
       const retryable = /timeout|network|fetch failed|503|504|ECONN|NetworkError/i.test(err.message)
@@ -1192,12 +1228,18 @@ async function transcribeFileWithRetry(file, onProgress) {
   }
 }
 
+// Point d'entrée des appelants (job principal, retry manuel). Les retries
+// automatiques sont faits par morceau (transcribeChunkWithRetry).
+async function transcribeFileWithRetry(file, onProgress, signal) {
+  return await transcribeFile(file, onProgress, signal)
+}
+
 // ── Lecture du flux SSE renvoyé par /api/transcribe ──
 // Le proxy maintient la connexion ouverte avec des heartbeats pendant que
 // Groq Whisper traite l'audio (évite le timeout 30s de Cloudflare → 502).
 // Renvoie { text } en succès, { error, status } en erreur.
-async function streamTranscribe(formData) {
-  const resp = await fetch('/api/transcribe', { method: 'POST', credentials: 'same-origin', body: formData })
+async function streamTranscribe(formData, signal) {
+  const resp = await fetch('/api/transcribe', { method: 'POST', credentials: 'same-origin', body: formData, signal })
 
   // Le serveur ouvre toujours un 200 (puisqu'il commence à streamer avant
   // d'avoir la réponse Groq). Une 4xx/5xx ici signale un échec amont
@@ -1238,10 +1280,10 @@ async function streamTranscribe(formData) {
 
 // ── Tentative Groq avec fallback AssemblyAI ───────────────────────
 // Retourne { text, segments } — segments peut être [] si fallback AssemblyAI
-async function transcribeWithFallback(formData, onProgress = () => {}) {
+async function transcribeWithFallback(formData, onProgress = () => {}, signal) {
   try {
     onProgress(55, 'Groq Whisper…')
-    const data = await streamTranscribe(formData)
+    const data = await streamTranscribe(formData, signal)
 
     // Erreur applicative renvoyée dans l'event SSE final
     if (data.error) {
@@ -1249,7 +1291,7 @@ async function transcribeWithFallback(formData, onProgress = () => {}) {
       if (msg.includes('429')) {
         onProgress(60, 'Fallback AssemblyAI…')
         const file = formData.get('file')
-        return await transcribeWithAssemblyAI(file, file?.name)
+        return await transcribeWithAssemblyAI(file, file?.name, signal)
       }
       throw new Error('Erreur Groq: ' + msg)
     }
@@ -1257,18 +1299,19 @@ async function transcribeWithFallback(formData, onProgress = () => {}) {
     return { text: data.text || '', segments: data.segments || [] }
 
   } catch (err) {
+    if (err.name === 'AbortError') throw err
     // Erreur réseau ou exception → on tente quand même AssemblyAI
     console.warn('Groq erreur, bascule vers AssemblyAI:', err.message)
     onProgress(60, 'Fallback AssemblyAI…')
     const file = formData.get('file')
-    return await transcribeWithAssemblyAI(file, file?.name)
+    return await transcribeWithAssemblyAI(file, file?.name, signal)
   }
 }
 
 // Fallback Whisper via AssemblyAI — accepte les gros fichiers,
 // gère le français nativement, pas de restriction de langue mixte
 // Retourne { text, segments:[] } pour rester compatible avec l'appelant
-async function transcribeWithAssemblyAI(file, fileName) {
+async function transcribeWithAssemblyAI(file, fileName, signal) {
   const formData = new FormData()
   formData.append('file', file, fileName || 'audio.mp3')
   formData.append('mode', currentMode) // formation → détection auto de la langue
@@ -1276,7 +1319,8 @@ async function transcribeWithAssemblyAI(file, fileName) {
   const resp = await fetch('/api/transcribe-assembly', {
     method: 'POST',
     credentials: 'same-origin',
-    body: formData
+    body: formData,
+    signal,
   })
 
   if (!resp.ok) {
@@ -1288,73 +1332,73 @@ async function transcribeWithAssemblyAI(file, fileName) {
   return { text: data.text || '', segments: [] }
 }
 
-// Extrait l'audio d'une vidéo MP4 et retourne un Blob WAV
-async function extractAudioFromVideo(file) {
-  return new Promise((resolve, reject) => {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      try {
-        const arrayBuffer = e.target.result
-        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
-        // Convertir AudioBuffer en WAV
-        const wavBlob = audioBufferToWav(audioBuffer)
-        resolve(new File([wavBlob],
-          file.name.replace(/\.[^.]+$/, '.wav'),
-          { type: 'audio/wav' }))
-      } catch(err) {
-        reject(new Error('Décodage audio échoué: ' + err.message))
-      } finally {
-        audioCtx.close()
-      }
+// Décode un fichier audio/vidéo en mono 16 kHz (format natif de Whisper).
+// decodeAudioData rééchantillonne au sampleRate du contexte : un
+// OfflineAudioContext à 16 kHz évite de garder en mémoire un buffer 48 kHz
+// stéréo (≈ 2 Go pour 90 min). Retourne { samples: Float32Array, sampleRate }.
+const TARGET_SAMPLE_RATE = 16000
+async function extractMono16k(file) {
+  const arrayBuffer = await file.arrayBuffer()
+  const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext
+  const ctx = new Offline(1, 1, TARGET_SAMPLE_RATE)
+  let audioBuffer = await new Promise((resolve, reject) =>
+    ctx.decodeAudioData(arrayBuffer, resolve,
+      err => reject(new Error('Décodage audio échoué: ' + (err?.message || 'format illisible')))))
+
+  // Navigateur qui n'a pas rééchantillonné : rendu via OfflineAudioContext
+  // mono 16 kHz (rééchantillonnage + downmix natifs).
+  if (audioBuffer.sampleRate !== TARGET_SAMPLE_RATE) {
+    const length = Math.ceil(audioBuffer.duration * TARGET_SAMPLE_RATE)
+    const render = new Offline(1, length, TARGET_SAMPLE_RATE)
+    const src = render.createBufferSource()
+    src.buffer = audioBuffer
+    src.connect(render.destination)
+    src.start()
+    audioBuffer = await render.startRendering()
+  }
+
+  // Downmix en place dans le canal 0 (pas d'allocation supplémentaire)
+  const samples = audioBuffer.getChannelData(0)
+  const nCh = audioBuffer.numberOfChannels
+  if (nCh > 1) {
+    const others = []
+    for (let c = 1; c < nCh; c++) others.push(audioBuffer.getChannelData(c))
+    for (let i = 0; i < samples.length; i++) {
+      let sum = samples[i]
+      for (let c = 0; c < others.length; c++) sum += others[c][i]
+      samples[i] = sum / nCh
     }
-    reader.onerror = () => reject(new Error('Lecture fichier échouée'))
-    reader.readAsArrayBuffer(file)
-  })
+  }
+  return { samples, sampleRate: TARGET_SAMPLE_RATE }
 }
 
-// Convertit un AudioBuffer en Blob WAV (PCM 16-bit)
-function audioBufferToWav(audioBuffer) {
-  const numChannels = Math.min(audioBuffer.numberOfChannels, 2)
-  const sampleRate = audioBuffer.sampleRate
-  const length = audioBuffer.length
-  const bytesPerSample = 2
-  const blockAlign = numChannels * bytesPerSample
-  const byteRate = sampleRate * blockAlign
-  const dataSize = length * blockAlign
+// Encode des échantillons mono Float32 en Blob WAV (PCM 16 bits)
+function pcm16Wav(samples, sampleRate) {
+  const dataSize = samples.length * 2
   const buffer = new ArrayBuffer(44 + dataSize)
   const view = new DataView(buffer)
   function writeStr(offset, str) {
     for (let i = 0; i < str.length; i++)
       view.setUint8(offset + i, str.charCodeAt(i))
   }
-  function writeUint32(offset, val) { view.setUint32(offset, val, true) }
-  function writeUint16(offset, val) { view.setUint16(offset, val, true) }
   writeStr(0, 'RIFF')
-  writeUint32(4, 36 + dataSize)
+  view.setUint32(4, 36 + dataSize, true)
   writeStr(8, 'WAVE')
   writeStr(12, 'fmt ')
-  writeUint32(16, 16)
-  writeUint16(20, 1) // PCM
-  writeUint16(22, numChannels)
-  writeUint32(24, sampleRate)
-  writeUint32(28, byteRate)
-  writeUint16(32, blockAlign)
-  writeUint16(34, 16) // bits per sample
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)              // PCM
+  view.setUint16(22, 1, true)              // mono
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true) // byteRate
+  view.setUint16(32, 2, true)              // blockAlign
+  view.setUint16(34, 16, true)             // bits per sample
   writeStr(36, 'data')
-  writeUint32(40, dataSize)
-  // Écrire les samples PCM 16-bit
-  const channels = []
-  for (let c = 0; c < numChannels; c++) {
-    channels.push(audioBuffer.getChannelData(c))
-  }
+  view.setUint32(40, dataSize, true)
   let offset = 44
-  for (let i = 0; i < length; i++) {
-    for (let c = 0; c < numChannels; c++) {
-      const sample = Math.max(-1, Math.min(1, channels[c][i]))
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true)
-      offset += 2
-    }
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]))
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true)
+    offset += 2
   }
   return new Blob([buffer], { type: 'audio/wav' })
 }
@@ -1546,7 +1590,7 @@ async function retryFile(idx) {
   const stat = document.getElementById('pf-status-' + idx)
   if (stat) stat.textContent = 'Retry manuel…'
   try {
-    const result = await transcribeFileWithRetry(file, (p, s) => updatePerFileBar(idx, p, s))
+    const result = await transcribeFileWithRetry(file, (p, s) => updatePerFileBar(idx, p, s), abortController?.signal)
     markPerFileDone(idx, true)
     resolver.resolve({ idx, file, result })
   } catch (err) {
@@ -1616,7 +1660,7 @@ async function startJob() {
 
     // Lance les N transcriptions EN PARALLÈLE
     const transcribePromises = snapshot.map((file, idx) => {
-      return transcribeFileWithRetry(file, (p, s) => updatePerFileBar(idx, p, s))
+      return transcribeFileWithRetry(file, (p, s) => updatePerFileBar(idx, p, s), signal)
         .then(result => {
           markPerFileDone(idx, true)
           return { idx, file, result, ok: true }
