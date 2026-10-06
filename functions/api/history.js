@@ -10,7 +10,8 @@ const CORS_HEADERS = {
 }
 
 // Limites de validation (anti-DOS / anti-pollution KV)
-const KEY_RE = /^[a-zA-Z0-9:_\-.]{1,100}$/
+// Seules les clés history:* sont acceptées (protège __folders__, __recent__…).
+const KEY_RE = /^history:[a-zA-Z0-9_\-.]{1,92}$/
 // CF KV value limit = 25 MiB. 1 MB par record = headroom large pour les
 // transcriptions multi-parts longues (1h30+ avec transcript brut + sections).
 const MAX_VALUE_BYTES = 1 * 1024 * 1024 // 1 MB
@@ -22,23 +23,58 @@ const FOLDERS_KEY = '__folders__'
 const MAX_FOLDERS = 200
 const FOLDER_NAME_MAX = 60
 
-// ── GET /api/history ─ Lister les 20 dernières entrées ───────
+// Index des clés récentes (hors préfixe "history:"), mis à jour au POST et
+// au DELETE. KV.list() est éventuellement cohérent (~60 s) : l'index garantit
+// qu'une entrée tout juste créée apparaît immédiatement dans le GET.
+const RECENT_KEY = '__recent__'
+const RECENT_MAX = 50
+
+async function readRecent(env) {
+  const raw = await env.MASTERHUB_HISTORY.get(RECENT_KEY)
+  if (!raw) return []
+  try {
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.filter(k => typeof k === 'string' && KEY_RE.test(k)) : []
+  } catch {
+    return []
+  }
+}
+
+async function updateRecent(env, fn) {
+  try {
+    const next = fn(await readRecent(env))
+    await env.MASTERHUB_HISTORY.put(RECENT_KEY, JSON.stringify(next.slice(0, RECENT_MAX)))
+  } catch (e) {
+    console.warn('[history] recent index update failed:', e?.message || e)
+  }
+}
+
+// ── GET /api/history ─ Lister les 50 entrées les plus récentes ──
+// list() renvoie les clés en ordre lexicographique CROISSANT (les plus
+// anciennes d'abord) : on pagine tout l'index, puis on trie en décroissant.
 async function handleGet(env) {
-  const list = await env.MASTERHUB_HISTORY.list({ prefix: 'history:', limit: 20 })
+  const names = new Set(await readRecent(env))
+  let cursor
+  do {
+    const page = await env.MASTERHUB_HISTORY.list({ prefix: 'history:', cursor })
+    for (const k of page.keys) names.add(k.name)
+    cursor = page.list_complete ? undefined : page.cursor
+  } while (cursor)
 
   // Trier par clé décroissante (timestamp dans la clé)
-  const keys = list.keys.sort((a, b) => b.name.localeCompare(a.name))
+  const keys = [...names].sort((a, b) => b.localeCompare(a)).slice(0, RECENT_MAX)
 
-  const items = await Promise.all(
-    keys.map(async k => {
-      const raw = await env.MASTERHUB_HISTORY.get(k.name)
+  const items = (await Promise.all(
+    keys.map(async name => {
+      const raw = await env.MASTERHUB_HISTORY.get(name)
+      if (raw === null) return null // supprimée mais encore dans list()/index
       try {
-        return { key: k.name, data: JSON.parse(raw) }
+        return { key: name, data: JSON.parse(raw) }
       } catch {
-        return { key: k.name, data: {} }
+        return { key: name, data: {} }
       }
     })
-  )
+  )).filter(Boolean)
 
   return Response.json(items, { headers: CORS_HEADERS })
 }
@@ -54,7 +90,7 @@ async function handlePost(request, env) {
 
   const { key, data } = body || {}
   if (!key || typeof key !== 'string' || !KEY_RE.test(key)) {
-    return Response.json({ error: 'invalid_key', detail: 'must match /^[a-zA-Z0-9:_-.]{1,100}$/' }, { status: 400, headers: CORS_HEADERS })
+    return Response.json({ error: 'invalid_key', detail: 'must match /^history:[a-zA-Z0-9_-.]{1,92}$/' }, { status: 400, headers: CORS_HEADERS })
   }
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return Response.json({ error: 'invalid_data', detail: 'must be a plain object' }, { status: 400, headers: CORS_HEADERS })
@@ -80,6 +116,7 @@ async function handlePost(request, env) {
     console.error('[history] KV put failed:', e?.message || e, 'key:', key)
     return Response.json({ error: 'kv_put_failed' }, { status: 500, headers: CORS_HEADERS })
   }
+  await updateRecent(env, keys => [key, ...keys.filter(k => k !== key)].sort((a, b) => b.localeCompare(a)))
   return Response.json({ success: true }, { headers: CORS_HEADERS })
 }
 
@@ -157,6 +194,7 @@ async function handleDelete(request, env) {
     console.error('[history] KV delete failed:', e?.message || e, 'key:', key)
     return Response.json({ error: 'kv_delete_failed' }, { status: 500, headers: CORS_HEADERS })
   }
+  await updateRecent(env, keys => keys.filter(k => k !== key))
   return Response.json({ success: true }, { headers: CORS_HEADERS })
 }
 
