@@ -131,7 +131,9 @@ async function categoryA() {
   ];
   for (const s of SLUGS) {
     protectedRoutes.push(['GET', `/api/eleves/${s}/onboarded`], ['POST', `/api/eleves/${s}/onboarded`, {}],
-                         ['GET', `/api/eleves/${s}/repertoire`], ['GET', `/api/eleves/${s}/repertoire/x`]);
+                         ['GET', `/api/eleves/${s}/repertoire`], ['GET', `/api/eleves/${s}/repertoire/x`],
+                         ['GET', `/api/eleves/${s}/roadmap`], ['PATCH', `/api/eleves/${s}/roadmap`, { parcours: 'general', seances: [] }],
+                         ['POST', `/api/eleves/${s}/seance`, { date: '2026-01-01', titre: 'x', resume: [], devoirs: [] }]);
   }
   for (const [method, path, body] of protectedRoutes) {
     const r = await http(path, body ? { method, headers: JSON_HEADERS, body: JSON.stringify(body) } : { method });
@@ -210,6 +212,17 @@ async function categoryB() {
         const rp = await http(`/api/eleves/${s}/repertoire`, H);
         if (rp.status === 200 && Array.isArray(rp.body?.morceaux)) ok(C, `[${s}] GET /repertoire (admin)`, `${rp.body.morceaux.length} morceaux`);
         else ko(C, `[${s}] GET /repertoire (admin)`, `status ${rp.status}`);
+        // Roadmap : 8 séances côté admin ; /public la renvoie sans note_coach
+        const rm = await http(`/api/eleves/${s}/roadmap`, H);
+        if (rm.status === 200 && rm.body?.roadmap?.seances?.length === 8) ok(C, `[${s}] GET /roadmap (admin)`, `${rm.body.roadmap.parcours}, séance ${rm.body.roadmap.seance_courante}`);
+        else if (rm.status === 404) skip(C, `[${s}] GET /roadmap (admin)`, 'pas de record eleve:<slug> en KV');
+        else ko(C, `[${s}] GET /roadmap (admin)`, `status ${rm.status}`);
+        const pub = await http(`/api/eleves/${s}/public`, H);
+        const pubTxt = JSON.stringify(pub.body || {});
+        if (pub.status === 200 && pub.body?.roadmap?.seances?.length === 8 && !pubTxt.includes('note_coach'))
+          ok(C, `[${s}] /public : roadmap sans note_coach`, '');
+        else if (pub.status === 200 && rm.status === 404 && !pubTxt.includes('note_coach')) skip(C, `[${s}] /public : roadmap`, 'pas de record eleve:<slug> en KV');
+        else ko(C, `[${s}] /public : roadmap sans note_coach`, `status ${pub.status}, note_coach ${pubTxt.includes('note_coach') ? 'présente' : 'absente'}`);
       }
     }
   }
