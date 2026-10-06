@@ -130,6 +130,86 @@
         .mh-hero-progress { margin-bottom: 22px; }
         .mh-hero-devoirs-label { margin-bottom: 0.7rem; }
 
+        /* ── Ton parcours (roadmap 8 séances, lecture seule) ── */
+        .mh-roadmap-steps {
+            list-style: none;
+            margin: 2px 0 18px;
+            padding: 0;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            position: relative;
+        }
+        .mh-roadmap-steps::before {
+            content: "";
+            position: absolute;
+            left: 6.25%;
+            right: 6.25%;
+            top: 13px;
+            height: 1px;
+            background: var(--mh-border-card-strong);
+        }
+        .mh-roadmap-step {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--mh-font-sans);
+            font-size: 10.5px;
+            color: var(--mh-text-label);
+            font-variant-numeric: tabular-nums;
+        }
+        .mh-roadmap-dot {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            background: var(--mh-bg-base);
+            border: 1px solid var(--mh-border-card-strong);
+            color: var(--mh-text-tertiary);
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .mh-roadmap-step.is-faite .mh-roadmap-dot {
+            background: var(--mh-gold-glow);
+            border-color: var(--mh-gold-border);
+            color: var(--mh-gold);
+        }
+        .mh-roadmap-step.is-faite { color: var(--mh-text-tertiary); }
+        .mh-roadmap-step.is-current .mh-roadmap-dot {
+            border-color: var(--mh-gold);
+            color: var(--mh-gold);
+            box-shadow: 0 0 0 4px var(--mh-gold-glow);
+        }
+        .mh-roadmap-step.is-current { color: var(--mh-gold); }
+        .mh-roadmap-kicker {
+            font-family: var(--mh-font-sans);
+            font-size: 11.5px;
+            font-weight: 500;
+            color: var(--mh-gold);
+            margin-bottom: 6px;
+        }
+        .mh-roadmap-text {
+            font-family: var(--mh-font-sans);
+            font-size: 0.93rem;
+            line-height: 1.5;
+            color: var(--mh-text-secondary);
+            margin: 8px 0 0;
+        }
+        .mh-roadmap-livrable {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: var(--mh-radius-sm);
+            background: var(--mh-bg-card);
+            border: 1px solid var(--mh-border-card);
+            font-family: var(--mh-font-sans);
+            font-size: 0.88rem;
+            line-height: 1.45;
+            color: var(--mh-text-secondary);
+        }
+        .mh-roadmap-livrable .mh-section-label { margin: 0 0 4px; }
+
         /* ── Devoirs refresh button (inline dans le label devoirs) ── */
         .mh-devoirs-label-row {
             display: flex;
@@ -781,6 +861,7 @@
             '<div id="impersonation-banner-host"></div>' +
             '<div class="mh-stack mh-stagger" style="margin-top:24px">' +
                 '<div id="hero-zone"></div>' +
+                '<div id="parcours-zone"></div>' +
                 '<div id="resume-zone"></div>' +
                 '<div id="analyse-zone"></div>' +
             '</div>' +
@@ -1178,7 +1259,9 @@
                 return r.json();
             })
             .then(function(data) {
+                _lastRoadmap = (data && data.roadmap) || null;
                 renderHero(data && data.stats, data && data.derniere_seance);
+                renderParcours(_lastRoadmap);
                 renderResume(data && data.derniere_seance, data && data.doc_url);
                 renderResourceCards(eleve, data);
                 fetchAutoSyncedDevoirs(eleve.slug, data && data.derniere_seance, data && data.stats);
@@ -1203,6 +1286,7 @@
     var _devoirsRefreshAvailable = true;
     var _lastDerniereSeance = null;
     var _lastStats = null;
+    var _lastRoadmap = null;
 
     // ──────────────────────────────────────────────
     //  Hero card (fusion programme + devoirs)
@@ -1237,6 +1321,12 @@
                 pct = Math.max(0, Math.min(100, stats.progression_pct));
             }
             if (over) pct = 100;
+            // Parcours 8 séances : la barre suit les séances faites (la date
+            // de fin reste affichée à droite).
+            if (_lastRoadmap && _lastRoadmap.total > 0) {
+                pct = Math.max(0, Math.min(100, (_lastRoadmap.faites / _lastRoadmap.total) * 100));
+                over = false;
+            }
             var fillClass = 'mh-progress-fill' + (over ? ' mh-progress-fill--over' : '');
             progressHtml = '<div class="mh-progress mh-hero-progress"><div class="' + fillClass + '" style="width:' + pct + '%"></div></div>';
             // Date à droite : borne de fin de programme.
@@ -1297,6 +1387,54 @@
 
         var btn = document.getElementById('devoirs-refresh-btn');
         if (btn) btn.addEventListener('click', function () { triggerDevoirsRefresh(btn); });
+    }
+
+    // ──────────────────────────────────────────────
+    //  Ton parcours (roadmap 8 séances, lecture seule)
+    // ──────────────────────────────────────────────
+    var ROADMAP_STATUT_FR = { faite: 'faite', en_cours: 'en cours', a_venir: 'à venir' };
+
+    function renderParcours(roadmap) {
+        var zone = document.getElementById('parcours-zone');
+        if (!zone) return;
+        if (!roadmap || !Array.isArray(roadmap.seances) || !roadmap.seances.length) {
+            zone.innerHTML = '';
+            return;
+        }
+        var current = null;
+        var stepsHtml = '';
+        for (var i = 0; i < roadmap.seances.length; i++) {
+            var s = roadmap.seances[i];
+            var isCurrent = s.n === roadmap.seance_courante;
+            if (isCurrent) current = s;
+            var cls = 'mh-roadmap-step' + (s.statut === 'faite' ? ' is-faite' : '') + (isCurrent ? ' is-current' : '');
+            var dot = s.statut === 'faite' ? '✓' : String(s.n);
+            stepsHtml +=
+                '<li class="' + cls + '" aria-label="Séance ' + s.n + ' : ' + escapeHtml(s.titre) + ' — ' + (ROADMAP_STATUT_FR[s.statut] || '') + '"' +
+                    (isCurrent ? ' aria-current="step"' : '') + '>' +
+                    '<span class="mh-roadmap-dot" aria-hidden="true">' + dot + '</span>' +
+                    '<span aria-hidden="true">S' + s.n + '</span>' +
+                '</li>';
+        }
+        var currentHtml = '';
+        if (current) {
+            currentHtml =
+                '<div class="mh-roadmap-kicker">Séance ' + current.n + ' · ' + (ROADMAP_STATUT_FR[current.statut] || '') + '</div>' +
+                '<h3 class="mh-title-section">' + escapeHtml(current.titre) + '</h3>' +
+                (current.objectif ? '<p class="mh-roadmap-text">' + escapeHtml(current.objectif) + '</p>' : '') +
+                (current.livrable
+                    ? '<div class="mh-roadmap-livrable"><div class="mh-section-label">Livrable</div>' + escapeHtml(current.livrable) + '</div>'
+                    : '');
+        }
+        zone.innerHTML =
+            '<div class="mh-card">' +
+                '<div class="mh-hero-head">' +
+                    '<div class="mh-section-label">Ton parcours</div>' +
+                    '<span class="mh-inline-stat">' + roadmap.faites + '/' + roadmap.total + ' séances</span>' +
+                '</div>' +
+                '<ol class="mh-roadmap-steps">' + stepsHtml + '</ol>' +
+                currentHtml +
+            '</div>';
     }
 
     function getCurrentSlugForDevoirs() {
