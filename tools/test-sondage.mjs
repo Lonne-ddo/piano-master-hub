@@ -132,7 +132,7 @@ async function categoryA() {
   for (const s of SLUGS) {
     protectedRoutes.push(['GET', `/api/eleves/${s}/onboarded`], ['POST', `/api/eleves/${s}/onboarded`, {}],
                          ['GET', `/api/eleves/${s}/repertoire`], ['GET', `/api/eleves/${s}/repertoire/x`],
-                         ['GET', `/api/eleves/${s}/roadmap`], ['PATCH', `/api/eleves/${s}/roadmap`, { parcours: 'general', seances: [] }],
+                         ['GET', `/api/eleves/${s}/roadmap`], ['PATCH', `/api/eleves/${s}/roadmap`, { seances: [] }],
                          ['POST', `/api/eleves/${s}/seance`, { date: '2026-01-01', titre: 'x', resume: [], devoirs: [] }]);
   }
   for (const [method, path, body] of protectedRoutes) {
@@ -224,6 +224,8 @@ async function categoryB() {
         else if (pub.status === 200 && rm.status === 404 && !pubTxt.includes('note_coach')) skip(C, `[${s}] /public : roadmap`, 'pas de record eleve:<slug> en KV');
         else ko(C, `[${s}] /public : roadmap sans note_coach`, `status ${pub.status}, note_coach ${pubTxt.includes('note_coach') ? 'présente' : 'absente'}`);
       }
+      if (IS_PROD) skip(C, 'Post-séance : encodage + nb_cours > 8', 'écrit en KV → exécuté hors prod uniquement');
+      else await seanceRoundTrip(C, H);
     }
   }
 
@@ -237,6 +239,37 @@ async function categoryB() {
     if (got429) ok(C, 'POST /api/admin/login → 429 au 6e échec', '');
     else ko(C, 'POST /api/admin/login → 429 au 6e échec', 'aucun 429');
   } else skip(C, 'POST /api/admin/login → 429', 'RL_LOGIN_TEST=1 pour tester (bloque l’IP 15 min)');
+}
+
+// Élève jetable : 9 séances post-séance (la 1re avec accents et
+// apostrophes typographiques) → /public doit rendre le résumé à
+// l'identique et nb_cours = 9 (non plafonné), progression parcours 8/8.
+async function seanceRoundTrip(C, H) {
+  const TXT = "Différence « maj7 » ’ noms d'accords — œuvre é";
+  const nom = 'Sondage Encodage';
+  const slug = 'sondage-encodage';
+  const auth = { ...H.headers, ...JSON_HEADERS };
+  await http(`/api/eleves/${slug}`, { method: 'DELETE', headers: H.headers });
+  const cr = await http('/api/eleves', { method: 'POST', headers: auth,
+    body: JSON.stringify({ nom, email: 'sondage-encodage@example.com' }) });
+  if (cr.status !== 201) { ko(C, 'Post-séance : création élève de test', `status ${cr.status}`); return; }
+  try {
+    for (let i = 1; i <= 9; i++) {
+      const r = await http(`/api/eleves/${slug}/seance`, { method: 'POST', headers: auth, body: JSON.stringify({
+        n: Math.min(i, 8), date: `2026-09-${String(i).padStart(2, '0')}`, titre: `Séance ${i}`,
+        resume: i === 9 ? [TXT] : ['x'], devoirs: [] }) });
+      if (r.status !== 200) { ko(C, `Post-séance : POST /seance n°${i}`, `status ${r.status}`); return; }
+    }
+    const pub = await http(`/api/eleves/${slug}/public`, H);
+    const got = pub.body?.derniere_seance?.resume?.[0];
+    if (got === TXT) ok(C, "Post-séance : « é ' « » ’ œ » identique dans /public", '');
+    else ko(C, "Post-séance : « é ' « » ’ œ » identique dans /public", JSON.stringify(got));
+    const nb = pub.body?.stats?.nb_cours, faites = pub.body?.roadmap?.faites;
+    if (nb === 9 && faites === 8) ok(C, 'Post-séance : nb_cours non plafonné', `nb_cours=${nb}, parcours ${faites}/8`);
+    else ko(C, 'Post-séance : nb_cours non plafonné', `nb_cours=${nb}, parcours ${faites}/8`);
+  } finally {
+    await http(`/api/eleves/${slug}`, { method: 'DELETE', headers: H.headers });
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -437,7 +470,7 @@ async function categoryF() {
         if (okTs) ok(C, `[${s}] onboarded firstSeenAt valide`, new Date(ts).toISOString());
         else ko(C, `[${s}] onboarded firstSeenAt invalide`, String(ts));
       } else ok(C, `[${s}] onboarded non vu (seen=false)`, 'cohérent (firstSeenAt null)');
-    } else ko(C, `[${s}] onboarded`, `status ${ob.status}`);
+    } else ko(C, `[${s}] onboarded`, `status ${ob.status}${ob.error ? " (" + ob.error + ")" : ""}`);
 
     // re-fetch repertoire pour cohérence (double lecture)
     const r1 = await http(`/api/eleves/${s}/repertoire`, H);
