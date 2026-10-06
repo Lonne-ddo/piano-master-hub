@@ -1,6 +1,6 @@
 // ─── /api/admin/shorts/:id ───────────────────────────────────────
 // GET    : retourne le record complet (passages + transcripts)
-// DELETE : supprime le record KV
+// DELETE : supprime le record KV et l'audio R2 shorts/<id>/*
 // Auth admin.
 
 import { requireAdminPassword } from '../../_lib/session.js';
@@ -60,5 +60,28 @@ export async function onRequestDelete({ params, request, env }) {
   } catch (e) {
     return jsonResponse({ error: 'kv_delete_failed', detail: e?.message || '' }, 500);
   }
-  return jsonResponse({ ok: true, id });
+
+  // Audio R2 des parties (shorts/<id>/part_N.ext) : supprimé avec le record.
+  // Un échec ici n'annule pas la suppression (record déjà retiré du KV).
+  let r2Deleted = 0;
+  if (env.ANALYSE_R2) {
+    try {
+      // Lister tout avant de supprimer (ne pas paginer sur un préfixe en cours
+      // de suppression), puis delete par lots de 1000 (limite R2).
+      const keys = [];
+      let cursor;
+      do {
+        const page = await env.ANALYSE_R2.list({ prefix: `shorts/${id}/`, cursor });
+        for (const o of page.objects) keys.push(o.key);
+        cursor = page.truncated ? page.cursor : undefined;
+      } while (cursor);
+      for (let i = 0; i < keys.length; i += 1000) {
+        await env.ANALYSE_R2.delete(keys.slice(i, i + 1000));
+      }
+      r2Deleted = keys.length;
+    } catch (e) {
+      console.warn('[shorts] R2 cleanup failed', id, e?.message || e);
+    }
+  }
+  return jsonResponse({ ok: true, id, r2Deleted });
 }
