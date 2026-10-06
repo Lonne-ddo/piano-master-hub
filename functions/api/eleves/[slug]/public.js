@@ -4,6 +4,7 @@
 // Whitelist STRICTE des champs exposés. PAS d'observations (privé coach).
 
 import { requireEleveOrAdmin } from '../../_lib/session.js';
+import { ensureRoadmap, publicRoadmap } from '../../_lib/roadmap.js';
 
 // Source primaire : KV `eleves:list`. FALLBACK_SLUGS pour dégradation gracieuse.
 const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
@@ -100,5 +101,9 @@ export async function onRequestGet({ params, request, env }) {
     telegram: safeUrl(data.canaux?.telegram?.url),
   };
 
-  return jsonResponse({ slug, stats, derniere_seance, doc_url, links });
+  // Parcours 8 séances (lecture seule, sans note_coach). Élève sans roadmap
+  // enregistrée → parcours "general" déduit de nb_cours (migration douce).
+  const roadmap = publicRoadmap(ensureRoadmap(data));
+
+  return jsonResponse({ slug, stats, derniere_seance, doc_url, links, roadmap });
 }

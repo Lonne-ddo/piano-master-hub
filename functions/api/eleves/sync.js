@@ -83,6 +83,7 @@ const SESSION_TITLE_RE = /^[\s#]*(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s*$/gm;
 // mergeStats, parseIsoDate, labelFr, computeProgressionPct importés de _lib/.
 // extractJSON aussi (3-level robust shared avec [id].js).
 import { mergeStats } from '../_lib/eleves-stats.js';
+import { applyRoadmapStats } from '../_lib/roadmap.js';
 import { extractJSON } from '../_lib/json-extract.js';
 
 // Helpers locaux à sync.js (utilisés par computeAutoStats uniquement)
@@ -454,7 +455,8 @@ export async function onRequestPost(context) {
 
       // Override préservé tel quel entre syncs (spread = robuste à l'ajout futur de champs).
       const statsOverride = { ...(existing?.stats_override || {}) };
-      const stats = mergeStats(statsAutoRaw, statsOverride);
+      // Roadmap enregistrée → nb_cours = séances faites (et non le compte du Doc)
+      const stats = applyRoadmapStats(mergeStats(statsAutoRaw, statsOverride), existing.roadmap);
 
       const updated = {
         // Préserve tout l'existant (theorie, canaux, repertoire, notes, statut, etc.)

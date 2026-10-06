@@ -59,6 +59,7 @@ const PROTECTED_FIELDS = [
   'canaux',
   'email',
   'archived',
+  'roadmap',
   '_patchedAt',
 ];
 
@@ -166,6 +167,7 @@ async function callLLM(prompt, env, opts) {
 // sont importés de _lib/ (C6+D2 dedup avec sync.js).
 import { extractJSON } from '../_lib/json-extract.js';
 import { mergeStats, parseIsoDate } from '../_lib/eleves-stats.js';
+import { applyRoadmapStats } from '../_lib/roadmap.js';
 
 // ─── Sanitization post-LLM des années (anti-hallucination) ───────
 // Le LLM peut produire "08/03/2024" sur un doc qui ne dit que "08/03". On corrige
@@ -468,7 +470,7 @@ export async function onRequestPatch({ params, request, env }) {
 
     updated.stats_override = newOverride;
     const autoRaw = existing.stats_auto_raw || { nb_cours: 0, date_debut: null, date_fin_prevue: null };
-    const stats = mergeStats(autoRaw, newOverride);
+    const stats = applyRoadmapStats(mergeStats(autoRaw, newOverride), existing.roadmap);
     updated.stats = stats;
     updated.sessionCount = stats.nb_cours;
     updated.progression = stats.progression_pct;
