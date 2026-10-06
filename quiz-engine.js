@@ -489,5 +489,5 @@
     // ─── Exposition globale ─────────────────────────────────────
     window.QuizEngine = QuizEngine;
     window.QUIZ_DATA = QUIZ_DATA;
-    window.noteToFr = noteToFr;
+    window.noteToFr = MT.noteToFr; // alias rétro-compat (noteToFr local supprimé)
 })();
