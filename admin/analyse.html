@@ -324,6 +324,43 @@
     }
 
 
+    /* ── Dossiers (barre de filtres + sélecteurs) ────────────── */
+    .folder-bar {
+      display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+      margin-bottom: 12px;
+    }
+    .folder-chip {
+      font-size: 12.5px; font-family: inherit;
+      min-height: 36px; padding: 6px 12px;
+      border-radius: 20px;
+      background: var(--bg2); color: var(--text2);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .folder-chip:hover { color: var(--text1); border-color: var(--v); }
+    .folder-chip.active { background: var(--v-dim); color: var(--v); border-color: rgba(139,111,232,0.45); }
+    .folder-chip .count { color: var(--text3); margin-left: 6px; font-family: 'DM Mono', monospace; font-size: 11px; }
+    .folder-chip.add { border-style: dashed; }
+    .folder-tools {
+      display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+      margin-bottom: 14px;
+      font-size: 12px; color: var(--text3);
+    }
+    .folder-tools:empty { display: none; }
+    .folder-select {
+      font-family: inherit; font-size: 12px;
+      background: var(--bg2); color: var(--text2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 8px; max-width: 180px;
+      cursor: pointer; outline: none;
+    }
+    .folder-select:focus { border-color: var(--v); }
+    .upload-row .folder-select { font-size: 14px; padding: 9px 10px; max-width: none; flex: 1 1 240px; }
+    .folder-error { font-size: 12px; color: var(--red); min-height: 16px; }
+    #folder-name { flex: none; font-size: 16px; }
+
     /* ── Toast ───────────────────────────────────────────────── */
     .ana-toast {
       position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
@@ -384,6 +421,10 @@
         <label for="vid-title">Titre</label>
         <input id="vid-title" type="text" class="title-input" maxlength="200" placeholder="Optionnel — sinon nom du fichier" />
       </div>
+      <div class="upload-row">
+        <label for="vid-folder">Dossier</label>
+        <select id="vid-folder" class="folder-select"></select>
+      </div>
       <label class="upload-row" style="cursor:pointer;">
         <input type="checkbox" id="vid-piano-solo" style="width:18px;height:18px;accent-color:var(--v);cursor:pointer;" />
         <span style="font-size:13px;color:var(--text2);">Piano solo (pas de séparation Demucs) <em style="color:var(--text3);font-style:normal;">— gratuit, instant</em></span>
@@ -408,6 +449,8 @@
   <!-- ── LISTE ───────────────────────────────────────────── -->
   <div class="section">
     <div class="section-title">Mes analyses</div>
+    <div id="folder-bar" class="folder-bar" role="toolbar" aria-label="Dossiers"></div>
+    <div id="folder-tools" class="folder-tools"></div>
     <div id="list-content">
       <div class="list-empty">Chargement…</div>
     </div>
@@ -427,6 +470,19 @@
       <button type="button" class="primary" id="assign-save">Enregistrer</button>
     </div>
   </div>
+</div>
+
+<!-- ─── Modal dossier (créer / renommer) ─── -->
+<div class="modal-overlay" id="folder-overlay">
+  <form class="modal-box assign" id="folder-form" autocomplete="off">
+    <div class="modal-title" id="folder-modal-title">Nouveau dossier</div>
+    <input id="folder-name" type="text" class="title-input" maxlength="60" placeholder="Ex. : Gospel, Morceaux de Noël…" required />
+    <div class="folder-error" id="folder-error"></div>
+    <div class="modal-actions">
+      <button type="button" id="folder-cancel">Annuler</button>
+      <button type="submit" class="primary" id="folder-save">Enregistrer</button>
+    </div>
+  </form>
 </div>
 
 <script src="/assets/js/stems-cache.js"></script>
@@ -471,6 +527,9 @@ const STEM_COLORS = {
 
 let videosCache = [];
 let elevesCache = [];
+let foldersCache = [];         // [{ id, name, order }] dans l'ordre du coach
+let activeFolder = 'all';      // 'all' | 'none' | <folderId>
+let folderEditId = null;       // null = création
 let assignTargetId = null;
 let activePlayer = null;       // instance AnalysePlayer en cours
 const pollHandles = {};        // id → setInterval handle (multitrack pending)
@@ -545,13 +604,29 @@ async function refreshList() {
   }
 }
 
+function folderOptionsHtml(selected) {
+  return '<option value="">Sans dossier</option>' + foldersCache.map((f) => (
+    '<option value="' + escapeAttr(f.id) + '"' + (f.id === selected ? ' selected' : '') + '>' + escapeHtml(f.name) + '</option>'
+  )).join('');
+}
+
 function renderList() {
+  renderFolderBar();
   const el = document.getElementById('list-content');
   if (!videosCache.length) {
     el.innerHTML = '<div class="list-empty">Aucune analyse. Upload-en une ci-dessus.</div>';
     return;
   }
-  el.innerHTML = videosCache.map((v) => {
+  const visible = videosCache.filter((v) => (
+    activeFolder === 'all' ? true
+      : activeFolder === 'none' ? !v.folderId
+      : v.folderId === activeFolder
+  ));
+  if (!visible.length) {
+    el.innerHTML = '<div class="list-empty">Aucun morceau ici. Choisis un dossier sur un morceau pour l\'y ranger.</div>';
+    return;
+  }
+  el.innerHTML = visible.map((v) => {
     const assigned = Array.isArray(v.assignedTo) ? v.assignedTo : [];
     const assignedLabel = assigned.length
       ? assigned.map((slug) => {
@@ -589,6 +664,7 @@ function renderList() {
           '<span class="ana-meta">' + escapeHtml(fmtDuration(v.durationSeconds)) + ' · ' + escapeHtml(fmtSize(v.sizeBytes)) + ' · ' + escapeHtml(fmtDate(v.uploadedAt)) + '</span>' +
           '<span class="' + assignedClass + '">' + escapeHtml(assignedLabel) + '</span>' +
           '<div class="ana-actions">' +
+            '<select class="folder-select" data-act="folder" aria-label="Dossier de « ' + escapeAttr(v.title) + ' »">' + folderOptionsHtml(v.folderId) + '</select>' +
             previewBtn +
             '<button class="ana-btn" data-act="assign">👥 Assigner</button>' +
             '<button class="ana-btn danger" data-act="delete">🗑</button>' +
@@ -610,7 +686,190 @@ function renderList() {
     });
     const titleEl = card.querySelector('.ana-title');
     if (titleEl) titleEl.addEventListener('click', () => startRename(card, id));
+    const folderSel = card.querySelector('select[data-act="folder"]');
+    if (folderSel) folderSel.addEventListener('change', () => moveToFolder(id, folderSel.value || null, folderSel));
   });
+}
+
+// ─── Dossiers ────────────────────────────────────────────────
+// Classement global du coach. Un élève voit un dossier dès qu'au moins
+// un morceau du dossier lui est assigné (et n'y voit que ses morceaux).
+async function loadFolders() {
+  try {
+    const r = await fetch('/api/analyse/folders', { credentials: 'same-origin' });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok && j.ok && Array.isArray(j.folders)) foldersCache = j.folders;
+  } catch { /* liste vide : tout reste « Sans dossier » */ }
+  renderUploadFolderSelect();
+}
+
+function renderUploadFolderSelect() {
+  const sel = document.getElementById('vid-folder');
+  const keep = sel.value;
+  sel.innerHTML = folderOptionsHtml(null);
+  // Par défaut : le dossier affiché ; sinon garde le choix précédent s'il existe
+  const def = (activeFolder !== 'all' && activeFolder !== 'none') ? activeFolder : keep;
+  sel.value = foldersCache.some((f) => f.id === def) ? def : '';
+}
+
+function renderFolderBar() {
+  const bar = document.getElementById('folder-bar');
+  const count = (pred) => videosCache.filter(pred).length;
+  const chip = (key, label, n) => (
+    '<button type="button" class="folder-chip' + (activeFolder === key ? ' active' : '') + '" data-folder="' + escapeAttr(key) + '"' +
+      ' aria-pressed="' + (activeFolder === key) + '">' +
+      escapeHtml(label) + '<span class="count">' + n + '</span></button>'
+  );
+  bar.innerHTML =
+    chip('all', 'Tous', videosCache.length) +
+    foldersCache.map((f) => chip(f.id, f.name, count((v) => v.folderId === f.id))).join('') +
+    chip('none', 'Sans dossier', count((v) => !v.folderId)) +
+    '<button type="button" class="folder-chip add" id="folder-add">+ Nouveau dossier</button>';
+  bar.querySelectorAll('button[data-folder]').forEach((b) => {
+    b.addEventListener('click', () => {
+      activeFolder = b.getAttribute('data-folder');
+      renderUploadFolderSelect();
+      renderList();
+    });
+  });
+  document.getElementById('folder-add').addEventListener('click', () => openFolderModal(null));
+
+  // Outils du dossier sélectionné : renommer, déplacer, supprimer
+  const tools = document.getElementById('folder-tools');
+  const idx = foldersCache.findIndex((f) => f.id === activeFolder);
+  if (idx === -1) { tools.innerHTML = ''; return; }
+  const off = ' disabled style="opacity:0.4;cursor:not-allowed;"';
+  tools.innerHTML =
+    '<span>Dossier « ' + escapeHtml(foldersCache[idx].name) + ' » :</span>' +
+    '<button type="button" class="ana-btn" data-ft="rename">✏️ Renommer</button>' +
+    '<button type="button" class="ana-btn" data-ft="left"' + (idx === 0 ? off : '') + ' aria-label="Déplacer avant">←</button>' +
+    '<button type="button" class="ana-btn" data-ft="right"' + (idx === foldersCache.length - 1 ? off : '') + ' aria-label="Déplacer après">→</button>' +
+    '<button type="button" class="ana-btn danger" data-ft="delete">🗑 Supprimer le dossier</button>';
+  tools.querySelectorAll('button[data-ft]').forEach((b) => {
+    b.addEventListener('click', () => {
+      const act = b.getAttribute('data-ft');
+      if (act === 'rename') openFolderModal(activeFolder);
+      else if (act === 'left') patchFolder(activeFolder, { order: idx - 1 });
+      else if (act === 'right') patchFolder(activeFolder, { order: idx + 1 });
+      else if (act === 'delete') deleteFolder(activeFolder);
+    });
+  });
+}
+
+function openFolderModal(id) {
+  folderEditId = id;
+  const f = foldersCache.find((x) => x.id === id);
+  document.getElementById('folder-modal-title').textContent = f ? 'Renommer le dossier' : 'Nouveau dossier';
+  document.getElementById('folder-name').value = f ? f.name : '';
+  document.getElementById('folder-error').textContent = '';
+  document.getElementById('folder-overlay').classList.add('show');
+  setTimeout(() => document.getElementById('folder-name').focus(), 30);
+}
+function closeFolderModal() {
+  document.getElementById('folder-overlay').classList.remove('show');
+  folderEditId = null;
+}
+document.getElementById('folder-cancel').addEventListener('click', closeFolderModal);
+document.getElementById('folder-overlay').addEventListener('click', (e) => {
+  if (e.target.id === 'folder-overlay') closeFolderModal();
+});
+
+const FOLDER_ERRORS = {
+  name_taken: 'Un dossier porte déjà ce nom.',
+  name_invalid: 'Nom requis (60 caractères max).',
+};
+
+document.getElementById('folder-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = document.getElementById('folder-name').value.trim();
+  const errEl = document.getElementById('folder-error');
+  if (!name) { errEl.textContent = FOLDER_ERRORS.name_invalid; return; }
+  const btn = document.getElementById('folder-save');
+  btn.disabled = true;
+  try {
+    const editing = folderEditId;
+    const r = await fetch(editing ? '/api/analyse/folders/' + encodeURIComponent(editing) : '/api/analyse/folders', {
+      method: editing ? 'PATCH' : 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) { errEl.textContent = FOLDER_ERRORS[j.error] || ('Erreur : ' + (j.error || 'HTTP ' + r.status)); return; }
+    foldersCache = j.folders;
+    if (!editing && j.folder) activeFolder = j.folder.id;
+    closeFolderModal();
+    renderUploadFolderSelect();
+    renderList();
+    toast(editing ? 'Dossier renommé ✓' : 'Dossier créé ✓', 'success');
+  } catch (err) {
+    errEl.textContent = 'Erreur réseau.';
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+async function patchFolder(id, body) {
+  try {
+    const r = await fetch('/api/analyse/folders/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    foldersCache = j.folders;
+    renderUploadFolderSelect();
+    renderList();
+  } catch (e) {
+    toast('Erreur : ' + (e.message || ''), 'error');
+  }
+}
+
+async function deleteFolder(id) {
+  const f = foldersCache.find((x) => x.id === id);
+  if (!f) return;
+  const n = videosCache.filter((v) => v.folderId === id).length;
+  const msg = 'Supprimer le dossier « ' + f.name + ' » ?' +
+    (n ? ' Ses ' + n + ' morceau' + (n > 1 ? 'x' : '') + ' passeront dans « Sans dossier » (rien n\'est supprimé).' : '');
+  if (!confirm(msg)) return;
+  try {
+    const r = await fetch('/api/analyse/folders/' + encodeURIComponent(id), { method: 'DELETE', credentials: 'same-origin' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    foldersCache = j.folders;
+    videosCache.forEach((v) => { if (v.folderId === id) v.folderId = null; });
+    activeFolder = 'all';
+    renderUploadFolderSelect();
+    renderList();
+    toast('Dossier supprimé ✓', 'success');
+  } catch (e) {
+    toast('Erreur : ' + (e.message || ''), 'error');
+  }
+}
+
+async function moveToFolder(id, folderId, sel) {
+  const v = videosCache.find((x) => x.id === id);
+  const previous = v ? (v.folderId || '') : '';
+  sel.disabled = true;
+  try {
+    const r = await fetch('/api/analyse/' + encodeURIComponent(id), {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folderId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (v) v.folderId = j.folderId;
+    renderList();
+    toast('Classé ✓', 'success');
+  } catch (e) {
+    sel.value = previous;
+    sel.disabled = false;
+    toast('Erreur : ' + (e.message || ''), 'error');
+  }
 }
 
 // ─── Rename inline ───────────────────────────────────────────
@@ -890,6 +1149,8 @@ function uploadFile(file, title, durationSec, pianoSolo) {
   fd.append('duration_sec', String(Math.round(durationSec)));
   fd.append('filename', file.name);
   fd.append('pianoSolo', pianoSolo ? 'true' : 'false');
+  const folderId = document.getElementById('vid-folder').value;
+  if (folderId) fd.append('folderId', folderId);
 
   progressBox.classList.add('active');
   progressBox.classList.remove('error');
@@ -984,15 +1245,16 @@ function resumePolling() {
   });
 }
 
-// ─── Esc ferme la modale Assigner (preview géré par AnalysePlayer) ─
+// ─── Esc ferme les modales Assigner / Dossier (preview géré par AnalysePlayer) ─
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (document.getElementById('assign-overlay').classList.contains('show')) closeAssign();
+  if (document.getElementById('folder-overlay').classList.contains('show')) closeFolderModal();
 });
 
 // ─── Init ────────────────────────────────────────────────────
 (async function init() {
-  await loadEleves();
+  await Promise.all([loadEleves(), loadFolders()]);
   await refreshList();
   resumePolling();
 })();
