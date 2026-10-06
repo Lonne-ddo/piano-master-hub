@@ -15,6 +15,7 @@ import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
+import vm from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = process.env.SONDAGE_BASE || 'https://piano-master-hub.pages.dev';
@@ -123,6 +124,10 @@ async function categoryA() {
     ['POST', '/api/quiz/submit', quizBody],
     ['POST', '/api/grilles/generate', { types: ['maj'] }],
     ['POST', '/api/bibli/generate', { titre: 'Amazing Grace' }],
+    ['GET', '/api/history'],
+    ['POST', '/api/claude', { mode: 'formation', messages: [{ role: 'user', content: 'x' }] }],
+    ['GET', '/api/admin/shorts/abcdefghijkl/audio/0'],
+    ['DELETE', '/api/admin/shorts/abcdefghijkl'],
   ];
   for (const s of SLUGS) {
     protectedRoutes.push(['GET', `/api/eleves/${s}/onboarded`], ['POST', `/api/eleves/${s}/onboarded`, {}],
@@ -337,6 +342,17 @@ function categoryD() {
     if (err) { ko(C, label, `parse: ${err}`); continue; }
     if (re.test(rd(file))) ok(C, label, file);
     else warn(C, label, `symbole attendu absent dans ${file}`);
+  }
+  // quiz-engine.js : s'exécute sans ReferenceError (window.noteToFr)
+  {
+    const sandbox = { console };
+    sandbox.window = sandbox;
+    try {
+      vm.runInNewContext(rd('mh-music-theory.js') + '\n' + rd('quiz-engine.js'), sandbox);
+      if (typeof sandbox.QuizEngine === 'function' && sandbox.noteToFr('C#') === 'Do♯')
+        ok(C, 'quiz-engine.js s\'exécute (QuizEngine + noteToFr)', '');
+      else ko(C, 'quiz-engine.js exports', 'QuizEngine ou noteToFr absent');
+    } catch (e) { ko(C, 'quiz-engine.js s\'exécute', String(e && e.message || e)); }
   }
   // _lib/devoirs-parser.js
   {
