@@ -1110,12 +1110,7 @@
     <h2>Parcours</h2>
     <div class="quick-sub" id="roadmapSub">Les modifications ne concernent que cet &eacute;l&egrave;ve : le parcours mod&egrave;le n'est jamais modifi&eacute;.</div>
     <form id="roadmapForm" autocomplete="off">
-      <div class="quick-field">
-        <label for="rmParcours">Parcours mod&egrave;le</label>
-        <select id="rmParcours" onchange="onParcoursChange()"></select>
-        <span class="quick-hint">Changer de mod&egrave;le remplace titres, objectifs et livrables. Statuts, dates et notes sont conserv&eacute;s.</span>
-      </div>
-      <div id="rmSeances" style="display:flex;flex-direction:column;gap:10px;margin-top:12px;"></div>
+      <div id="rmSeances" style="display:flex;flex-direction:column;gap:10px;"></div>
       <div class="quick-error" id="roadmapError"></div>
       <div class="quick-actions">
         <button type="button" class="hbtn" onclick="closeRoadmapModal()">Annuler</button>
@@ -1780,7 +1775,6 @@ function renderRoadmapCard(studentId) {
   const rc = roadmapCache[studentId];
   if (!card || !rc) return;
   const rm = rc.roadmap;
-  const tpl = rc.templates[rm.parcours] || {};
   const faites = rm.seances.filter(x => x.statut === 'faite').length;
   const current = rm.seances[rm.seance_courante - 1];
   const items = rm.seances.map(x => {
@@ -1794,7 +1788,7 @@ function renderRoadmapCard(studentId) {
   const history = (rc.seances || []).slice(-5).reverse();
   card.innerHTML = `
     <div class="card-title">
-      🗺️ Parcours <span class="rm-label">${escapeHtml(tpl.label || rm.parcours)} · ${faites}/8 faites${rc.persisted ? '' : ' · déduit du nombre de cours'}</span>
+      🗺️ Parcours <span class="rm-label">${faites}/8 faites${rc.persisted ? '' : ' · déduit du nombre de cours'}</span>
       <span class="rm-head-actions">
         <button type="button" class="ds-quick-btn" onclick="openRoadmapModal('${studentId}')">✏️ Éditer le parcours</button>
       </span>
@@ -1822,9 +1816,6 @@ async function openRoadmapModal(studentId) {
   if (!rc) { showToast('Parcours indisponible'); return; }
   roadmapEditId = studentId;
   roadmapDraft = JSON.parse(JSON.stringify(rc.roadmap));
-  const sel = document.getElementById('rmParcours');
-  sel.innerHTML = Object.keys(rc.templates).map(k => `<option value="${k}">${escapeHtml(rc.templates[k].label)}</option>`).join('');
-  sel.value = roadmapDraft.parcours;
   document.getElementById('roadmapError').textContent = '';
   renderRoadmapEditor();
   document.getElementById('roadmapOverlay').style.display = 'flex';
@@ -1874,26 +1865,6 @@ function readRoadmapEditor() {
   }
 }
 
-function onParcoursChange() {
-  const sel = document.getElementById('rmParcours');
-  const rc = roadmapCache[roadmapEditId];
-  if (!rc || !roadmapDraft) return;
-  const tpl = rc.templates[sel.value];
-  readRoadmapEditor();
-  if (!tpl || !confirm(`Remplacer les titres, objectifs et livrables par le parcours « ${tpl.label} » ?`)) {
-    sel.value = roadmapDraft.parcours;
-    return;
-  }
-  roadmapDraft.parcours = sel.value;
-  roadmapDraft.seances.forEach((x, i) => {
-    x.titre = tpl.seances[i].titre;
-    x.objectif = tpl.seances[i].objectif;
-    x.livrable = tpl.seances[i].livrable;
-  });
-  renderRoadmapEditor();
-}
-window.onParcoursChange = onParcoursChange;
-
 document.getElementById('roadmapForm').addEventListener('submit', async function (ev) {
   ev.preventDefault();
   if (!roadmapEditId || !roadmapDraft) return;
@@ -1910,7 +1881,7 @@ document.getElementById('roadmapForm').addEventListener('submit', async function
       method: 'PATCH',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parcours: roadmapDraft.parcours, seances: roadmapDraft.seances }),
+      body: JSON.stringify({ seances: roadmapDraft.seances }),
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok || !payload.ok) throw new Error(payload.error || `HTTP ${res.status}`);

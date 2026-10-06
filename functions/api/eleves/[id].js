@@ -60,6 +60,7 @@ const PROTECTED_FIELDS = [
   'email',
   'archived',
   'roadmap',
+  'nb_seances',
   '_patchedAt',
 ];
 
@@ -167,7 +168,7 @@ async function callLLM(prompt, env, opts) {
 // sont importés de _lib/ (C6+D2 dedup avec sync.js).
 import { extractJSON } from '../_lib/json-extract.js';
 import { mergeStats, parseIsoDate } from '../_lib/eleves-stats.js';
-import { applyRoadmapStats } from '../_lib/roadmap.js';
+import { applySeanceStats } from '../_lib/roadmap.js';
 
 // ─── Sanitization post-LLM des années (anti-hallucination) ───────
 // Le LLM peut produire "08/03/2024" sur un doc qui ne dit que "08/03". On corrige
@@ -470,7 +471,7 @@ export async function onRequestPatch({ params, request, env }) {
 
     updated.stats_override = newOverride;
     const autoRaw = existing.stats_auto_raw || { nb_cours: 0, date_debut: null, date_fin_prevue: null };
-    const stats = applyRoadmapStats(mergeStats(autoRaw, newOverride), existing.roadmap);
+    const stats = applySeanceStats(mergeStats(autoRaw, newOverride), existing.nb_seances);
     updated.stats = stats;
     updated.sessionCount = stats.nb_cours;
     updated.progression = stats.progression_pct;
@@ -642,6 +643,7 @@ export async function onRequestPatch({ params, request, env }) {
 //   - eleve:<slug>     → supprimé
 //   - eleves:list      → slug retiré
 //   - email:<email>    → supprimé (index inverse)
+//   - seances:<slug>   → supprimé (historique post-séance)
 //   - stems/quiz/loops → laissés orphelins (les apps gèrent les références
 //     manquantes par filtre côté liste, pas de cleanup auto pour éviter
 //     les pertes de données accidentelles).
@@ -683,7 +685,12 @@ export async function onRequestDelete({ params, request, env }) {
     console.warn('[eleves/DELETE] eleves:list update failed:', e?.message || e);
   }
 
-  // 3) Delete index inverse email
+  // 3) Historique post-séance : propre à l'élève, sinon un élève recréé
+  // avec le même nom hériterait de ses séances (et de son nb_cours).
+  try { await env.MASTERHUB_STUDENTS.delete(`seances:${id}`); }
+  catch (e) { console.warn('[eleves/DELETE] seances delete failed:', e?.message || e); }
+
+  // 4) Delete index inverse email
   if (existing.email && typeof existing.email === 'string') {
     try { await env.MASTERHUB_STUDENTS.delete(`email:${existing.email.toLowerCase()}`); }
     catch (e) { console.warn('[eleves/DELETE] email index delete failed:', e?.message || e); }

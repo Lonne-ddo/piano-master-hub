@@ -9,7 +9,7 @@
 //   - roadmap         : statut/date (+ livrable, note coach si fournis) de la séance n
 //   - derniere_seance : la plus récente de l'historique, manualEdit:true
 //                       (prioritaire sur la sync du Google Doc)
-//   - stats.nb_cours  : nombre de séances faites
+//   - stats.nb_cours  : nombre total de séances enregistrées (sans plafond)
 
 import { requireAdminPassword } from '../../_lib/session.js';
 import { parseIsoDate } from '../../_lib/eleves-stats.js';
@@ -116,7 +116,7 @@ export async function onRequestPost({ params, request, env }) {
   const existingDs = record.derniere_seance;
   const keepDocSeance = existingDs && existingDs.manualEdit !== true
     && typeof existingDs.date === 'string' && existingDs.date > latest.date;
-  const updated = { ...withRoadmap(record, nextRoadmap), _patchedAt: new Date().toISOString() };
+  const updated = { ...withRoadmap(record, nextRoadmap, history.length), _patchedAt: new Date().toISOString() };
   if (!keepDocSeance) {
     updated.derniere_seance = {
       date: latest.date,

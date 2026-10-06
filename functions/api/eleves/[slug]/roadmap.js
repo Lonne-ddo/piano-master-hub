@@ -2,9 +2,9 @@
 // Admin uniquement (cookie mh_admin_pw).
 // GET   → { roadmap, persisted, templates, seances } : roadmap de l'élève
 //         (parcours "general" déduit de nb_cours si jamais enregistrée),
-//         modèles de parcours et historique des séances saisies.
-// PATCH → body { parcours, seances[8] } : remplace la roadmap de l'élève
-//         (les modèles ne sont jamais modifiés). nb_cours = séances faites.
+//         modèle de parcours et historique des séances saisies.
+// PATCH → body { seances[8] } : remplace la roadmap de l'élève
+//         (le modèle n'est jamais modifié). nb_cours inchangé (séances saisies).
 
 import { requireAdminPassword } from '../../_lib/session.js';
 import {
