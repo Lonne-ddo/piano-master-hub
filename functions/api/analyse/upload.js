@@ -1,7 +1,7 @@
 // ─── POST /api/analyse/upload ────────────────────────────────────
 // Upload admin d'un fichier audio (mp3/wav/m4a/flac).
 //
-// Multipart : 1 file + 1 title + (optionnel) duration_sec + pianoSolo (bool).
+// Multipart : 1 file + 1 title + (optionnel) duration_sec + pianoSolo (bool) + folderId.
 //
 // Pipeline :
 //   1. Auth admin + validation MIME audio + size + duration
@@ -13,6 +13,7 @@
 //       qui finalise les stems R2 + update KV à 'success' quand Replicate termine.
 
 import { requireAdminPassword, signReplicateToken } from '../_lib/session.js';
+import { loadFolders } from './_folders.js';
 import {
   MIME_TYPES_ALLOWED, EXTENSION_BY_MIME, MAX_SIZE_BYTES, MAX_DURATION_S,
   MONTHLY_CAP, REPLICATE_VERSION, DEMUCS_MODEL, COST_EUR_PER_RUN,
@@ -92,6 +93,12 @@ export async function onRequestPost({ request, env }) {
 
   // ── R2 put original ──
   const id = genId();
+  // Dossier (optionnel) : doit exister, sinon refus avant l'upload R2
+  const folderIdRaw = String(formData.get('folderId') || '');
+  if (folderIdRaw && !(await loadFolders(env)).some((f) => f.id === folderIdRaw)) {
+    return jsonResponse({ error: 'folder_not_found' }, 400);
+  }
+
   const ext = EXTENSION_BY_MIME[mimeType] || 'bin';
   const r2KeyOriginal = `analyse/${id}/original.${ext}`;
   const originalFilename = String(formData.get('filename') || (file.name || '')).slice(0, 200);
@@ -116,6 +123,7 @@ export async function onRequestPost({ request, env }) {
     sizeBytes,
     durationSeconds,
     assignedTo: [],
+    ...(folderIdRaw ? { folderId: folderIdRaw } : {}),
     uploadedAt: Date.now(),
     uploadedBy: 'admin',
     status: pianoSolo ? 'success' : 'pending',

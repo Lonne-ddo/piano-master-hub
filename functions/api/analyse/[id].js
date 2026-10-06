@@ -1,9 +1,10 @@
 // ─── /api/analyse/:id ────────────────────────────────────────────
-// PATCH  → rename ou réassigner (admin only)
+// PATCH  → rename, réassigner ou classer dans un dossier (folderId | null) (admin only)
 // DELETE → supprime KV + R2 (original + stems si multitrack, admin only)
 
 import { requireAdminPassword } from '../_lib/session.js';
 import { isValidId, loadValidSlugs, CORS, jsonResponse } from './_helpers.js';
+import { loadFolders } from './_folders.js';
 
 export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS });
@@ -63,6 +64,19 @@ export async function onRequestPatch({ params, request, env }) {
     updated.assignedTo = cleanSlugs;
   }
 
+  // ── folderId : dossier existant, ou null = « Sans dossier » ──
+  if (body.folderId !== undefined) {
+    if (body.folderId === null || body.folderId === '') {
+      delete updated.folderId;
+    } else {
+      const folders = await loadFolders(env);
+      if (typeof body.folderId !== 'string' || !folders.some((f) => f.id === body.folderId)) {
+        return jsonResponse({ error: 'folder_not_found' }, 400);
+      }
+      updated.folderId = body.folderId;
+    }
+  }
+
   try {
     await env.MASTERHUB_ANALYSE.put(`analyse:${id}`, JSON.stringify(updated));
   } catch (e) {
@@ -74,6 +88,7 @@ export async function onRequestPatch({ params, request, env }) {
     id,
     title: updated.title,
     assignedTo: updated.assignedTo,
+    folderId: updated.folderId || null,
   });
 }
 

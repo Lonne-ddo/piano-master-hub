@@ -40,6 +40,7 @@ export async function onRequestGet({ request, env }) {
           sizeBytes: v.sizeBytes || 0,
           durationSeconds: v.durationSeconds || 0,
           assignedTo: Array.isArray(v.assignedTo) ? v.assignedTo : [],
+          folderId: v.folderId || null,
           uploadedAt: v.uploadedAt || 0,
           originalFilename: v.originalFilename || '',
           // multitrack-only fields (présents seulement si applicable)

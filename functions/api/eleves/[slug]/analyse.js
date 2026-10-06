@@ -7,7 +7,12 @@
 //
 // Auth : admin OU élève sur sa propre fiche (requireEleveOrAdmin).
 //
-// Réponse : { ok, items: [...] } trié uploadedAt desc, unifié au schéma :
+// Réponse : { ok, folders, items: [...] } trié uploadedAt desc.
+//   folders : dossiers du coach contenant au moins un morceau assigné à
+//             cet élève ({ id, name, order }, ordre du coach). Jamais de
+//             dossier vide ni de dossier ne contenant que des morceaux
+//             d'autres élèves.
+// Items unifiés au schéma :
 //   {
 //     id, title, type: 'single' | 'multitrack',
 //     durationSeconds, sizeBytes (best-effort), mimeType,
@@ -16,9 +21,11 @@
 //     streamUrl                   // /api/analyse/:id/stream OU /api/stems/:id/audio/vocals (1er stem si legacy)
 //     trackUrlPrefix              // '/api/analyse/:id/stream/' ou '/api/stems/:id/audio/' selon legacy
 //     legacy: bool                // true = vient de MASTERHUB_HISTORY stems
+//     folderId                    // dossier, ou null (sans dossier + legacy)
 //   }
 
 import { requireEleveOrAdmin } from '../../_lib/session.js';
+import { loadFolders, sortFolders } from '../../analyse/_folders.js';
 
 const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
 
@@ -82,6 +89,7 @@ async function listNewAnalyses(env, slug) {
           streamUrl: `/api/analyse/${encodeURIComponent(v.id)}/stream`,
           trackUrlPrefix: `/api/analyse/${encodeURIComponent(v.id)}/stream/`,
           legacy: false,
+          folderId: typeof v.folderId === 'string' ? v.folderId : null,
         });
       }
     }
@@ -127,6 +135,7 @@ async function listLegacyStems(env, slug) {
           streamUrl: null, // legacy n'a pas de "original" R2 séparé
           trackUrlPrefix: `/api/stems/${encodeURIComponent(v.id)}/audio/`,
           legacy: true,
+          folderId: null,
         });
       }
     }
@@ -147,13 +156,23 @@ export async function onRequestGet({ params, request, env }) {
   const auth = await requireEleveOrAdmin(slug, request, env);
   if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status);
 
-  const [newItems, legacyItems] = await Promise.all([
+  const [newItems, legacyItems, allFolders] = await Promise.all([
     listNewAnalyses(env, slug),
     listLegacyStems(env, slug),
+    env.MASTERHUB_ANALYSE ? loadFolders(env) : [],
   ]);
+
+  // Dossiers visibles = ceux qui contiennent au moins un morceau de l'élève.
+  // Un folderId orphelin (dossier supprimé) retombe dans « Autres ».
+  const used = new Set(newItems.map((it) => it.folderId).filter(Boolean));
+  const folders = sortFolders(allFolders)
+    .filter((f) => used.has(f.id))
+    .map((f) => ({ id: f.id, name: f.name, order: f.order }));
+  const visible = new Set(folders.map((f) => f.id));
+  for (const it of newItems) if (it.folderId && !visible.has(it.folderId)) it.folderId = null;
 
   const merged = [...newItems, ...legacyItems];
   merged.sort((a, b) => (b.uploadedAt || 0) - (a.uploadedAt || 0));
 
-  return jsonResponse({ ok: true, items: merged });
+  return jsonResponse({ ok: true, folders, items: merged });
 }
