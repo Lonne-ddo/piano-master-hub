@@ -325,6 +325,30 @@
             transition: background 150ms ease;
         }
         .mh-sep-open:hover { background: rgba(139, 111, 232, 0.22); }
+        .mh-sep-group { border-top: 1px solid var(--mh-border-card); }
+        .mh-sep-group:first-of-type { border-top: none; }
+        .mh-sep-group > summary {
+            list-style: none;
+            display: flex; align-items: center; gap: 8px;
+            min-height: 44px;
+            cursor: pointer;
+            font-size: 11px; font-weight: 600;
+            letter-spacing: .1em; text-transform: uppercase;
+            color: var(--mh-text-label);
+        }
+        .mh-sep-group > summary::-webkit-details-marker { display: none; }
+        .mh-sep-group > summary::before {
+            content: '›';
+            font-size: 15px;
+            transition: transform .15s ease;
+        }
+        .mh-sep-group[open] > summary::before { transform: rotate(90deg); }
+        .mh-sep-group-count { opacity: .6; font-weight: 500; }
+        .mh-sep-group .mh-sep-item:first-of-type { padding-top: 0; }
+        .mh-sep-group[open] { padding-bottom: 10px; }
+        @media (prefers-reduced-motion: reduce) {
+            .mh-sep-group > summary::before { transition: none; }
+        }
         .mh-sep-viewall {
             display: block;
             margin-top: 12px;
@@ -1064,7 +1088,7 @@
             .then(function (j) {
                 if (!j || !j.ok) return;
                 var items = Array.isArray(j.items) ? j.items : [];
-                renderAnalyses(zone, items, slug);
+                renderAnalyses(zone, items, slug, Array.isArray(j.folders) ? j.folders : []);
             })
             .catch(function () { /* silent */ });
     }
@@ -1081,7 +1105,27 @@
     };
     var activePlayer = null;
 
-    function renderAnalyses(zone, items, slug) {
+    // Morceaux groupés par dossier du coach (ordre du coach), « Autres »
+    // en dernier (sans dossier + anciennes séparations). L'API ne renvoie
+    // que les dossiers contenant au moins un morceau de l'élève.
+    function groupByFolder(items, folders) {
+        var groups = [];
+        var byId = {};
+        (folders || []).forEach(function (f) {
+            var g = { id: f.id, name: f.name, items: [] };
+            byId[f.id] = g;
+            groups.push(g);
+        });
+        var autres = { id: '', name: 'Autres', items: [] };
+        items.forEach(function (it) {
+            (it.folderId && byId[it.folderId] ? byId[it.folderId] : autres).items.push(it);
+        });
+        groups = groups.filter(function (g) { return g.items.length; });
+        if (autres.items.length) groups.push(autres);
+        return groups;
+    }
+
+    function renderAnalyses(zone, items, slug, folders) {
         if (!items.length) {
             zone.innerHTML =
                 '<div class="mh-card">' +
@@ -1104,20 +1148,37 @@
             return s.length > max ? s.slice(0, max - 1) + '…' : s;
         }
 
+        // 4 morceaux max par section (liste simple sans dossier) ; le reste
+        // est sur la page Analyse.
         var PREVIEW_MAX = 4;
-        var preview = items.slice(0, PREVIEW_MAX);
         var totalCount = items.length;
-        var hasMore = totalCount > PREVIEW_MAX;
+        var groups = groupByFolder(items, folders);
+        var flat = groups.length === 1 && !groups[0].id;
+        var preview = [];
+        var hasMore = false;
+
+        function itemsHtml(list) {
+            return list.map(function (s) {
+                var idx = preview.push(s) - 1;
+                return '<div class="mh-sep-item" data-idx="' + idx + '">' +
+                    '<span class="mh-sep-title">' + escapeHtml(truncate(s.title || 'Sans titre', 40)) + '</span>' +
+                    '<span class="mh-sep-date">' + escapeHtml(fmtDate(s.uploadedAt)) + '</span>' +
+                    '<button type="button" class="mh-sep-open" data-id="' + escapeHtml(s.id) + '" aria-label="Ouvrir l\'analyse">▶ Ouvrir</button>' +
+                '</div>';
+            }).join('');
+        }
 
         var html = '<div class="mh-card">' +
             '<div class="mh-section-label">Analyse</div>' +
             '<h3 class="mh-title-section" style="margin-bottom:14px">Tes morceaux à étudier</h3>';
-        preview.forEach(function (s, idx) {
-            html += '<div class="mh-sep-item" data-idx="' + idx + '">' +
-                '<span class="mh-sep-title">' + escapeHtml(truncate(s.title || 'Sans titre', 40)) + '</span>' +
-                '<span class="mh-sep-date">' + escapeHtml(fmtDate(s.uploadedAt)) + '</span>' +
-                '<button type="button" class="mh-sep-open" data-id="' + escapeHtml(s.id) + '" aria-label="Ouvrir l\'analyse">▶ Ouvrir</button>' +
-            '</div>';
+        groups.forEach(function (g, gi) {
+            if (g.items.length > PREVIEW_MAX) hasMore = true;
+            var list = itemsHtml(g.items.slice(0, PREVIEW_MAX));
+            html += flat ? list
+                : '<details class="mh-sep-group"' + (gi === 0 ? ' open' : '') + '>' +
+                    '<summary>' + escapeHtml(g.name) + '<span class="mh-sep-group-count">' + g.items.length + '</span></summary>' +
+                    list +
+                  '</details>';
         });
         if (hasMore) {
             html += '<a class="mh-sep-viewall" href="/analyse?eleve=' + encodeURIComponent(slug) + '">' +

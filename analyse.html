@@ -95,11 +95,37 @@
         }
 
         /* ── Liste vidéos ────────────────────────────────────── */
+        .folder-group { margin-bottom: 18px; }
+        .folder-group > summary {
+            list-style: none;
+            display: flex; align-items: center; gap: 10px;
+            min-height: var(--tap-min);
+            padding: 0 4px;
+            cursor: pointer;
+            font-size: 0.78rem; font-weight: 600;
+            letter-spacing: .1em; text-transform: uppercase;
+            color: var(--text-muted);
+        }
+        .folder-group > summary::-webkit-details-marker { display: none; }
+        .folder-group > summary::before {
+            content: '›';
+            display: inline-block;
+            font-size: 1.1rem;
+            transition: transform .15s ease;
+        }
+        .folder-group[open] > summary::before { transform: rotate(90deg); }
+        .folder-group > summary:hover { color: var(--text); }
+        .folder-count { color: var(--text-faint); font-weight: 500; }
+        @media (prefers-reduced-motion: reduce) {
+            .folder-group > summary::before { transition: none; }
+        }
         .videos-list {
             display: flex; flex-direction: column;
             gap: 12px;
             margin-top: 28px;
         }
+        .folder-group .videos-list { margin-top: 4px; }
+        .folder-group:first-child { margin-top: 28px; }
 
         .video-card {
             display: flex;
@@ -273,8 +299,27 @@
             '<div class="empty-state"><strong>Oups.</strong>' + escapeHtml(msg || 'Impossible de charger les analyses.') + '</div>';
     }
 
-    function renderList(items) {
-        if (!items || !items.length) { renderEmpty(); return; }
+    // Morceaux groupés par dossier du coach (ordre du coach), « Autres »
+    // en dernier (sans dossier + anciennes séparations). L'API ne renvoie
+    // que les dossiers contenant au moins un morceau de l'élève.
+    function groupByFolder(items, folders) {
+        var groups = [];
+        var byId = {};
+        (folders || []).forEach(function (f) {
+            var g = { id: f.id, name: f.name, items: [] };
+            byId[f.id] = g;
+            groups.push(g);
+        });
+        var autres = { id: '', name: 'Autres', items: [] };
+        items.forEach(function (it) {
+            (it.folderId && byId[it.folderId] ? byId[it.folderId] : autres).items.push(it);
+        });
+        groups = groups.filter(function (g) { return g.items.length; });
+        if (autres.items.length) groups.push(autres);
+        return groups;
+    }
+
+    function cardsHtml(items) {
         var html = '<div class="videos-list">';
         for (var i = 0; i < items.length; i++) {
             var v = items[i];
@@ -294,7 +339,23 @@
                     '<span class="video-card-arrow">&rsaquo;</span>' +
                 '</button>';
         }
-        html += '</div>';
+        return html + '</div>';
+    }
+
+    function renderList(items, folders) {
+        if (!items || !items.length) { renderEmpty(); return; }
+        var groups = groupByFolder(items, folders);
+        var html;
+        if (groups.length === 1 && !groups[0].id) {
+            html = cardsHtml(items); // aucun dossier : liste simple
+        } else {
+            html = groups.map(function (g) {
+                return '<details class="folder-group" open>' +
+                    '<summary>' + escapeHtml(g.name) + '<span class="folder-count">' + g.items.length + '</span></summary>' +
+                    cardsHtml(g.items) +
+                '</details>';
+            }).join('');
+        }
         document.getElementById('content').innerHTML = html;
 
         document.querySelectorAll('.video-card').forEach(function (btn) {
@@ -377,7 +438,7 @@
             }
             var j = await r.json();
             var items = Array.isArray(j.items) ? j.items : [];
-            renderList(items);
+            renderList(items, Array.isArray(j.folders) ? j.folders : []);
         } catch (e) {
             renderError(e && e.message);
         }
