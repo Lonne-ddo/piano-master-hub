@@ -21,35 +21,31 @@ RÈGLES
 - Fidélité stricte au transcript : n'invente rien, ne déduis aucune généralité absente.
 - Écris en français clair et pédagogique. Conserve les termes techniques anglais quand ils sont d'usage (voicing, shell, rootless, etc.), avec la traduction FR au premier emploi.
 - Utilise les timestamps fournis (format m:ss) quand ils sont disponibles pour situer les moments du cours.
-- Si une section n'a aucun contenu réel, écris "—" sous son titre (ne l'invente pas).
+- Si une section n'a aucun contenu réel, ne l'inclus pas (ne l'invente pas).
 
-FORMAT DE SORTIE — Markdown français, EXACTEMENT ces sections dans cet ordre :
+FORMAT DE SORTIE — JSON STRICT, AUCUN TEXTE HORS JSON (pas de Markdown, pas de fences) :
+{
+  "sections": [
+    { "key": "plan", "title": "🗺️ Plan de la leçon", "items": ["[0:00] …", "[2:15] …"] }
+  ]
+}
 
-## Plan de la leçon (avec timestamps)
-Déroulé chronologique de la leçon, chaque étape avec son timestamp.
-
-## Concepts clés (théorie expliquée)
-La théorie musicale enseignée, expliquée clairement (accords, gammes, harmonie, rythme…).
-
-## Démos piano (timestamps + description)
-Chaque démonstration au piano : timestamp + ce qui est joué/montré.
-
-## Exercices à pratiquer
-Les exercices proposés dans la leçon, formulés à l'impératif.
-
-## Citations utiles (EN + traduction FR)
-Phrases marquantes du formateur, en anglais original suivi de la traduction française.
-
-## Vocabulaire EN→FR
-Termes techniques anglais rencontrés → équivalent français (liste).
-
-## 🔄 Réutilisable pour Lonne Company
-Ce qui, dans cette leçon, peut être réexploité par Estelon dans ses propres cours/contenus (Lonne Company) : idées, angles pédagogiques, exercices adaptables.`;
+Chaque item est une chaîne de texte simple (pas de Markdown). Sections possibles, dans CET ordre (key → title) :
+- "plan" → "🗺️ Plan de la leçon" : déroulé chronologique, un item par étape, préfixé par son timestamp [m:ss].
+- "concepts" → "📚 Concepts clés" : la théorie musicale enseignée, expliquée clairement (accords, gammes, harmonie, rythme…).
+- "demos" → "🎹 Démos piano" : chaque démonstration au piano, préfixée par son timestamp [m:ss], avec ce qui est joué/montré.
+- "exercices" → "✅ Exercices à pratiquer" : les exercices proposés dans la leçon, formulés à l'impératif.
+- "citations" → "💬 Citations utiles" : phrase anglaise originale entre guillemets, puis « → » et la traduction française.
+- "vocabulaire" → "🔤 Vocabulaire EN→FR" : un item par terme, au format « terme anglais → équivalent français ».
+- "reutilisable" → "🔄 Réutilisable pour Lonne Company" : ce qui peut être réexploité par Estelon dans ses propres cours/contenus (idées, angles pédagogiques, exercices adaptables).`;
 
 // ── Helpers ──────────────────────────────────────────────────────
+// Erreurs qui justifient de passer au provider suivant : surcharge/réseau,
+// mais aussi 400/401/402/403 (clé invalide, crédit épuisé, requête refusée
+// par CE provider) et réponse vide.
 function isRetryableError(error) {
   const msg = String(error?.message || '');
-  return /\b(429|500|502|503|504|UNAVAILABLE|overloaded|timeout|network|fetch failed)\b/i.test(msg);
+  return /\b(400|401|402|403|429|500|502|503|504|UNAVAILABLE|overloaded|timeout|network|fetch failed|réponse vide)\b/i.test(msg);
 }
 
 // Normalise la sortie LLM : retire les fences markdown si présentes.
