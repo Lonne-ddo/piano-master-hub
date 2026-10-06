@@ -128,6 +128,10 @@ async function categoryA() {
     ['POST', '/api/claude', { mode: 'formation', messages: [{ role: 'user', content: 'x' }] }],
     ['GET', '/api/admin/shorts/abcdefghijkl/audio/0'],
     ['DELETE', '/api/admin/shorts/abcdefghijkl'],
+    ['GET', '/api/analyse/folders'],
+    ['POST', '/api/analyse/folders', { name: 'x' }],
+    ['PATCH', '/api/analyse/folders/abcdefghijkl', { name: 'x' }],
+    ['DELETE', '/api/analyse/folders/abcdefghijkl'],
   ];
   for (const s of SLUGS) {
     protectedRoutes.push(['GET', `/api/eleves/${s}/onboarded`], ['POST', `/api/eleves/${s}/onboarded`, {}],
@@ -226,6 +230,8 @@ async function categoryB() {
       }
       if (IS_PROD) skip(C, 'Post-séance : encodage + nb_cours > 8', 'écrit en KV → exécuté hors prod uniquement');
       else await seanceRoundTrip(C, H);
+      if (IS_PROD) skip(C, 'Dossiers Analyse (écriture)', 'crée un morceau visible chez un élève → exécuté hors prod uniquement');
+      else await folderRoundTrip(C, H);
     }
   }
 
@@ -269,6 +275,62 @@ async function seanceRoundTrip(C, H) {
     else ko(C, 'Post-séance : nb_cours non plafonné', `nb_cours=${nb}, parcours ${faites}/8`);
   } finally {
     await http(`/api/eleves/${slug}`, { method: 'DELETE', headers: H.headers });
+  }
+}
+
+// Dossiers Analyse : dossier de test + morceau « piano solo » minuscule
+// assigné au 1er élève → visible chez lui dans son dossier, invisible chez
+// le 2e. Tout est supprimé à la fin (morceau KV + R2, dossier).
+async function folderRoundTrip(C, H) {
+  if (SLUGS.length < 2) { skip(C, 'Dossiers Analyse', 'il faut 2 élèves'); return; }
+  const [a, b] = SLUGS;
+  const auth = { ...H.headers, ...JSON_HEADERS };
+  const name = 'sondage-dossier-' + Date.now();
+  let folderId = null, itemId = null;
+  try {
+    const cf = await http('/api/analyse/folders', { method: 'POST', headers: auth, body: JSON.stringify({ name }) });
+    if (cf.status !== 201 || !cf.body?.folder?.id) {
+      if (cf.status >= 500 && !IS_PROD) skip(C, 'Dossiers Analyse', `${cf.status} : KV Analyse non lié sur cette preview`);
+      else ko(C, 'POST /api/analyse/folders', `status ${cf.status}`);
+      return;
+    }
+    folderId = cf.body.folder.id;
+    ok(C, 'POST /api/analyse/folders (admin)', 'dossier de test créé');
+    const dup = await http('/api/analyse/folders', { method: 'POST', headers: auth, body: JSON.stringify({ name: name.toUpperCase() }) });
+    if (dup.status === 409) ok(C, 'Dossier : nom en double (casse ignorée) → 409', '');
+    else ko(C, 'Dossier : nom en double (casse ignorée) → 409', `status ${dup.status}`);
+
+    const fd = new FormData();
+    fd.append('file', new Blob([new Uint8Array(1024)], { type: 'audio/mpeg' }), 'sondage.mp3');
+    fd.append('title', '[sondage] morceau de test');
+    fd.append('pianoSolo', 'true');
+    fd.append('folderId', folderId);
+    const up = await http('/api/analyse/upload', { method: 'POST', headers: H.headers, body: fd });
+    itemId = up.body?.id || null;
+    if (up.status !== 201 || !itemId) { ko(C, 'Dossiers : upload morceau de test', `status ${up.status}`); return; }
+    const as = await http(`/api/analyse/${itemId}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ assignedTo: [a] }) });
+    if (as.status !== 200) { ko(C, 'Dossiers : assignation', `status ${as.status}`); return; }
+
+    const ea = await http(`/api/eleves/${a}/analyse`, H);
+    const eb = await http(`/api/eleves/${b}/analyse`, H);
+    const seenA = ea.body?.folders?.some((f) => f.id === folderId)
+      && ea.body?.items?.some((it) => it.id === itemId && it.folderId === folderId);
+    const seenB = eb.body?.folders?.some((f) => f.id === folderId) || eb.body?.items?.some((it) => it.id === itemId);
+    if (seenA) ok(C, `Dossier visible chez l'élève assigné (${a})`, '');
+    else ko(C, `Dossier visible chez l'élève assigné (${a})`, `status ${ea.status}`);
+    if (eb.status === 200 && !seenB) ok(C, `Dossier invisible chez un autre élève (${b})`, '');
+    else ko(C, `Dossier invisible chez un autre élève (${b})`, `status ${eb.status}, visible=${seenB}`);
+
+    // Suppression du dossier : le morceau repasse « Sans dossier »
+    const df = await http(`/api/analyse/folders/${folderId}`, { method: 'DELETE', headers: H.headers });
+    const it = await http('/api/analyse', H);
+    const after = it.body?.items?.find((x) => x.id === itemId);
+    if (df.status === 200) folderId = null;
+    if (df.status === 200 && after && after.folderId === null) ok(C, 'DELETE dossier → morceau « Sans dossier », non supprimé', '');
+    else ko(C, 'DELETE dossier → morceau « Sans dossier », non supprimé', `status ${df.status}, folderId=${after?.folderId}`);
+  } finally {
+    if (itemId) await http(`/api/analyse/${itemId}`, { method: 'DELETE', headers: H.headers });
+    if (folderId) await http(`/api/analyse/folders/${folderId}`, { method: 'DELETE', headers: H.headers });
   }
 }
 
