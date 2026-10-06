@@ -713,13 +713,14 @@ function openPreview(id) {
       if (btn.classList.contains('loading')) return;
       btn.classList.add('loading');
       try {
-        const resp = await fetch(
-          '/api/analyse/' + encodeURIComponent(id) + '/stream/' + encodeURIComponent(trackId),
-          { credentials: 'same-origin' }
-        );
+        // URL de la piste telle que déclarée plus haut : /stream/<stem> en
+        // multitrack, /stream (original) en single — /stream/main n'existe pas.
+        const track = tracks.find((t) => t.id === trackId);
+        if (!track) throw new Error('piste inconnue');
+        const resp = await fetch(track.url, { credentials: 'same-origin' });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const blob = await resp.blob();
-        const label = STEM_LABELS_FR[trackId] || trackId;
+        const label = STEM_LABELS_FR[trackId] || track.label || trackId;
         const base = (v.title || id)
           .replace(/[\/\\?%*:|"<>]/g, '')
           .replace(/\s+/g, ' ').trim()
