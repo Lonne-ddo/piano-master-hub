@@ -79,6 +79,9 @@ export async function onRequestGet({ params, request, env }) {
     resume: Array.isArray(data.derniere_seance.resume)
       ? data.derniere_seance.resume.filter(Boolean).map(String)
       : null,
+    // Séance éditée par le coach (formulaire admin) : ses devoirs priment
+    // sur ceux parsés depuis le Doc côté client.
+    manualEdit: data.derniere_seance.manualEdit === true,
     // PAS d'observations (privé coach)
   } : null;
 

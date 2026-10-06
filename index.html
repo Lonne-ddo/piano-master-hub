@@ -1248,12 +1248,16 @@
             progressHtml = '<div class="mh-progress mh-hero-progress"><div class="mh-progress-fill" style="width:0%"></div></div>';
         }
 
-        // Devoirs (auto-syncés en priorité, fallback LLM)
+        // Devoirs : édition manuelle du coach (manualEdit) en priorité absolue,
+        // puis auto-syncés depuis le Doc, puis fallback LLM.
         var devoirs = null;
-        if (Array.isArray(_autoSyncedDevoirs) && _autoSyncedDevoirs.length > 0) {
+        var derniereDevoirs = (derniere && Array.isArray(derniere.devoirs)) ? derniere.devoirs.filter(Boolean) : [];
+        if (derniere && derniere.manualEdit === true && derniereDevoirs.length > 0) {
+            devoirs = derniereDevoirs;
+        } else if (Array.isArray(_autoSyncedDevoirs) && _autoSyncedDevoirs.length > 0) {
             devoirs = _autoSyncedDevoirs;
-        } else if (derniere && Array.isArray(derniere.devoirs) && derniere.devoirs.filter(Boolean).length > 0) {
-            devoirs = derniere.devoirs.filter(Boolean);
+        } else if (derniereDevoirs.length > 0) {
+            devoirs = derniereDevoirs;
         }
 
         var refreshBtn = _devoirsRefreshAvailable
