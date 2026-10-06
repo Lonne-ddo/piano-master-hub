@@ -46,6 +46,13 @@ export async function onRequestPost(context) {
       });
     }
 
+    // Mode (rétro-compat : absent → "seance"). Séance : français imposé.
+    // Formation : contenus souvent en anglais → détection automatique.
+    const mode = formData.get('mode') === 'formation' ? 'formation' : 'seance';
+    const languageOpts = mode === 'formation'
+      ? { language_detection: true }
+      : { language_code: 'fr' };
+
     // Étape 1 : Upload du fichier vers AssemblyAI
     const arrayBuffer = await file.arrayBuffer();
     const uploadResp = await fetch('https://api.assemblyai.com/v2/upload', {
@@ -74,7 +81,7 @@ export async function onRequestPost(context) {
       body: JSON.stringify({
         audio_url: upload_url,
         speech_models: ['universal-2'],
-        language_code: 'fr',
+        ...languageOpts,
         punctuate: true,
         format_text: true
       })

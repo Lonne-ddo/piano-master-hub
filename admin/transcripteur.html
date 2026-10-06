@@ -1271,6 +1271,7 @@ async function transcribeWithFallback(formData, onProgress = () => {}) {
 async function transcribeWithAssemblyAI(file, fileName) {
   const formData = new FormData()
   formData.append('file', file, fileName || 'audio.mp3')
+  formData.append('mode', currentMode) // formation → détection auto de la langue
 
   const resp = await fetch('/api/transcribe-assembly', {
     method: 'POST',
