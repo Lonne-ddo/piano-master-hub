@@ -1,0 +1,39 @@
+{
+  "id": "degres",
+  "family": "degres-progressions",
+  "title": "Les degrés",
+  "summary": "Chaque note et chaque accord de la gamme a un numéro. Tu joues le même morceau dans toutes les tonalités.",
+  "keyboard": {
+    "range": ["C4", "F5"],
+    "groupLabel": "Choisir un degré",
+    "options": [
+      { "label": "I", "sub": "C", "aria": "I : C majeur", "notes": ["C4", "E4", "G4"], "caption": "I en C = C (majeur) : C E G" },
+      { "label": "ii", "sub": "Dm", "aria": "ii : Dm mineur", "notes": ["D4", "F4", "A4"], "caption": "ii en C = Dm (mineur) : D F A" },
+      { "label": "iii", "sub": "Em", "aria": "iii : Em mineur", "notes": ["E4", "G4", "B4"], "caption": "iii en C = Em (mineur) : E G B" },
+      { "label": "IV", "sub": "F", "aria": "IV : F majeur", "notes": ["F4", "A4", "C5"], "caption": "IV en C = F (majeur) : F A C" },
+      { "label": "V", "sub": "G", "aria": "V : G majeur", "notes": ["G4", "B4", "D5"], "caption": "V en C = G (majeur) : G B D" },
+      { "label": "vi", "sub": "Am", "aria": "vi : Am mineur", "notes": ["A4", "C5", "E5"], "caption": "vi en C = Am (mineur) : A C E" },
+      { "label": "vii°", "sub": "Bdim", "aria": "vii° : Bdim diminué", "notes": ["B4", "D5", "F5"], "caption": "vii° en C = Bdim (diminué) : B D F" }
+    ]
+  },
+  "essentials": [
+    { "parts": [
+      { "term": "Notes", "text": "numérotées de 1 à 7." },
+      { "term": "Accords", "text": "chiffres romains (majuscule = majeur, minuscule = mineur)." }
+    ] },
+    { "parts": [{ "term": "Ordre fixe", "text": "en majeur, c'est la gamme qui impose le type d'accord, ce n'est pas un choix." }] },
+    { "parts": [{ "term": "Trio magique", "text": "tonalité → gamme → degrés, sur chaque morceau." }] }
+  ],
+  "tips": [
+    { "status": "ok", "text": "I, IV et V, ce sont les voyelles. Tu cherches un accord à l'oreille ? Teste-les en premier." },
+    { "status": "ok", "text": "La tonalité, c'est la maison du morceau. La gamme, c'est la série de notes qui va avec." },
+    { "status": "ok", "text": "La note de basse, à la main gauche, te donne le degré de l'accord." }
+  ],
+  "avoid": "Transposer au feeling. Construis d'abord la gamme de la nouvelle tonalité, puis place les degrés dessus.",
+  "exercise": [
+    { "status": "draft", "text": "Joue les 7 accords de C en disant leur chiffre à voix haute." },
+    { "status": "draft", "text": "Joue I – V – vi – IV en C : C, G, Am, F." },
+    { "status": "ok", "text": "Construis la gamme de G, puis rejoue I – V – vi – IV en G." }
+  ],
+  "related": ["gamme-majeure", "transposition", "lecture-de-grille-d-accords"]
+}

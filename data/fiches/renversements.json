@@ -1,0 +1,38 @@
+{
+  "id": "renversements",
+  "family": "accords-harmonie",
+  "title": "Renversements",
+  "summary": "Mêmes notes, autre ordre. Tu choisis la note du bas pour rester proche sur le clavier.",
+  "keyboard": {
+    "range": ["C4", "E5"],
+    "groupLabel": "Position de l'accord",
+    "options": [
+      { "label": "Fondamental", "aria": "Fondamental de C", "notes": ["C4", "E4", "G4"] },
+      { "label": "1er renv.", "aria": "1er renversement de C", "notes": ["E4", "G4", "C5"] },
+      { "label": "2e renv.", "aria": "2e renversement de C", "notes": ["G4", "C5", "E5"] }
+    ]
+  },
+  "essentials": [
+    { "parts": [{ "term": "Fondamental", "text": "les notes les plus rapprochées, la fondamentale en bas." }] },
+    { "parts": [{ "term": "Renverser", "text": "la note de gauche passe à droite, une octave au-dessus." }] },
+    { "parts": [{ "term": "Le but", "text": "bouger la main le moins possible d'un accord à l'autre." }] }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "De C à G, ne saute pas : joue G renversé, B D G. Tu économises ton énergie.",
+      "variants": [
+        { "status": "draft", "text": "De C à G, ne saute pas : joue G renversé, B D G. Ta main bouge à peine, tu économises ton énergie." }
+      ]
+    },
+    { "status": "ok", "text": "Un accord te semble inconnu ? Vérifie d'abord s'il n'est pas juste renversé." },
+    { "status": "ok", "text": "Dis le nom des notes à chaque renversement." }
+  ],
+  "avoid": "Confondre renversement et voicing. Le renversement change juste l'ordre ; le voicing choisit la note qui ressort.",
+  "exercise": [
+    { "status": "ok", "text": "Joue C, F et G dans les 3 positions, en disant le nom des notes à voix haute." },
+    { "status": "draft", "text": "Enchaîne C → F → G → C sans quitter le milieu du clavier." },
+    { "status": "draft", "text": "Refais l'enchaînement les yeux fermés." }
+  ],
+  "related": ["accords-majeurs", "accords-mineurs", "voice-leading", "accord-slash-c-e"]
+}

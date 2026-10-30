@@ -1,0 +1,35 @@
+{
+  "id": "intervalles",
+  "family": "accords-harmonie",
+  "title": "Intervalles",
+  "summary": "Un intervalle, c'est la distance entre deux notes, comptée en demi-tons. C'est lui qui donne sa couleur à un accord.",
+  "keyboard": {
+    "range": ["C4", "E5"],
+    "groupLabel": "Choisir un intervalle",
+    "options": [
+      { "label": "3m", "aria": "Tierce mineure", "notes": ["C4", "Eb4"], "caption": "C → Eb · 3 demi-tons" },
+      { "label": "3M", "aria": "Tierce majeure", "notes": ["C4", "E4"], "caption": "C → E · 4 demi-tons" },
+      { "label": "4", "aria": "Quarte", "notes": ["C4", "F4"], "caption": "C → F · 5 demi-tons" },
+      { "label": "5", "aria": "Quinte", "notes": ["C4", "G4"], "caption": "C → G · 7 demi-tons" },
+      { "label": "7m", "aria": "Septième mineure", "notes": ["C4", "Bb4"], "caption": "C → Bb · 10 demi-tons, un ton sous l'octave" },
+      { "label": "7M", "aria": "Septième majeure", "notes": ["C4", "B4"], "caption": "C → B · 11 demi-tons, un demi-ton sous l'octave" }
+    ]
+  },
+  "essentials": [
+    { "parts": [{ "term": "Demi-ton", "text": "la touche juste à côté, blanche ou noire. Un ton = 2 demi-tons." }] },
+    { "parts": [{ "term": "Compter à partir de 0", "text": "la note de départ ne compte pas." }] },
+    { "parts": [{ "term": "Les 3 à connaître", "text": "tierce mineure = 3 demi-tons, tierce majeure = 4, quinte = 7. Avec ça, tu construis tous les accords de base." }] }
+  ],
+  "tips": [
+    { "status": "draft", "text": "Accroche chaque intervalle à une chanson. La quarte, de C à F, je l'ai retenue avec La Marseillaise : elle commence par une quarte." },
+    { "status": "ok", "text": "La 7e majeure, c'est un demi-ton avant l'octave. La 7e mineure, un ton avant." },
+    { "status": "draft", "text": "Connecte le feeling à quelque chose de concret sur le piano : comment ça se construit, la forme dans ta main, et comment ça sonne." }
+  ],
+  "avoid": "Compter la note de départ. De C à E, il y a 4 demi-tons, pas 5.",
+  "exercise": [
+    { "status": "ok", "text": "Sur chaque note blanche, joue la tierce mineure, la tierce majeure, puis la quinte. Prends le temps d'écouter la différence." },
+    { "status": "draft", "text": "Fais 10 questions d'intervalles sur tonedear.com." },
+    { "status": "draft", "text": "Trouve une chanson-repère pour la tierce majeure et pour la quinte, comme la Marseillaise pour la quarte." }
+  ],
+  "related": ["accords-majeurs", "accords-mineurs", "accord-de-7e-de-dominante"]
+}
