@@ -260,12 +260,271 @@ function notionsLoadResume() {
         .catch(function () { /* pas de carte Reprendre */ });
 }
 
+// ─── Clavier (un seul moteur pour toutes les fiches) ───────────────
+var NOTIONS_PITCH = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+var NOTIONS_WHITE_PCS = [0, 2, 4, 5, 7, 9, 11];
+
+// "Eb4" → { midi: 63, name: "Eb" }
+function notionsParseNote(note) {
+    var m = /^([A-G])(#|b)?(\d)$/.exec(String(note));
+    if (!m) return null;
+    var midi = (Number(m[3]) + 1) * 12 + NOTIONS_PITCH[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+    return { midi: midi, name: m[1] + (m[2] || '') };
+}
+
+// Touches de la plage : blanches côte à côte, noires à cheval sur la jointure
+function notionsKeyboardHtml(range) {
+    var lo = notionsParseNote(range[0]);
+    var hi = notionsParseNote(range[1]);
+    if (!lo || !hi) return { html: '', dense: false };
+    var whites = [];
+    var blacks = [];
+    for (var m = lo.midi; m <= hi.midi; m++) {
+        if (NOTIONS_WHITE_PCS.indexOf(m % 12) !== -1) whites.push(m);
+        else if (whites.length) blacks.push({ midi: m, after: whites.length - 1 });
+    }
+    var w = 100 / whites.length;
+    var bw = w * 0.63;
+    var html = '';
+    whites.forEach(function (midi, i) {
+        html += '<div class="key key-white" data-midi="' + midi + '" style="left:' + (i * w) + '%;width:calc(' + w + '% - 1px)">' +
+            '<span class="key-fill"></span><span class="key-label"></span></div>';
+    });
+    blacks.forEach(function (b) {
+        html += '<div class="key key-black" data-midi="' + b.midi + '" style="left:' + ((b.after + 1) * w - bw / 2 - 0.15) + '%;width:' + bw + '%">' +
+            '<span class="key-fill"></span><span class="key-label"></span></div>';
+    });
+    return { html: html, dense: whites.length > 10 };
+}
+
+function notionsKeyboardSelect(kb, index) {
+    var opt = kb.options[index];
+    var lit = {};
+    var names = [];
+    opt.notes.forEach(function (n) {
+        var p = notionsParseNote(n);
+        if (!p) return;
+        lit[p.midi] = p.name;
+        names.push(p.name);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.kb .key'), function (key) {
+        var midi = key.getAttribute('data-midi');
+        var on = Object.prototype.hasOwnProperty.call(lit, midi);
+        key.classList.toggle('is-on', on);
+        if (on) key.querySelector('.key-label').textContent = lit[midi];
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.kb-options button'), function (btn, i) {
+        btn.setAttribute('aria-pressed', i === index ? 'true' : 'false');
+    });
+    var board = document.getElementById('kb');
+    if (board) board.setAttribute('aria-label', 'Clavier : ' + (opt.aria || opt.label) + ', notes ' + names.join(' '));
+    var caption = document.getElementById('kb-caption');
+    if (caption) caption.textContent = opt.caption || '';
+}
+
+// ─── Fiche ─────────────────────────────────────────────────────────
+var NOTIONS_FICHE_ICONS = {
+    avoid: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F2A8A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5"></path><path d="M12 16.5v.5"></path></svg>',
+    timer: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2 2"></path><path d="M9 2h6"></path></svg>',
+    close: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>'
+};
+
+// Astuce affichée : la version ok (la principale, sinon une variante ok)
+function notionsTipText(tip) {
+    if (tip.status === 'ok') return tip.text;
+    var variants = tip.variants || [];
+    for (var i = 0; i < variants.length; i++) if (variants[i].status === 'ok') return variants[i].text;
+    return null;
+}
+
+function notionsRenderFiche(fiche) {
+    var family = notionsFindFamily(fiche.family);
+    var kb = fiche.keyboard;
+    var board = notionsKeyboardHtml(kb.range);
+    var hasSub = kb.options.some(function (o) { return !!o.sub; });
+    var hasCaption = kb.options.some(function (o) { return !!o.caption; });
+    var tips = (fiche.tips || []).map(notionsTipText).filter(Boolean);
+    var steps = notionsVisibleSteps(fiche);
+    var done = notionsReadDone(fiche.id);
+
+    var related = (fiche.related || []).map(function (id) {
+        var n = notionsFindNotion(id);
+        if (!n) return '';
+        if (n.fiche) return '<a href="' + notionsEscape(notionsFicheUrl(n.id)) + '">' + notionsEscape(n.name) + '</a>';
+        return '<span aria-disabled="true" title="Fiche bientôt disponible">' + notionsEscape(n.name) + '</span>';
+    }).join('');
+
+    document.title = 'Master Hub — ' + fiche.title;
+    notionsApp.innerHTML =
+        '<article class="fiche">' +
+            '<div class="fiche-scroll">' +
+                '<header class="fiche-head fu">' +
+                    '<a class="icon-btn press" href="' + notionsEscape(notionsLibraryUrl()) + '" aria-label="Retour à la bibliothèque">' + NOTIONS_ICONS.back + '</a>' +
+                    '<div class="fiche-head-text">' +
+                        '<span class="kicker">' + notionsEscape(family ? family.name : '') + '</span>' +
+                        '<h1>' + notionsEscape(fiche.title) + '</h1>' +
+                    '</div>' +
+                '</header>' +
+                '<p class="fiche-summary fu d1">' + notionsEscape(fiche.summary) + '</p>' +
+                '<div class="kb-block fu d2">' +
+                    '<div class="kb-options' + (hasSub ? ' has-sub' : '') + '" role="group" aria-label="' + notionsEscape(kb.groupLabel || 'Choisir sur le clavier') + '" style="grid-template-columns:repeat(' + kb.options.length + ',minmax(0,1fr))">' +
+                        kb.options.map(function (o, i) {
+                            return '<button type="button" class="press" data-opt="' + i + '" aria-pressed="false"' + (o.aria ? ' aria-label="' + notionsEscape(o.aria) + '"' : '') + '>' +
+                                '<span class="kb-opt-main">' + notionsEscape(o.label) + '</span>' +
+                                (o.sub ? '<span class="kb-opt-sub">' + notionsEscape(o.sub) + '</span>' : '') +
+                            '</button>';
+                        }).join('') +
+                    '</div>' +
+                    '<div class="kb' + (board.dense ? ' is-dense' : '') + '" id="kb" role="img">' + board.html + '</div>' +
+                    (hasCaption ? '<p class="kb-caption" id="kb-caption" aria-live="polite"></p>' : '') +
+                '</div>' +
+                '<section class="essentials fu d3" aria-labelledby="ess-title">' +
+                    '<h2 class="section-label" id="ess-title" style="margin:0;font-weight:400">L\'essentiel</h2>' +
+                    (fiche.essentials || []).map(function (e) {
+                        return '<p>' + e.parts.map(function (p) {
+                            return '<strong>' + notionsEscape(p.term) + '</strong> · ' + notionsEscape(p.text);
+                        }).join(' ') + '</p>';
+                    }).join('') +
+                '</section>' +
+                (tips.length ?
+                    '<section class="tips fu d4" aria-labelledby="tips-title">' +
+                        '<div class="tips-head"><span class="tips-avatar" aria-hidden="true">L</span><h2 id="tips-title">Les astuces de Lonne</h2></div>' +
+                        tips.map(function (t) { return '<p>« ' + notionsEscape(t) + ' »</p>'; }).join('') +
+                    '</section>' : '') +
+                '<div class="avoid fu d5">' + NOTIONS_FICHE_ICONS.avoid +
+                    '<p><strong>À éviter</strong> · ' + notionsEscape(fiche.avoid) + '</p>' +
+                '</div>' +
+            '</div>' +
+            '<div class="fiche-foot">' +
+                '<button type="button" class="btn-primary press fu d6" id="ex-open" aria-haspopup="dialog" aria-controls="ex-sheet">' +
+                    NOTIONS_FICHE_ICONS.timer + 'Exercice · 5 min' +
+                '</button>' +
+            '</div>' +
+        '</article>' +
+        '<div class="backdrop" id="ex-backdrop" hidden></div>' +
+        '<div class="sheet" id="ex-sheet" role="dialog" aria-modal="true" aria-labelledby="ex-title" hidden>' +
+            '<div class="sheet-handle" aria-hidden="true"></div>' +
+            '<div class="sheet-head">' +
+                '<h2 id="ex-title">Exercice · 5 min</h2>' +
+                '<button type="button" class="icon-btn" id="ex-close" aria-label="Fermer">' + NOTIONS_FICHE_ICONS.close + '</button>' +
+            '</div>' +
+            '<ul class="steps">' +
+                steps.map(function (s) {
+                    var d = done.indexOf(s.index) !== -1;
+                    return '<li><button type="button" class="step press" data-step="' + s.index + '" aria-pressed="' + (d ? 'true' : 'false') + '">' +
+                        '<span class="step-box" aria-hidden="true">' + (d ? '✓' : '') + '</span>' +
+                        '<span class="step-text">' + notionsEscape(s.text) + '</span>' +
+                    '</button></li>';
+                }).join('') +
+            '</ul>' +
+            (related ?
+                '<div class="related-block">' +
+                    '<span class="kicker">Notions liées</span>' +
+                    '<div class="related">' + related + '</div>' +
+                '</div>' : '') +
+        '</div>';
+    notionsApp.removeAttribute('aria-busy');
+
+    Array.prototype.forEach.call(notionsApp.querySelectorAll('.kb-options button'), function (btn) {
+        btn.addEventListener('click', function () {
+            notionsKeyboardSelect(kb, Number(btn.getAttribute('data-opt')));
+        });
+    });
+    notionsKeyboardSelect(kb, 0);
+
+    Array.prototype.forEach.call(notionsApp.querySelectorAll('.step'), function (btn) {
+        btn.addEventListener('click', function () { notionsToggleStep(fiche.id, btn); });
+    });
+
+    document.getElementById('ex-open').addEventListener('click', notionsOpenSheet);
+    document.getElementById('ex-close').addEventListener('click', notionsCloseSheet);
+    document.getElementById('ex-backdrop').addEventListener('click', notionsCloseSheet);
+    document.addEventListener('keydown', notionsSheetKeys);
+}
+
+function notionsToggleStep(ficheId, btn) {
+    var index = Number(btn.getAttribute('data-step'));
+    var done = notionsReadDone(ficheId);
+    var pos = done.indexOf(index);
+    var box = btn.querySelector('.step-box');
+    if (pos === -1) {
+        done.push(index);
+        btn.setAttribute('aria-pressed', 'true');
+        box.textContent = '✓';
+        box.classList.remove('pop');
+        void box.offsetWidth; // relance l'animation
+        box.classList.add('pop');
+    } else {
+        done.splice(pos, 1);
+        btn.setAttribute('aria-pressed', 'false');
+        box.textContent = '';
+        box.classList.remove('pop');
+    }
+    done.sort(function (a, b) { return a - b; });
+    notionsStoreSet(notionsDoneKey(ficheId), JSON.stringify(done));
+}
+
+function notionsSheetOpen() {
+    var sheet = document.getElementById('ex-sheet');
+    return !!sheet && !sheet.hidden;
+}
+
+function notionsOpenSheet() {
+    document.getElementById('ex-backdrop').hidden = false;
+    document.getElementById('ex-sheet').hidden = false;
+    document.querySelector('.fiche').setAttribute('aria-hidden', 'true');
+    document.getElementById('ex-close').focus();
+}
+
+function notionsCloseSheet() {
+    if (!notionsSheetOpen()) return;
+    document.getElementById('ex-backdrop').hidden = true;
+    document.getElementById('ex-sheet').hidden = true;
+    document.querySelector('.fiche').removeAttribute('aria-hidden');
+    document.getElementById('ex-open').focus();
+}
+
+// Échap ferme ; Tab reste dans le panneau tant qu'il est ouvert
+function notionsSheetKeys(e) {
+    if (!notionsSheetOpen()) return;
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        notionsCloseSheet();
+        return;
+    }
+    if (e.key !== 'Tab') return;
+    var focusables = document.getElementById('ex-sheet').querySelectorAll('button, a[href]');
+    if (!focusables.length) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+}
+
+function notionsOpenFiche(id) {
+    var notion = notionsFindNotion(id);
+    if (!notion || !notion.fiche) {
+        window.location.replace(notionsLibraryUrl());
+        return;
+    }
+    notionsLoadJson('/data/fiches/' + encodeURIComponent(id) + '.json')
+        .then(function (fiche) {
+            if (!fiche || fiche.id !== id || !fiche.keyboard) throw new Error('fiche invalide');
+            notionsStoreSet('notions:' + notionsSlug + ':last', id);
+            notionsRenderFiche(fiche);
+        })
+        .catch(function () {
+            notionsShowMessage('Impossible de charger cette fiche. Vérifie ta connexion puis recharge la page.');
+        });
+}
+
 // ─── Démarrage ─────────────────────────────────────────────────────
 function notionsStart() {
     notionsLoadJson('/data/notions.json')
         .then(function (index) {
             notionsIndex = index;
-            notionsRenderLibrary();
+            if (notionsFicheId) notionsOpenFiche(notionsFicheId);
+            else notionsRenderLibrary();
         })
         .catch(function () {
             notionsShowMessage('Impossible de charger les notions. Vérifie ta connexion puis recharge la page.');
