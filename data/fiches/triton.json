@@ -84,11 +84,11 @@
   "avoid": "Confondre triton et quarte. La quarte fait 2 tons et demi (C–F), le triton 3 tons (C–F#).",
   "exercise": [
     {
-      "status": "draft",
+      "status": "ok",
       "text": "Trouve le triton dans G7, C7 et Bdim7."
     },
     {
-      "status": "draft",
+      "status": "ok",
       "text": "Joue B–F, puis résous sur C–E : écoute la tension se relâcher."
     }
   ],

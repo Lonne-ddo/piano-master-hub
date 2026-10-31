@@ -74,11 +74,11 @@
   "avoid": "Finir un morceau sur le V7 : la tension reste en suspens.",
   "exercise": [
     {
-      "status": "draft",
+      "status": "ok",
       "text": "Enchaîne G7 → C, D7 → G, Eb7 → Ab."
     },
     {
-      "status": "draft",
+      "status": "ok",
       "text": "Sur un morceau, repère chaque fin de phrase et cherche le V → I."
     }
   ],

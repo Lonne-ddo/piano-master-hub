@@ -83,11 +83,11 @@
   "avoid": "Laisser le passage sans résolution. L'accord tendu doit atterrir sur la cible.",
   "exercise": [
     {
-      "status": "draft",
+      "status": "ok",
       "text": "Avant chaque accord d'une grille simple, ajoute un dim7 un demi-ton en dessous."
     },
     {
-      "status": "draft",
+      "status": "ok",
       "text": "Refais la même grille avec un accord de 7e sur le 5 de chaque cible."
     }
   ],

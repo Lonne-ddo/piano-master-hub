@@ -82,11 +82,11 @@
   "avoid": "Lire C/E comme deux accords. C'est un seul accord, avec E imposé à la basse.",
   "exercise": [
     {
-      "status": "draft",
+      "status": "ok",
       "text": "Joue C/E puis F/D : la basse à la main gauche, l'accord à la main droite."
     },
     {
-      "status": "draft",
+      "status": "ok",
       "text": "Sur une grille, repère les accords slash et joue-les de la même façon."
     }
   ],
