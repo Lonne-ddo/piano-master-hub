@@ -1,0 +1,96 @@
+{
+  "id": "melodie-md-accompagnement-mg",
+  "family": "technique-jeu",
+  "title": "Mélodie MD + accompagnement MG",
+  "summary": "La main droite porte la mélodie en haut, la main gauche la basse. L'accord remplit le milieu.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "E5"
+    ],
+    "groupLabel": "Construire par couches",
+    "options": [
+      {
+        "label": "Basse",
+        "aria": "Basse",
+        "notes": [
+          "C4"
+        ],
+        "caption": "MG : la fondamentale tout à gauche"
+      },
+      {
+        "label": "+ accord",
+        "aria": "+ accord",
+        "notes": [
+          "C4",
+          "E4",
+          "G4"
+        ],
+        "caption": "Les notes de l'accord au milieu"
+      },
+      {
+        "label": "+ mélodie",
+        "aria": "+ mélodie",
+        "notes": [
+          "C4",
+          "E4",
+          "G4",
+          "E5"
+        ],
+        "caption": "MD : la mélodie en haut"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Main droite",
+          "text": "la mélodie dans les aigus + des notes d'accompagnement."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Main gauche",
+          "text": "la fondamentale tout à gauche + des notes de l'accord au milieu."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Le milieu",
+          "text": "utilise les renversements pour placer les notes de l'accord à portée."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Sur un nouveau morceau, sacrifie le rythme d'abord : concentre-toi sur l'accord, le doigt, les sauts."
+    },
+    {
+      "status": "ok",
+      "text": "Si la main droite gère mélodie et accompagnement, fais de petits sauts et lie avec la pédale."
+    },
+    {
+      "status": "ok",
+      "text": "La mélodie doit toujours ressortir en haut."
+    }
+  ],
+  "avoid": "Jouer la triade complète dans les graves : ça sonne lourd. Préfère l'octave, ou fondamentale + quinte.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Choisis un morceau et travaille la mélodie à la main droite, les accords à la main gauche, sans contrainte de rythme."
+    }
+  ],
+  "related": [
+    "voicing",
+    "renversements",
+    "separation-des-mains"
+  ]
+}

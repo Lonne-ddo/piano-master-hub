@@ -1,0 +1,93 @@
+{
+  "id": "voicing",
+  "family": "accords-harmonie",
+  "title": "Voicing",
+  "summary": "Le voicing choisit comment tu répartis les notes de l'accord, et laquelle ressort en haut.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "E5"
+    ],
+    "groupLabel": "Même accord, autre voicing",
+    "options": [
+      {
+        "label": "Serré",
+        "aria": "Serré",
+        "notes": [
+          "C4",
+          "E4",
+          "G4",
+          "B4"
+        ],
+        "caption": "Cmaj7 : toutes les notes collées"
+      },
+      {
+        "label": "Écarté",
+        "aria": "Écarté",
+        "notes": [
+          "C4",
+          "G4",
+          "B4",
+          "E5"
+        ],
+        "caption": "MG : C G · MD : B E, la tierce passe en haut"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Mélodie",
+          "text": "elle ressort toujours en haut."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Répartition",
+          "text": "main droite = mélodie + complément d'accord, main gauche = basse + notes de l'accord."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Priorités",
+          "text": "la quinte peut sauter. La tierce et la 7e colorent l'accord."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Voicing ≠ renversement : le voicing choisit la note qui ressort, le renversement change juste l'ordre."
+    },
+    {
+      "status": "ok",
+      "text": "Les dissonances sonnent mieux écartées aux extrémités."
+    },
+    {
+      "status": "ok",
+      "text": "Ne laisse pas de vide à la main droite : complète avec des notes de l'accord."
+    }
+  ],
+  "avoid": "Noyer la mélodie dans l'accord. Elle doit rester la note la plus haute.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Sur chaque accord maj7 et min7, teste différents voicings."
+    },
+    {
+      "status": "ok",
+      "text": "Joue maj9, min9 et min11 chromatiquement, voicés différemment à chaque fois, pour écouter les nuances."
+    }
+  ],
+  "related": [
+    "renversements",
+    "melodie-md-accompagnement-mg",
+    "maj9-min9-min11"
+  ]
+}

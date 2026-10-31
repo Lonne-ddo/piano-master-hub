@@ -1,0 +1,104 @@
+{
+  "id": "accord-de-7e-de-dominante",
+  "family": "accords-harmonie",
+  "title": "Accord de 7e de dominante",
+  "summary": "Un accord majeur avec une 7e mineure. Il crée une tension qui demande à résoudre.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "F5"
+    ],
+    "groupLabel": "Tension puis résolution",
+    "options": [
+      {
+        "label": "G7",
+        "aria": "G7",
+        "notes": [
+          "G4",
+          "B4",
+          "D5",
+          "F5"
+        ],
+        "caption": "G B D F : triade majeure + 7e mineure"
+      },
+      {
+        "label": "→ C",
+        "aria": "→ C",
+        "notes": [
+          "G4",
+          "C5",
+          "E5"
+        ],
+        "caption": "F descend sur E, B monte sur C"
+      },
+      {
+        "label": "C7",
+        "aria": "C7",
+        "notes": [
+          "C4",
+          "E4",
+          "G4",
+          "Bb4"
+        ],
+        "caption": "C E G Bb : il appelle F"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Construction",
+          "text": "triade majeure + 7e mineure, un ton sous l'octave."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Notation",
+          "text": "le chiffre seul : C7, G7, sans « m » ni « maj »."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Rôle",
+          "text": "le V7 va vers le I : G7 → C, D7 → G, Eb7 → Ab."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "La dominante, c'est une virgule : tension, attente, « c'est pas fini »."
+    },
+    {
+      "status": "ok",
+      "text": "Écoute la note la plus aiguë : la 7e mineure résout naturellement vers l'accord suivant."
+    },
+    {
+      "status": "ok",
+      "text": "On ne finit pas un morceau sur un accord de 7e de dominante."
+    }
+  ],
+  "avoid": "Confondre C7 et Cmaj7. Le chiffre seul donne une 7e mineure (Bb) ; « maj » donne une 7e majeure (B).",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Joue les accords de 7e de dominante chromatiquement, en disant leur construction à voix haute."
+    },
+    {
+      "status": "draft",
+      "text": "Enchaîne G7 → C, D7 → G, Eb7 → Ab."
+    }
+  ],
+  "related": [
+    "cadence-v-i",
+    "accord-maj7",
+    "triton",
+    "tension-resolution"
+  ]
+}

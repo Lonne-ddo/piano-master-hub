@@ -1,0 +1,97 @@
+{
+  "id": "gammes-relatives",
+  "family": "gammes-tonalites",
+  "title": "Gammes relatives",
+  "summary": "Une gamme majeure et une gamme mineure qui partagent les mêmes notes, avec une tonique différente.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "A5"
+    ],
+    "groupLabel": "Mêmes notes",
+    "options": [
+      {
+        "label": "C majeur",
+        "aria": "C majeur",
+        "notes": [
+          "C4",
+          "D4",
+          "E4",
+          "F4",
+          "G4",
+          "A4",
+          "B4",
+          "C5"
+        ],
+        "caption": "Tonique C"
+      },
+      {
+        "label": "A mineur",
+        "aria": "A mineur",
+        "notes": [
+          "A4",
+          "B4",
+          "C5",
+          "D5",
+          "E5",
+          "F5",
+          "G5",
+          "A5"
+        ],
+        "caption": "Mêmes notes, tonique A"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Mêmes notes",
+          "text": "C majeur et A mineur ont les mêmes notes, mais ne gravitent pas autour de la même."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Trouver la relative",
+          "text": "1,5 ton sous la tonique majeure ; 1,5 ton au-dessus de la tonique mineure."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Mêmes altérations",
+          "text": "Bb majeur et G mineur ont tous les deux Bb et Eb."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Retiens 12 paires plutôt que 24 gammes séparées."
+    },
+    {
+      "status": "ok",
+      "text": "La relative mineure, c'est le 6e degré de la gamme majeure."
+    }
+  ],
+  "avoid": "Appliquer la règle à toutes les gammes mineures. Elle vaut pour la mineure naturelle.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Travaille les gammes majeures et mineures sur toutes les notes."
+    },
+    {
+      "status": "draft",
+      "text": "Pour chaque gamme majeure, retrouve sa relative mineure et joue les deux."
+    }
+  ],
+  "related": [
+    "gamme-majeure",
+    "gamme-mineure-naturelle",
+    "tonalite-vs-gamme"
+  ]
+}

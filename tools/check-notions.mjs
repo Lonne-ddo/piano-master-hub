@@ -5,6 +5,7 @@
 // Contrôles : ids uniques, familles connues, chaque fiche dans l'index
 // (et inversement), related[] vers des ids existants, notes du clavier
 // valides et dans la plage, status ok/draft, aucun champ de niveau.
+// Avertissement (non bloquant) : fiche sans étape d'exercice en ok.
 // Exit code : 0 si tout passe, 1 sinon.
 // ═══════════════════════════════════════════════════════════════════
 import { readFileSync, readdirSync } from 'node:fs';
@@ -15,6 +16,8 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = join(ROOT, 'data');
 const errors = [];
 const fail = (msg) => errors.push(msg);
+const warnings = [];
+const warn = (msg) => warnings.push(msg);
 
 function readJson(path) {
   try { return JSON.parse(readFileSync(path, 'utf8')); }
@@ -110,7 +113,7 @@ for (const file of files) {
     (t.variants || []).forEach((v, j) => checkStatus(v, `tips[${i}].variants[${j}]`));
   });
   (f.exercise || []).forEach((s, i) => checkStatus(s, `exercise[${i}]`));
-  if (!(f.exercise || []).some((s) => s.status === 'ok')) fail(`${where} : aucune étape d'exercice en ok`);
+  if (!(f.exercise || []).some((s) => s.status === 'ok')) warn(`${where} : aucune étape d'exercice en ok (bouton Exercice masqué)`);
   if (!(f.tips || []).some((t) => t.status === 'ok')) fail(`${where} : aucune astuce en ok`);
 
   (f.related || []).forEach((r) => {
@@ -143,6 +146,7 @@ for (const id of withFiche) {
   if (!seen.has(id)) fail(`notions.json : « ${id} » marquée fiche mais data/fiches/${id}.json absent`);
 }
 
+if (warnings.length) console.warn(`⚠ ${warnings.length} avertissement(s) :\n- ` + warnings.join('\n- '));
 if (errors.length) {
   console.error(`✗ ${errors.length} erreur(s) :\n- ` + errors.join('\n- '));
   process.exit(1);

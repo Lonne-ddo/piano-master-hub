@@ -1,0 +1,100 @@
+{
+  "id": "accord-maj7",
+  "family": "accords-harmonie",
+  "title": "Accord maj7",
+  "summary": "Un accord majeur avec une 7e majeure, un demi-ton sous l'octave. Couleur ouverte, lumineuse.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "E5"
+    ],
+    "groupLabel": "Comparer les 7e",
+    "options": [
+      {
+        "label": "Cmaj7",
+        "aria": "Cmaj7",
+        "notes": [
+          "C4",
+          "E4",
+          "G4",
+          "B4"
+        ],
+        "caption": "7e majeure : B, un demi-ton sous l'octave"
+      },
+      {
+        "label": "C7",
+        "aria": "C7",
+        "notes": [
+          "C4",
+          "E4",
+          "G4",
+          "Bb4"
+        ],
+        "caption": "7e mineure : Bb, un ton sous l'octave"
+      },
+      {
+        "label": "Fmaj7",
+        "aria": "Fmaj7",
+        "notes": [
+          "F4",
+          "A4",
+          "C5",
+          "E5"
+        ],
+        "caption": "F A C E"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Construction",
+          "text": "triade majeure + 7e majeure, un demi-ton avant l'octave."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Notation",
+          "text": "maj, Δ ou M : Cmaj7, CΔ7, CM7."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Couleur",
+          "text": "ouvert, lumineux."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Le maj7, c'est un champ de tulipes : ouvert, lumineux."
+    },
+    {
+      "status": "ok",
+      "text": "Un accord qui sonne ouvert, cool, sans dissonance ? Pense maj7 ou maj9."
+    }
+  ],
+  "avoid": "Confondre Cmaj7 et C7 : un demi-ton d'écart sur la 7e change toute la couleur.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Construis les maj7 et min7 chromatiquement sur chaque note."
+    },
+    {
+      "status": "ok",
+      "text": "Sur chaque accord, teste différents voicings."
+    }
+  ],
+  "related": [
+    "accord-min7",
+    "accord-de-7e-de-dominante",
+    "maj9-min9-min11"
+  ]
+}

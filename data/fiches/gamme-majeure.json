@@ -1,0 +1,117 @@
+{
+  "id": "gamme-majeure",
+  "family": "gammes-tonalites",
+  "title": "Gamme majeure",
+  "summary": "Sept notes construites avec une formule fixe de tons et demi-tons. C'est la base des degrés.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "G5"
+    ],
+    "groupLabel": "Gamme",
+    "options": [
+      {
+        "label": "C",
+        "aria": "C",
+        "notes": [
+          "C4",
+          "D4",
+          "E4",
+          "F4",
+          "G4",
+          "A4",
+          "B4",
+          "C5"
+        ],
+        "caption": "Aucune altération"
+      },
+      {
+        "label": "G",
+        "aria": "G",
+        "notes": [
+          "G4",
+          "A4",
+          "B4",
+          "C5",
+          "D5",
+          "E5",
+          "F#5",
+          "G5"
+        ],
+        "caption": "Une altération : F#"
+      },
+      {
+        "label": "D",
+        "aria": "D",
+        "notes": [
+          "D4",
+          "E4",
+          "F#4",
+          "G4",
+          "A4",
+          "B4",
+          "C#5",
+          "D5"
+        ],
+        "caption": "Deux altérations : F# et C#"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Formule",
+          "text": "1 ton, 1 ton, ½ ton, 1 ton, 1 ton, 1 ton, ½ ton."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Les demi-tons",
+          "text": "entre la 3e et la 4e note, entre la 7e et l'octave."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Altérations",
+          "text": "G majeur a F# ; D majeur a F# et C#."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Retiens les altérations de chaque gamme pour les retrouver plus vite."
+    },
+    {
+      "status": "ok",
+      "text": "Vérifie une gamme à l'oreille, en plus du calcul des tons."
+    },
+    {
+      "status": "ok",
+      "text": "Avant une nouvelle tonalité, joue d'abord sa gamme."
+    }
+  ],
+  "avoid": "Construire la gamme au feeling. Applique la formule depuis la première note.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Travaille les gammes majeures sur toutes les notes."
+    },
+    {
+      "status": "ok",
+      "text": "Chante la gamme, même approximativement, pour la mémoriser."
+    }
+  ],
+  "related": [
+    "degres",
+    "gammes-relatives",
+    "gamme-mineure-naturelle",
+    "transposition"
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "id": "transposition",
+  "family": "gammes-tonalites",
+  "title": "Transposition",
+  "summary": "Rejouer la même suite de degrés dans une autre tonalité, sans le bouton transposer.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "A5"
+    ],
+    "groupLabel": "Construire la gamme cible",
+    "options": [
+      {
+        "label": "C majeur",
+        "aria": "C majeur",
+        "notes": [
+          "C4",
+          "D4",
+          "E4",
+          "F4",
+          "G4",
+          "A4",
+          "B4",
+          "C5"
+        ],
+        "caption": "Tonalité de départ"
+      },
+      {
+        "label": "Ab majeur",
+        "aria": "Ab majeur",
+        "notes": [
+          "Ab4",
+          "Bb4",
+          "C5",
+          "Db5",
+          "Eb5",
+          "F5",
+          "G5",
+          "Ab5"
+        ],
+        "caption": "Nouvelle tonalité : construis sa gamme d'abord"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Principe",
+          "text": "même suite de degrés, nouvelle tonalité."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Étape 1",
+          "text": "construis la gamme de la nouvelle tonalité."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Étape 2",
+          "text": "donne un chiffre à chaque note, puis replace les degrés."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Transpose dans l'ordre : mélodie seule, puis accords seuls en chantant la mélodie, puis les deux ensemble."
+    },
+    {
+      "status": "ok",
+      "text": "Force-toi à jouer dans les tonalités peu familières."
+    }
+  ],
+  "avoid": "Utiliser le bouton transposer du clavier. Tu dois pouvoir le faire de tête.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Crée une petite suite d'accords et transpose-la, accords seuls."
+    },
+    {
+      "status": "ok",
+      "text": "Transpose un morceau de C majeur en Ab majeur, accords seuls, sans le bouton transposer."
+    }
+  ],
+  "related": [
+    "degres",
+    "gamme-majeure",
+    "chiffres-romains"
+  ]
+}

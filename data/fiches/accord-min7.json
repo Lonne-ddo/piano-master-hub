@@ -1,0 +1,115 @@
+{
+  "id": "accord-min7",
+  "family": "accords-harmonie",
+  "title": "Accord min7",
+  "summary": "Un accord mineur avec une 7e mineure, un ton sous l'octave. Triste, mais stylé.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "G5"
+    ],
+    "groupLabel": "Accord min7",
+    "options": [
+      {
+        "label": "Cm7",
+        "aria": "Cm7",
+        "notes": [
+          "C4",
+          "Eb4",
+          "G4",
+          "Bb4"
+        ],
+        "caption": "C Eb G Bb"
+      },
+      {
+        "label": "Dm7",
+        "aria": "Dm7",
+        "notes": [
+          "D4",
+          "F4",
+          "A4",
+          "C5"
+        ],
+        "caption": "D F A C"
+      },
+      {
+        "label": "Em7",
+        "aria": "Em7",
+        "notes": [
+          "E4",
+          "G4",
+          "B4",
+          "D5"
+        ],
+        "caption": "E G B D"
+      },
+      {
+        "label": "Am7",
+        "aria": "Am7",
+        "notes": [
+          "A4",
+          "C5",
+          "E5",
+          "G5"
+        ],
+        "caption": "A C E G"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Construction",
+          "text": "triade mineure + 7e mineure, un ton avant l'octave."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Notation",
+          "text": "m + 7 : Cm7, Dm7."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Couleur",
+          "text": "triste mais stylé."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Le min7, c'est triste mais stylé : quelqu'un qui pleure sur un yacht."
+    },
+    {
+      "status": "ok",
+      "text": "Accord à 4 notes : la main droite tient l'accord, la main gauche tient la fondamentale seule."
+    },
+    {
+      "status": "ok",
+      "text": "Pense l'accord par son nom (min7, maj7, dominante) en plus du degré : les deux visions ensemble donnent un spectre complet."
+    }
+  ],
+  "avoid": "Compter la 7e depuis C au lieu de la fondamentale de l'accord. Sur Fm7, la 7e est Eb.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Construis les min7 chromatiquement sur chaque note, en verbalisant la construction."
+    },
+    {
+      "status": "ok",
+      "text": "Ear training : majeur, mineur, diminué, maj7 et min7 sur tonedear.com."
+    }
+  ],
+  "related": [
+    "accord-maj7",
+    "accords-mineurs",
+    "maj9-min9-min11"
+  ]
+}

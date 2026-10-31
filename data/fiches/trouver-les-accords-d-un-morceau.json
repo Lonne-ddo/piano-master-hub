@@ -1,0 +1,101 @@
+{
+  "id": "trouver-les-accords-d-un-morceau",
+  "family": "oreille",
+  "title": "Trouver les accords d'un morceau",
+  "summary": "Basse, note la plus aiguë, couleur : trois repères pour déduire l'accord.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "E5"
+    ],
+    "groupLabel": "Une basse E peut être…",
+    "options": [
+      {
+        "label": "Fondamentale",
+        "aria": "Fondamentale",
+        "notes": [
+          "E4",
+          "G#4",
+          "B4"
+        ],
+        "caption": "E en fondamentale : accord de E"
+      },
+      {
+        "label": "Tierce",
+        "aria": "Tierce",
+        "notes": [
+          "C4",
+          "E4",
+          "G4"
+        ],
+        "caption": "E en tierce : accord de C"
+      },
+      {
+        "label": "Quinte",
+        "aria": "Quinte",
+        "notes": [
+          "A4",
+          "C#5",
+          "E5"
+        ],
+        "caption": "E en quinte : accord de A"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "1. Basse",
+          "text": "la note la plus grave, souvent la fondamentale."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "2. Aigu + couleur",
+          "text": "la note qui ressort, puis joyeux, triste, tension ou ouvert."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "3. Le milieu",
+          "text": "déduis les notes entre les deux."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Pour retrouver une note : murmure-la, puis cherche-la note par note sur le clavier."
+    },
+    {
+      "status": "ok",
+      "text": "La mélodie du chant donne souvent les extensions de l'accord : 9e, 11e, 13e."
+    },
+    {
+      "status": "ok",
+      "text": "Accord inconnu ? Regroupe toutes ses notes en position fermée pour repérer la fondamentale."
+    }
+  ],
+  "avoid": "Tester des accords entiers au hasard. Avance note par note.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "En écoutant de la musique, identifie le type d'accord au feeling, puis vérifie au clavier."
+    },
+    {
+      "status": "ok",
+      "text": "Ear training : distingue d'abord les couleurs générales avant les notes précises."
+    }
+  ],
+  "related": [
+    "majeur-ou-mineur-a-l-oreille",
+    "trouver-la-tonalite-a-l-oreille",
+    "analyser-un-morceau-a-l-oreille"
+  ]
+}

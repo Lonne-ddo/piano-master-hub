@@ -1,0 +1,144 @@
+{
+  "id": "accords-diatoniques",
+  "family": "degres-progressions",
+  "title": "Accords diatoniques",
+  "summary": "Les 7 accords construits sur les notes d'une gamme. En majeur, leur type est imposé.",
+  "keyboard": {
+    "range": [
+      "F4",
+      "B5"
+    ],
+    "groupLabel": "Accords de F majeur",
+    "options": [
+      {
+        "label": "I",
+        "aria": "I",
+        "notes": [
+          "F4",
+          "A4",
+          "C5"
+        ],
+        "sub": "F",
+        "caption": "F : majeur"
+      },
+      {
+        "label": "ii",
+        "aria": "ii",
+        "notes": [
+          "G4",
+          "Bb4",
+          "D5"
+        ],
+        "sub": "Gm",
+        "caption": "Gm : mineur"
+      },
+      {
+        "label": "iii",
+        "aria": "iii",
+        "notes": [
+          "A4",
+          "C5",
+          "E5"
+        ],
+        "sub": "Am",
+        "caption": "Am : mineur"
+      },
+      {
+        "label": "IV",
+        "aria": "IV",
+        "notes": [
+          "Bb4",
+          "D5",
+          "F5"
+        ],
+        "sub": "Bb",
+        "caption": "Bb : majeur"
+      },
+      {
+        "label": "V",
+        "aria": "V",
+        "notes": [
+          "C5",
+          "E5",
+          "G5"
+        ],
+        "sub": "C",
+        "caption": "C : majeur"
+      },
+      {
+        "label": "vi",
+        "aria": "vi",
+        "notes": [
+          "D5",
+          "F5",
+          "A5"
+        ],
+        "sub": "Dm",
+        "caption": "Dm : mineur"
+      },
+      {
+        "label": "vii°",
+        "aria": "vii°",
+        "notes": [
+          "E5",
+          "G5",
+          "Bb5"
+        ],
+        "sub": "E°",
+        "caption": "Edim : diminué"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Ordre fixe",
+          "text": "majeur, mineur, mineur, majeur, majeur, mineur, diminué."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Accords voyelles",
+          "text": "I, IV et V, les accords principaux de la tonalité."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Composer",
+          "text": "piocher dans les accords diatoniques de la tonalité sonne bien dans 80 % des cas."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Accord bizarre ? Raccroche-toi aux accords diatoniques de la tonalité et cherche quelle triade correspond à la basse."
+    },
+    {
+      "status": "ok",
+      "text": "Pour composer : fixe d'abord la boucle d'accords en t'appuyant sur les degrés, cherche la mélodie ensuite."
+    }
+  ],
+  "avoid": "Vouloir tout raccrocher aux degrés. Un dim7 de passage, par exemple, n'appartient à aucun.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Sur un morceau maîtrisé, joue la mélodie à la main droite et complète avec les accords diatoniques."
+    },
+    {
+      "status": "ok",
+      "text": "Sur chaque morceau travaillé, identifie tonalité, gamme et degrés diatoniques."
+    }
+  ],
+  "related": [
+    "degres",
+    "chiffres-romains",
+    "gamme-majeure"
+  ]
+}

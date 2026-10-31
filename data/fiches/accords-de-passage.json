@@ -1,0 +1,99 @@
+{
+  "id": "accords-de-passage",
+  "family": "degres-progressions",
+  "title": "Accords de passage",
+  "summary": "Un accord glissé juste avant l'accord cible pour créer une tension qui résout.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "G5"
+    ],
+    "groupLabel": "Deux approches vers Dm",
+    "options": [
+      {
+        "label": "C#dim7",
+        "aria": "C#dim7",
+        "notes": [
+          "C#4",
+          "E4",
+          "G4",
+          "Bb4"
+        ],
+        "caption": "Par demi-ton : C# est juste sous D"
+      },
+      {
+        "label": "A7",
+        "aria": "A7",
+        "notes": [
+          "A4",
+          "C#5",
+          "E5",
+          "G5"
+        ],
+        "caption": "Par le 5 : A est le 5 de D"
+      },
+      {
+        "label": "Dm",
+        "aria": "Dm",
+        "notes": [
+          "D4",
+          "F4",
+          "A4"
+        ],
+        "caption": "La cible"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Par demi-ton",
+          "text": "un dim7 ou un m7♭5 un demi-ton au-dessus ou en dessous de la cible."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Par le 5",
+          "text": "vois la cible comme un I provisoire, joue un accord tendu sur son 5, puis résous."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Exemple",
+          "text": "vers Gm : le 5 de G est D. Joue un accord tendu sur D, puis résous sur Gm."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Les deux approches fonctionnent : la première est plus directe, la seconde plus riche."
+    },
+    {
+      "status": "ok",
+      "text": "N'aie pas peur de modifier les accords pour créer de nouvelles couleurs."
+    }
+  ],
+  "avoid": "Laisser le passage sans résolution. L'accord tendu doit atterrir sur la cible.",
+  "exercise": [
+    {
+      "status": "draft",
+      "text": "Avant chaque accord d'une grille simple, ajoute un dim7 un demi-ton en dessous."
+    },
+    {
+      "status": "draft",
+      "text": "Refais la même grille avec un accord de 7e sur le 5 de chaque cible."
+    }
+  ],
+  "related": [
+    "accord-diminue",
+    "demi-diminue-m7b5",
+    "tension-resolution"
+  ]
+}

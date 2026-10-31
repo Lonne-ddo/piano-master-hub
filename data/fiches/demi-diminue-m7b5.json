@@ -1,0 +1,85 @@
+{
+  "id": "demi-diminue-m7b5",
+  "family": "accords-harmonie",
+  "title": "Demi-diminué (m7♭5)",
+  "summary": "Un dim7 dont la dernière tierce est majeure. Il ouvre les II–V–I en mineur.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "E5"
+    ],
+    "groupLabel": "Comparer",
+    "options": [
+      {
+        "label": "Dm7♭5",
+        "aria": "Dm7♭5",
+        "notes": [
+          "D4",
+          "F4",
+          "Ab4",
+          "C5"
+        ],
+        "caption": "D F Ab C : min + min + maj"
+      },
+      {
+        "label": "Ddim7",
+        "aria": "Ddim7",
+        "notes": [
+          "D4",
+          "F4",
+          "Ab4",
+          "B4"
+        ],
+        "caption": "D F Ab B : seule la 7e change"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Construction",
+          "text": "tierce mineure + tierce mineure + tierce majeure."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Différence avec le dim7",
+          "text": "seule la 7e change : mineure dans le m7♭5, diminuée dans le dim7."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Usage",
+          "text": "le II d'un II–V–I mineur : Dm7♭5 → G7 → Cm."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "m7♭5 et min6 : mêmes notes, renversement différent."
+    },
+    {
+      "status": "ok",
+      "text": "Un dim7 ou un m7♭5 un demi-ton au-dessus ou en dessous de l'accord cible, c'est une tension qui résout bien."
+    }
+  ],
+  "avoid": "Confondre Cm7♭5 et Cdim7 : la 7e du m7♭5 est mineure (Bb), celle du dim7 est abaissée une fois de plus (A).",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "II–V–I mineur chromatique sur toutes les notes : Dm7♭5 → Gaug7 → Cm11, puis un demi-ton plus haut."
+    }
+  ],
+  "related": [
+    "accord-diminue",
+    "progression-ii-v-i",
+    "maj9-min9-min11"
+  ]
+}
