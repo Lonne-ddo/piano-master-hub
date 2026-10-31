@@ -1635,6 +1635,8 @@
         }
         // 4. Outils — teal (lien interne)
         html += resourceCardHtml('/outils?eleve=' + encodeURIComponent(slug), 'ti-tool', 'teal', 'Outils', 'Exercices interactifs', false);
+        // 4b. Notions — violet (fiches de cours, lien interne)
+        html += resourceCardHtml('/notions?eleve=' + encodeURIComponent(slug), 'ti-book', 'violet', 'Notions', 'Fiches de cours', false);
         // 5. Cours vidéo (Bonzai) — pink
         html += resourceCardHtml('https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master', 'ti-player-play', 'pink', 'Cours vidéo', 'Accès Bonzai', true);
         // 6. Cours en live (Discord) — gold (id explicite pour le deeplink mobile)
