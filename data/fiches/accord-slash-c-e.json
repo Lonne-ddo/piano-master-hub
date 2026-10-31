@@ -1,0 +1,98 @@
+{
+  "id": "accord-slash-c-e",
+  "family": "accords-harmonie",
+  "title": "Accord slash (C/E)",
+  "summary": "La note après la barre est la basse. Le reste de l'accord se joue au-dessus.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "E5"
+    ],
+    "groupLabel": "Lire un slash",
+    "options": [
+      {
+        "label": "C",
+        "aria": "C",
+        "notes": [
+          "C4",
+          "E4",
+          "G4"
+        ],
+        "caption": "C à la basse : accord normal"
+      },
+      {
+        "label": "C/E",
+        "aria": "C/E",
+        "notes": [
+          "E4",
+          "G4",
+          "C5"
+        ],
+        "caption": "E à la basse : c'est un renversement"
+      },
+      {
+        "label": "F/D",
+        "aria": "F/D",
+        "notes": [
+          "D4",
+          "F4",
+          "A4",
+          "C5"
+        ],
+        "caption": "D n'est pas dans F : nouvelle couleur"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Lecture",
+          "text": "C/E = E à la basse, accord de C au-dessus."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Basse dans l'accord",
+          "text": "c'est un renversement."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Basse hors de l'accord",
+          "text": "nouvelle couleur : F/D = D à la basse + F au-dessus."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "La note après « / » est la basse obligée, quelle que soit la main droite."
+    },
+    {
+      "status": "ok",
+      "text": "Un accord complexe, c'est souvent un accord connu avec une basse différente."
+    }
+  ],
+  "avoid": "Lire C/E comme deux accords. C'est un seul accord, avec E imposé à la basse.",
+  "exercise": [
+    {
+      "status": "draft",
+      "text": "Joue C/E puis F/D : la basse à la main gauche, l'accord à la main droite."
+    },
+    {
+      "status": "draft",
+      "text": "Sur une grille, repère les accords slash et joue-les de la même façon."
+    }
+  ],
+  "related": [
+    "renversements",
+    "accords-majeurs",
+    "slash-avance-basse-de-passage"
+  ]
+}

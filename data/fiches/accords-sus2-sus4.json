@@ -1,0 +1,101 @@
+{
+  "id": "accords-sus2-sus4",
+  "family": "accords-harmonie",
+  "title": "Accords sus2 / sus4",
+  "summary": "La tierce est remplacée par la 2e ou la 4e. Ni majeur ni mineur : la couleur reste suspendue.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "E5"
+    ],
+    "groupLabel": "Suspendre la tierce",
+    "options": [
+      {
+        "label": "Csus2",
+        "aria": "Csus2",
+        "notes": [
+          "C4",
+          "D4",
+          "G4"
+        ],
+        "caption": "C D G : la 2e remplace la tierce"
+      },
+      {
+        "label": "C",
+        "aria": "C",
+        "notes": [
+          "C4",
+          "E4",
+          "G4"
+        ],
+        "caption": "C E G : la tierce revient"
+      },
+      {
+        "label": "Csus4",
+        "aria": "Csus4",
+        "notes": [
+          "C4",
+          "F4",
+          "G4"
+        ],
+        "caption": "C F G : la 4e remplace la tierce"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "sus2 · sus4",
+          "text": "1, 2, 5 et 1, 4, 5. La 2e ou la 4e remplace la tierce."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Couleur",
+          "text": "lumineux, en attente de résolution."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Usage",
+          "text": "souvent juste avant l'accord majeur : Esus4 → E."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Un sentiment d'attente de résolution ? Pense sus2 ou sus4."
+    },
+    {
+      "status": "ok",
+      "text": "Sus2 et sus4 se voient aussi comme un empilement de quartes."
+    },
+    {
+      "status": "ok",
+      "text": "Sus2 ou add9 ? Si la tierce est là, c'est un add9."
+    }
+  ],
+  "avoid": "Garder la tierce en plus de la 4e. Dans un sus4, la tierce disparaît.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Ear training : ajoute sus2 et sus4 sur tonedear.com."
+    },
+    {
+      "status": "draft",
+      "text": "Joue Csus4 → C, puis Gsus4 → G : écoute l'attente, puis la résolution."
+    }
+  ],
+  "related": [
+    "accords-majeurs",
+    "accords-enrichis-add9-9-11-13",
+    "tension-resolution"
+  ]
+}

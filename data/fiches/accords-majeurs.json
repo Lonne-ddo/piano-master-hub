@@ -1,0 +1,115 @@
+{
+  "id": "accords-majeurs",
+  "family": "accords-harmonie",
+  "title": "Accords majeurs",
+  "summary": "Trois notes : une tierce majeure, puis une tierce mineure. C'est la couleur joyeuse.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "E5"
+    ],
+    "groupLabel": "Accord majeur",
+    "options": [
+      {
+        "label": "C",
+        "aria": "C",
+        "notes": [
+          "C4",
+          "E4",
+          "G4"
+        ],
+        "caption": "C E G : 2 tons + 1,5 ton"
+      },
+      {
+        "label": "F",
+        "aria": "F",
+        "notes": [
+          "F4",
+          "A4",
+          "C5"
+        ],
+        "caption": "F A C"
+      },
+      {
+        "label": "G",
+        "aria": "G",
+        "notes": [
+          "G4",
+          "B4",
+          "D5"
+        ],
+        "caption": "G B D"
+      },
+      {
+        "label": "D",
+        "aria": "D",
+        "notes": [
+          "D4",
+          "F#4",
+          "A4"
+        ],
+        "caption": "D F# A : une touche noire au milieu"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Construction",
+          "text": "fondamentale, puis tierce majeure (2 tons), puis tierce mineure (1,5 ton)."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Couleur",
+          "text": "joyeux."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Notation",
+          "text": "la lettre seule : C, F, G. Pas de suffixe = majeur."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Associe chaque accord à une couleur : majeur = joyeux, mineur = triste ou contrarié."
+    },
+    {
+      "status": "ok",
+      "text": "N'évite pas les touches noires : intègre-les, accueille-les."
+    },
+    {
+      "status": "ok",
+      "text": "Joue les accords lentement, en disant le nom des notes."
+    }
+  ],
+  "avoid": "Jouer la triade complète dans les graves : ça sonne lourd. À la main gauche, préfère la fondamentale seule ou en octave.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Construis un accord majeur sur chaque note, touches noires comprises."
+    },
+    {
+      "status": "ok",
+      "text": "Ear training : entraîne-toi à reconnaître majeur et mineur sur tonedear.com."
+    },
+    {
+      "status": "draft",
+      "text": "Joue C, puis remplace E par Eb : écoute le passage de joyeux à triste."
+    }
+  ],
+  "related": [
+    "accords-mineurs",
+    "intervalles",
+    "renversements"
+  ]
+}

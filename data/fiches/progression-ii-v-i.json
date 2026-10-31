@@ -1,0 +1,100 @@
+{
+  "id": "progression-ii-v-i",
+  "family": "degres-progressions",
+  "title": "Progression II–V–I",
+  "summary": "Trois accords qui préparent puis résolvent la tonique. Le cœur de beaucoup de grilles.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "F5"
+    ],
+    "groupLabel": "II–V–I en C",
+    "options": [
+      {
+        "label": "Dm7",
+        "aria": "Dm7",
+        "notes": [
+          "D4",
+          "F4",
+          "A4",
+          "C5"
+        ],
+        "sub": "ii",
+        "caption": "ii : prépare"
+      },
+      {
+        "label": "G7",
+        "aria": "G7",
+        "notes": [
+          "G4",
+          "B4",
+          "D5",
+          "F5"
+        ],
+        "sub": "V",
+        "caption": "V : tension"
+      },
+      {
+        "label": "Cmaj7",
+        "aria": "Cmaj7",
+        "notes": [
+          "C4",
+          "E4",
+          "G4",
+          "B4"
+        ],
+        "sub": "I",
+        "caption": "I : résolution"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Majeur",
+          "text": "Dm7 → G7 → Cmaj7."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Mineur enrichi",
+          "text": "m7♭5 → aug7 (ou 7♭9) → min11 : Dm7♭5 → Gaug7 → Cm11."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Raccourci",
+          "text": "le V peut sauter : II → I directement."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Travaille-le chromatiquement sur toutes les notes, jusqu'à ce que ce soit un réflexe."
+    },
+    {
+      "status": "ok",
+      "text": "Le combo m7♭5 → aug7 → min11 est un point de départ : crée tes propres combinaisons."
+    }
+  ],
+  "avoid": "Rester sur les grilles par confort. Passe vite à des morceaux réels.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "II–V–I mineur chromatique sur toutes les notes : Dm7♭5 → Gaug7 → Cm11, puis un demi-ton plus haut."
+    }
+  ],
+  "related": [
+    "degres",
+    "demi-diminue-m7b5",
+    "cadence-v-i",
+    "maj9-min9-min11"
+  ]
+}

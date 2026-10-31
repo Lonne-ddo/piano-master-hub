@@ -1,0 +1,90 @@
+{
+  "id": "cadence-v-i",
+  "family": "degres-progressions",
+  "title": "Cadence V–I",
+  "summary": "Le V7 qui va vers le I. Le mouvement le plus naturel pour conclure une phrase.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "E5"
+    ],
+    "groupLabel": "La cadence en F",
+    "options": [
+      {
+        "label": "C7",
+        "aria": "C7",
+        "notes": [
+          "C4",
+          "E4",
+          "G4",
+          "Bb4"
+        ],
+        "sub": "V7",
+        "caption": "V7 de F : tension"
+      },
+      {
+        "label": "F",
+        "aria": "F",
+        "notes": [
+          "C4",
+          "F4",
+          "A4"
+        ],
+        "sub": "I",
+        "caption": "I : E monte sur F, Bb descend sur A"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Le mouvement",
+          "text": "V7 → I : G7 → C, D7 → G, Eb7 → Ab."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Son nom",
+          "text": "la cadence parfaite."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Où",
+          "text": "très fréquente en fin de phrase ou de couplet, pas seulement en fin de morceau."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Fin de phrase, respiration, sentiment de clôture ? Teste un mouvement 5 → 1."
+    },
+    {
+      "status": "ok",
+      "text": "On ne finit pas un morceau sur un accord de 7e de dominante."
+    }
+  ],
+  "avoid": "Finir un morceau sur le V7 : la tension reste en suspens.",
+  "exercise": [
+    {
+      "status": "draft",
+      "text": "Enchaîne G7 → C, D7 → G, Eb7 → Ab."
+    },
+    {
+      "status": "draft",
+      "text": "Sur un morceau, repère chaque fin de phrase et cherche le V → I."
+    }
+  ],
+  "related": [
+    "accord-de-7e-de-dominante",
+    "degres",
+    "tension-resolution"
+  ]
+}

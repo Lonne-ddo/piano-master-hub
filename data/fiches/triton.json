@@ -1,0 +1,100 @@
+{
+  "id": "triton",
+  "family": "degres-progressions",
+  "title": "Triton",
+  "summary": "Un intervalle de 3 tons. C'est lui qui crée la tension des accords de dominante et des diminués.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "F5"
+    ],
+    "groupLabel": "Repérer le triton",
+    "options": [
+      {
+        "label": "C–F#",
+        "aria": "C–F#",
+        "notes": [
+          "C4",
+          "F#4"
+        ],
+        "caption": "3 tons : 6 demi-tons"
+      },
+      {
+        "label": "B–F",
+        "aria": "B–F",
+        "notes": [
+          "B4",
+          "F5"
+        ],
+        "caption": "Le triton de G7…"
+      },
+      {
+        "label": "G7",
+        "aria": "G7",
+        "notes": [
+          "G4",
+          "B4",
+          "D5",
+          "F5"
+        ],
+        "caption": "… caché dans l'accord"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Taille",
+          "text": "3 tons, soit 6 demi-tons."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Où",
+          "text": "1 triton dans la 7e de dominante, 2 dans le dim7."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Rôle",
+          "text": "tension, puis résolution."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Quand tu entends une dissonance forte, pense triton : ça peut être ça."
+    },
+    {
+      "status": "ok",
+      "text": "Dissonance forte → triton → dim7 ou 7e de dominante."
+    },
+    {
+      "status": "ok",
+      "text": "Utilise les tritons pour créer de la tension et de la résolution."
+    }
+  ],
+  "avoid": "Confondre triton et quarte. La quarte fait 2 tons et demi (C–F), le triton 3 tons (C–F#).",
+  "exercise": [
+    {
+      "status": "draft",
+      "text": "Trouve le triton dans G7, C7 et Bdim7."
+    },
+    {
+      "status": "draft",
+      "text": "Joue B–F, puis résous sur C–E : écoute la tension se relâcher."
+    }
+  ],
+  "related": [
+    "accord-de-7e-de-dominante",
+    "accord-diminue",
+    "tension-resolution"
+  ]
+}

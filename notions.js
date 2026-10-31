@@ -249,7 +249,7 @@ function notionsLoadResume() {
                     '<span class="resume-body">' +
                         '<span class="resume-kicker">Reprendre</span>' +
                         '<span class="resume-title">' + notionsEscape(fiche.title) + '</span>' +
-                        '<span class="resume-progress">' + notionsStepsLabel(doneCount, steps.length) + '</span>' +
+                        (steps.length ? '<span class="resume-progress">' + notionsStepsLabel(doneCount, steps.length) + '</span>' : '') +
                     '</span>' +
                     '<span style="color:var(--n-text-3);display:flex">' + NOTIONS_ICONS.chevron + '</span>' +
                 '</a>';
@@ -395,12 +395,37 @@ function notionsRenderFiche(fiche) {
                     '<p><strong>À éviter</strong> · ' + notionsEscape(fiche.avoid) + '</p>' +
                 '</div>' +
             '</div>' +
-            '<div class="fiche-foot">' +
-                '<button type="button" class="btn-primary press fu d6" id="ex-open" aria-haspopup="dialog" aria-controls="ex-sheet">' +
-                    NOTIONS_FICHE_ICONS.timer + 'Exercice · 5 min' +
-                '</button>' +
-            '</div>' +
+            // Pas d'étape validée : pas de bouton ni de panneau d'exercice
+            (steps.length ?
+                '<div class="fiche-foot">' +
+                    '<button type="button" class="btn-primary press fu d6" id="ex-open" aria-haspopup="dialog" aria-controls="ex-sheet">' +
+                        NOTIONS_FICHE_ICONS.timer + 'Exercice · 5 min' +
+                    '</button>' +
+                '</div>' : '') +
         '</article>' +
+        (steps.length ? notionsSheetHtml(steps, done, related) : '');
+    notionsApp.removeAttribute('aria-busy');
+
+    Array.prototype.forEach.call(notionsApp.querySelectorAll('.kb-options button'), function (btn) {
+        btn.addEventListener('click', function () {
+            notionsKeyboardSelect(kb, Number(btn.getAttribute('data-opt')));
+        });
+    });
+    notionsKeyboardSelect(kb, 0);
+    if (!steps.length) return;
+
+    Array.prototype.forEach.call(notionsApp.querySelectorAll('.step'), function (btn) {
+        btn.addEventListener('click', function () { notionsToggleStep(fiche.id, btn); });
+    });
+
+    document.getElementById('ex-open').addEventListener('click', notionsOpenSheet);
+    document.getElementById('ex-close').addEventListener('click', notionsCloseSheet);
+    document.getElementById('ex-backdrop').addEventListener('click', notionsCloseSheet);
+    document.addEventListener('keydown', notionsSheetKeys);
+}
+
+function notionsSheetHtml(steps, done, related) {
+    return '' +
         '<div class="backdrop" id="ex-backdrop" hidden></div>' +
         '<div class="sheet" id="ex-sheet" role="dialog" aria-modal="true" aria-labelledby="ex-title" hidden>' +
             '<div class="sheet-handle" aria-hidden="true"></div>' +
@@ -423,23 +448,6 @@ function notionsRenderFiche(fiche) {
                     '<div class="related">' + related + '</div>' +
                 '</div>' : '') +
         '</div>';
-    notionsApp.removeAttribute('aria-busy');
-
-    Array.prototype.forEach.call(notionsApp.querySelectorAll('.kb-options button'), function (btn) {
-        btn.addEventListener('click', function () {
-            notionsKeyboardSelect(kb, Number(btn.getAttribute('data-opt')));
-        });
-    });
-    notionsKeyboardSelect(kb, 0);
-
-    Array.prototype.forEach.call(notionsApp.querySelectorAll('.step'), function (btn) {
-        btn.addEventListener('click', function () { notionsToggleStep(fiche.id, btn); });
-    });
-
-    document.getElementById('ex-open').addEventListener('click', notionsOpenSheet);
-    document.getElementById('ex-close').addEventListener('click', notionsCloseSheet);
-    document.getElementById('ex-backdrop').addEventListener('click', notionsCloseSheet);
-    document.addEventListener('keydown', notionsSheetKeys);
 }
 
 function notionsToggleStep(ficheId, btn) {

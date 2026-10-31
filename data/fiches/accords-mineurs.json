@@ -1,0 +1,107 @@
+{
+  "id": "accords-mineurs",
+  "family": "accords-harmonie",
+  "title": "Accords mineurs",
+  "summary": "Trois notes : une tierce mineure, puis une tierce majeure. C'est la couleur triste.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "E5"
+    ],
+    "groupLabel": "Accord mineur",
+    "options": [
+      {
+        "label": "Cm",
+        "aria": "Cm",
+        "notes": [
+          "C4",
+          "Eb4",
+          "G4"
+        ],
+        "caption": "C Eb G : 1,5 ton + 2 tons"
+      },
+      {
+        "label": "Dm",
+        "aria": "Dm",
+        "notes": [
+          "D4",
+          "F4",
+          "A4"
+        ],
+        "caption": "D F A"
+      },
+      {
+        "label": "Em",
+        "aria": "Em",
+        "notes": [
+          "E4",
+          "G4",
+          "B4"
+        ],
+        "caption": "E G B"
+      },
+      {
+        "label": "Am",
+        "aria": "Am",
+        "notes": [
+          "A4",
+          "C5",
+          "E5"
+        ],
+        "caption": "A C E"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Construction",
+          "text": "fondamentale, puis tierce mineure (1,5 ton), puis tierce majeure (2 tons)."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Couleur",
+          "text": "triste, contrarié."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Notation",
+          "text": "m, min ou – après la lettre : Am, Amin, A–."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Joyeux ou triste ? Fie-toi d'abord à ton instinct, cherche les notes ensuite."
+    },
+    {
+      "status": "ok",
+      "text": "Pour identifier un accord à l'oreille : isole la note de basse, puis teste seulement majeur ou mineur sur cette note."
+    }
+  ],
+  "avoid": "Inverser l'ordre des tierces. En mineur, la petite tierce (1,5 ton) vient en premier.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Construis un accord mineur sur chaque note, en disant le nom des notes."
+    },
+    {
+      "status": "draft",
+      "text": "Joue C puis Cm, F puis Fm : seule la tierce bouge."
+    }
+  ],
+  "related": [
+    "accords-majeurs",
+    "majeur-ou-mineur-a-l-oreille",
+    "gammes-relatives"
+  ]
+}

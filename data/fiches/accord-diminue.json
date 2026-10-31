@@ -1,0 +1,117 @@
+{
+  "id": "accord-diminue",
+  "family": "accords-harmonie",
+  "title": "Accord diminué",
+  "summary": "Des tierces mineures empilées. Le dim7 est l'accord le plus sombre, et il va toujours quelque part.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "A5"
+    ],
+    "groupLabel": "Diminué",
+    "options": [
+      {
+        "label": "Bdim",
+        "aria": "Bdim",
+        "notes": [
+          "B4",
+          "D5",
+          "F5"
+        ],
+        "caption": "B D F : deux tierces mineures"
+      },
+      {
+        "label": "Bdim7",
+        "aria": "Bdim7",
+        "notes": [
+          "B4",
+          "D5",
+          "F5",
+          "Ab5"
+        ],
+        "caption": "B D F Ab : trois tierces mineures"
+      },
+      {
+        "label": "G#dim7",
+        "aria": "G#dim7",
+        "notes": [
+          "G#4",
+          "B4",
+          "D5",
+          "F5"
+        ],
+        "caption": "Un demi-ton sous A…"
+      },
+      {
+        "label": "→ Am",
+        "aria": "→ Am",
+        "notes": [
+          "A4",
+          "C5",
+          "E5"
+        ],
+        "caption": "… il résout sur Am"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "Construction",
+          "text": "que des tierces mineures, 3 demi-tons entre chaque note."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Couleur",
+          "text": "sombre, ténébreux. Le dim7 contient 2 tritons, d'où sa tension."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Usage",
+          "text": "un demi-ton sous l'accord cible : G#dim7 → Am."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Le mot dim te dit tout : un dim7, ce sont des tierces mineures empilées, sans exception."
+    },
+    {
+      "status": "ok",
+      "text": "Ne raccroche pas le dim7 à un degré : vois-le comme un accord qui va quelque part."
+    },
+    {
+      "status": "ok",
+      "text": "Il n'existe que 3 dim7 différents sur le clavier : les autres sont des renversements."
+    }
+  ],
+  "avoid": "Jouer F# ou A dans Bdim7. La quinte est diminuée (F), et la 7e aussi (Ab, un demi-ton sous la 7e mineure).",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Ear training : ajoute les accords diminués sur tonedear.com."
+    },
+    {
+      "status": "draft",
+      "text": "Construis un dim7 sur chaque note blanche, en ajoutant 3 demi-tons à chaque fois."
+    },
+    {
+      "status": "draft",
+      "text": "Joue G#dim7 → Am, puis C#dim7 → Dm."
+    }
+  ],
+  "related": [
+    "demi-diminue-m7b5",
+    "triton",
+    "accords-de-passage"
+  ]
+}

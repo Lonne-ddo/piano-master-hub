@@ -1,0 +1,113 @@
+{
+  "id": "maj9-min9-min11",
+  "family": "accords-harmonie",
+  "title": "maj9 / min9 / min11",
+  "summary": "Des accords de 7e avec la 9e, voire la 11e. Ils remplacent les accords simples sans casser la progression.",
+  "keyboard": {
+    "range": [
+      "C4",
+      "F5"
+    ],
+    "groupLabel": "Accord enrichi",
+    "options": [
+      {
+        "label": "Cmaj9",
+        "aria": "Cmaj9",
+        "notes": [
+          "C4",
+          "E4",
+          "G4",
+          "B4",
+          "D5"
+        ],
+        "caption": "maj7 + 9e"
+      },
+      {
+        "label": "Cm9",
+        "aria": "Cm9",
+        "notes": [
+          "C4",
+          "Eb4",
+          "G4",
+          "Bb4",
+          "D5"
+        ],
+        "caption": "min7 + 9e"
+      },
+      {
+        "label": "Cm11",
+        "aria": "Cm11",
+        "notes": [
+          "C4",
+          "Eb4",
+          "G4",
+          "Bb4",
+          "D5",
+          "F5"
+        ],
+        "caption": "min7 + 9e + 11e"
+      }
+    ]
+  },
+  "essentials": [
+    {
+      "parts": [
+        {
+          "term": "maj9 · min9",
+          "text": "maj7 + 9e, min7 + 9e."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "min11",
+          "text": "triade mineure + 7e mineure + 9e + 11e. La 7e est toujours mineure."
+        }
+      ]
+    },
+    {
+      "parts": [
+        {
+          "term": "Usage",
+          "text": "ils remplacent un majeur ou un mineur simple sans trop de tension."
+        }
+      ]
+    }
+  ],
+  "tips": [
+    {
+      "status": "ok",
+      "text": "Astuce min11 : main gauche = triade mineure, main droite = accord majeur un ton en dessous. Bm11 = Bm à gauche + A à droite."
+    },
+    {
+      "status": "ok",
+      "text": "Dès qu'un accord mineur apparaît, remplace-le par un min9 ou un min11."
+    },
+    {
+      "status": "ok",
+      "text": "Un min11 difficile à plaquer ? Arpège-le avec la pédale."
+    }
+  ],
+  "avoid": "Jouer un min9 à la place d'un min11 : la 11e manque. Un « 11 » implique la 7e et la 9e.",
+  "exercise": [
+    {
+      "status": "ok",
+      "text": "Joue maj9, min9 et min11 sur toutes les notes, en écoutant la couleur générale."
+    },
+    {
+      "status": "ok",
+      "text": "Sur chaque min11, nomme note par note la 7e, la 9e et la 11e."
+    },
+    {
+      "status": "ok",
+      "text": "Sur une progression, alterne mineur simple un tour et min11 le tour suivant."
+    }
+  ],
+  "related": [
+    "accord-min7",
+    "accord-maj7",
+    "accords-enrichis-add9-9-11-13",
+    "voicing"
+  ]
+}
