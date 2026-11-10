@@ -59,8 +59,9 @@ const PROTECTED_FIELDS = [
   'canaux',
   'email',
   'archived',
-  'roadmap',
+  'roadmap',      // parcours retiré : donnée héritée conservée, ignorée
   'nb_seances',
+  'accompagnement',
   '_patchedAt',
 ];
 
@@ -164,11 +165,12 @@ async function callLLM(prompt, env, opts) {
   }
 }
 
-// extractJSON, mergeStats, parseIsoDate, labelFr, computeProgressionPct
+// extractJSON, parseIsoDate, stats élèves
 // sont importés de _lib/ (C6+D2 dedup avec sync.js).
 import { extractJSON } from '../_lib/json-extract.js';
-import { mergeStats, parseIsoDate } from '../_lib/eleves-stats.js';
-import { applySeanceStats } from '../_lib/roadmap.js';
+import {
+  parseIsoDate, computeEleveStats, loadEleveStats, ACCOMPAGNEMENTS,
+} from '../_lib/eleves-stats.js';
 
 // ─── Sanitization post-LLM des années (anti-hallucination) ───────
 // Le LLM peut produire "08/03/2024" sur un doc qui ne dit que "08/03". On corrige
@@ -331,25 +333,27 @@ export async function onRequestGet({ params, request, env }) {
   const cacheKey = `eleve:${id}`;
   const cachedRaw = await env.MASTERHUB_STUDENTS.get(cacheKey, { type: 'text' });
   const cached = cachedRaw ? JSON.parse(cachedRaw) : null;
+  // Stats dérivées des séances publiées + accompagnement (jamais figées en KV)
+  const withStats = async (rec) => ({ ...rec, stats: await loadEleveStats(env, id, rec) });
 
   // 0. Pas de Google Doc attaché → on retourne le cache KV brut.
   // Cas typique : élève créé via POST /api/eleves sans doc_id. L'admin pourra
   // attacher un Doc plus tard via PATCH (UI inline 'Ajouter un Google Doc').
   // Sans cette branche, le code essaierait fetch un Doc inexistant + crash.
   if (!student.docId) {
-    if (cached) return jsonResponse({ ...cached, source: 'no_doc' });
-    return jsonResponse({
+    if (cached) return jsonResponse(await withStats({ ...cached, source: 'no_doc' }));
+    return jsonResponse(await withStats({
       id,
       nom: student.nom,
       programme: student.programme,
       statut: student.statut,
       source: 'empty',
-    });
+    }));
   }
 
   // 1. Cache frais (TTL KV géré nativement)
   if (cached && !forceSync) {
-    return jsonResponse({ ...cached, source: 'fresh' });
+    return jsonResponse(await withStats({ ...cached, source: 'fresh' }));
   }
 
   // 2. Fetch Google Doc
@@ -360,7 +364,7 @@ export async function onRequestGet({ params, request, env }) {
     docText = await docRes.text();
   } catch (e) {
     if (cached) {
-      return jsonResponse({ ...cached, source: 'stale', error: `Doc fetch failed: ${e.message}` });
+      return jsonResponse(await withStats({ ...cached, source: 'stale', error: `Doc fetch failed: ${e.message}` }));
     }
     return jsonResponse({
       error: "Impossible d'accéder au Google Doc. Vérifie que le partage est activé (lecture — quiconque avec le lien).",
@@ -374,7 +378,7 @@ export async function onRequestGet({ params, request, env }) {
     parsed = await parseDoc(docText, student, env);
   } catch (e) {
     if (cached) {
-      return jsonResponse({ ...cached, source: 'stale', error: 'LLM unavailable', details: e.message });
+      return jsonResponse(await withStats({ ...cached, source: 'stale', error: 'LLM unavailable', details: e.message }));
     }
     return jsonResponse({
       error: 'All LLM providers failed and no cache available',
@@ -400,16 +404,18 @@ export async function onRequestGet({ params, request, env }) {
     console.error('[eleves/[id]] KV put failed:', e?.message || e, 'key:', cacheKey);
   }
 
-  return jsonResponse({ ...parsed, source: 'fresh' });
+  return jsonResponse(await withStats({ ...parsed, source: 'fresh' }));
 }
 
 // ─── PATCH /api/eleves/{id} ──────────────────────────────────────
-// Body : { stats_override: { date_debut?: "YYYY-MM-DD"|null, date_fin?: "YYYY-MM-DD"|null, total_cours?: int|null } }
+// Body : { stats_override?: { date_debut?: "YYYY-MM-DD"|null, date_fin?: "YYYY-MM-DD"|null, total_cours?: int|null },
+//         accompagnement?: 'avec_fin' | 'sans_fin' }
 // - Champs présents dans body.stats_override sont mergés avec l'override existant.
 // - Valeur null = supprime le champ d'override (revient au calcul auto/défaut).
 // - date_debut/date_fin : ISO YYYY-MM-DD uniquement.
 // - total_cours : entier 1..100.
-// - Recompute `stats` via mergeStats(stats_auto_raw, nouvel override).
+// - accompagnement : avec_fin (défaut, fin = début + 8 semaines) | sans_fin.
+// - `stats` toujours recalculées (séances publiées + override + accompagnement).
 const ALLOWED_OVERRIDE_FIELDS = ['date_debut', 'date_fin', 'total_cours'];
 
 export async function onRequestPatch({ params, request, env }) {
@@ -470,11 +476,14 @@ export async function onRequestPatch({ params, request, env }) {
     }
 
     updated.stats_override = newOverride;
-    const autoRaw = existing.stats_auto_raw || { nb_cours: 0, date_debut: null, date_fin_prevue: null };
-    const stats = applySeanceStats(mergeStats(autoRaw, newOverride), existing.nb_seances);
-    updated.stats = stats;
-    updated.sessionCount = stats.nb_cours;
-    updated.progression = stats.progression_pct;
+  }
+
+  // ── Handle accompagnement (avec_fin | sans_fin) ─────────────────
+  if (body.accompagnement !== undefined) {
+    if (!ACCOMPAGNEMENTS.includes(body.accompagnement)) {
+      return jsonResponse({ error: 'accompagnement invalide (avec_fin | sans_fin)' }, 400);
+    }
+    updated.accompagnement = body.accompagnement;
   }
 
   // ── Handle doc_id patch (admin édite l'URL Google Doc) ──────
@@ -618,6 +627,16 @@ export async function onRequestPatch({ params, request, env }) {
     const { manualEdit, _editedAt, ...rest } = updated.derniere_seance;
     updated.derniere_seance = rest;
   }
+
+  // Stats recalculées depuis l'historique des séances publiées
+  let history = [];
+  try {
+    const h = await env.MASTERHUB_STUDENTS.get(`seances:${id}`, { type: 'json' });
+    if (Array.isArray(h)) history = h;
+  } catch { /* stats sans historique */ }
+  updated.stats = computeEleveStats(updated, history);
+  updated.sessionCount = updated.stats.nb_cours;
+  updated.progression = updated.stats.progression_pct;
 
   updated._patchedAt = new Date().toISOString();
   // Pas de TTL : un override saisi manuellement doit persister jusqu'au prochain reset explicite.

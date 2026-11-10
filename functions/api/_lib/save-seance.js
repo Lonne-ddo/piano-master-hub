@@ -1,28 +1,25 @@
 // ─── Enregistrement d'une séance (logique partagée) ──────────────
 // Utilisé par POST /api/eleves/:slug/seance (formulaire post-séance admin).
 //
-// Entrée : { n?, date, titre, resume[], devoirs[], livrable?, statut?, note_coach? }
-//   n       : numéro de la séance du parcours (1..8, défaut = séance courante)
-//   statut  : 'faite' (défaut) | 'en_cours' — faite → la suivante passe en cours
+// Entrée : { date, titre, resume[], devoirs[], livrable?, note_coach? }
+//   n : calculé ici = nombre de séances déjà enregistrées + 1 (un `n`
+//       envoyé par le client est ignoré).
 //
 // Effets :
 //   - seances:<slug>  : la séance est AJOUTÉE à l'historique (jamais écrasé)
-//   - roadmap         : statut/date (+ livrable, note coach si fournis) de la séance n
+//   - roadmap         : jamais touchée (parcours retiré ; données KV ignorées)
 //   - derniere_seance : la plus récente de l'historique, manualEdit:true
-//   - stats.nb_cours  : nombre total de séances enregistrées (sans plafond)
+//   - stats           : recalculées depuis l'historique (cf. _lib/eleves-stats.js)
 
-import { parseIsoDate } from './eleves-stats.js';
-import {
-  ROADMAP_SIZE, ROADMAP_LIMITS, ensureRoadmap, normalizeRoadmap, withRoadmap,
-} from './roadmap.js';
+import { parseIsoDate, computeEleveStats } from './eleves-stats.js';
 
 export const SEANCE_LIMITS = {
   titre: 80,
   item: 500,       // caractères par puce (résumés issus du transcripteur)
   items: 30,       // puces max par liste
   history: 200,    // séances conservées dans seances:<slug>
-  livrable: ROADMAP_LIMITS.livrable,
-  note_coach: ROADMAP_LIMITS.note_coach,
+  livrable: 200,
+  note_coach: 1000,
 };
 
 export const SLUG_RE = /^[a-z0-9-]{1,40}$/;
@@ -48,7 +45,7 @@ export async function readSeances(env, slug) {
 }
 
 // Valide et enregistre une séance.
-// Retourne { ok: true, entry, roadmap, data, seances }
+// Retourne { ok: true, entry, data, seances }
 //       ou { ok: false, status, error, detail? }.
 export async function saveSeance(env, slug, body) {
   slug = String(slug || '').toLowerCase();
@@ -65,33 +62,21 @@ export async function saveSeance(env, slug, body) {
   const resume = cleanList(body.resume ?? []);
   const devoirs = cleanList(body.devoirs ?? []);
   if (!resume || !devoirs) return { ok: false, status: 400, error: 'resume et devoirs : listes attendues' };
-  const statut = body.statut === 'en_cours' ? 'en_cours' : 'faite';
   const livrable = cleanText(body.livrable, SEANCE_LIMITS.livrable);
   const noteCoach = cleanText(body.note_coach, SEANCE_LIMITS.note_coach);
 
   const record = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`, { type: 'json' });
   if (!record) return { ok: false, status: 404, error: 'Élève introuvable' };
 
-  const roadmap = ensureRoadmap(record);
-  const n = body.n === undefined || body.n === null ? roadmap.seance_courante : Number(body.n);
-  if (!Number.isInteger(n) || n < 1 || n > ROADMAP_SIZE) {
-    return { ok: false, status: 400, error: `n invalide (1..${ROADMAP_SIZE})` };
-  }
-
-  // ── Roadmap : séance n ──
-  const seance = roadmap.seances[n - 1];
-  seance.statut = statut;
-  seance.date = date;
-  if (livrable) seance.livrable = livrable;
-  if (noteCoach) seance.note_coach = noteCoach;
-  const nextRoadmap = normalizeRoadmap(roadmap);
-
-  // ── Historique : ajout, jamais d'écrasement ──
+  // ── Numéro : séances déjà enregistrées + 1 ──
   const historyKey = `seances:${slug}`;
   let history = await readSeances(env, slug);
+  const n = history.length + 1;
+
+  // ── Historique : ajout, jamais d'écrasement ──
   const entry = {
     id: crypto.randomUUID(),
-    n, date, titre, resume, devoirs, livrable, statut,
+    n, date, titre, resume, devoirs, livrable,
     note_coach: noteCoach,
     createdAt: new Date().toISOString(),
   };
@@ -107,7 +92,14 @@ export async function saveSeance(env, slug, body) {
   const existingDs = record.derniere_seance;
   const keepDocSeance = existingDs && existingDs.manualEdit !== true
     && typeof existingDs.date === 'string' && existingDs.date > latest.date;
-  const updated = { ...withRoadmap(record, nextRoadmap, history.length), _patchedAt: new Date().toISOString() };
+  const stats = computeEleveStats(record, history);
+  const updated = {
+    ...record,
+    stats,
+    nb_seances: history.length,
+    sessionCount: history.length,
+    _patchedAt: new Date().toISOString(),
+  };
   if (!keepDocSeance) {
     updated.derniere_seance = {
       date: latest.date,
@@ -126,5 +118,5 @@ export async function saveSeance(env, slug, body) {
     return { ok: false, status: 500, error: 'kv_put_failed', detail: e?.message || '' };
   }
 
-  return { ok: true, entry, roadmap: nextRoadmap, data: updated, seances: history };
+  return { ok: true, entry, data: updated, seances: history };
 }

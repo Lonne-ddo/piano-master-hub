@@ -1,11 +1,25 @@
-// ─── Helpers stats élèves partagés (eleves/[id].js + roadmap.js) ─
-// C6 dedup : avant ce module, mergeStats + parseIsoDate + labelFr + computeProgressionPct
-// + MONTHS_LONG_FR étaient dupliqués à l'identique entre les 2 fichiers.
+// ─── Stats élèves (eleves/[id].js, eleves/[slug]/public.js, save-seance.js) ─
+// Les stats sont DÉRIVÉES de l'historique des séances publiées
+// (seances:<slug>) et du type d'accompagnement de l'élève :
+//   - nb_seances / nb_cours : nombre de séances publiées
+//   - avec_fin (défaut) : date_debut = date de la 1re séance publiée,
+//                         date_fin   = date_debut + 8 semaines,
+//                         progression_pct = temps écoulé entre les deux
+//   - sans_fin          : date_debut seule, pas de date de fin ni de progression
+// Les surcharges manuelles (record.stats_override.date_debut / date_fin)
+// restent prioritaires sur le calcul automatique.
 
 const MONTHS_LONG_FR = [
   'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
   'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre',
 ];
+
+export const ACCOMPAGNEMENTS = ['avec_fin', 'sans_fin'];
+export const DUREE_AVEC_FIN_JOURS = 8 * 7;
+
+export function normalizeAccompagnement(v) {
+  return v === 'sans_fin' ? 'sans_fin' : 'avec_fin';
+}
 
 export function parseIsoDate(s) {
   if (!s) return null;
@@ -15,9 +29,20 @@ export function parseIsoDate(s) {
   return isNaN(d) ? null : d;
 }
 
+function toIso(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+export function addDaysIso(iso, days) {
+  const d = parseIsoDate(iso);
+  if (!d) return null;
+  d.setDate(d.getDate() + days);
+  return toIso(d);
+}
+
 export function labelFr(iso) {
   const d = parseIsoDate(iso);
-  if (!d) return '—';
+  if (!d) return null;
   return `${d.getDate()} ${MONTHS_LONG_FR[d.getMonth()]} ${d.getFullYear()}`;
 }
 
@@ -31,29 +56,53 @@ export function computeProgressionPct(debutIso, finIso) {
   return Math.min(100, Math.max(0, Math.round((elapsed / total) * 100)));
 }
 
-// Admin (override) gagne TOUJOURS sur auto/LLM si défini.
-// override = { date_debut?: iso, date_fin?: iso, total_cours?: int }
-export function mergeStats(autoRaw, override) {
-  const auto = autoRaw || {};
-  const ov = override || {};
-  const isSet = (v) => v !== undefined && v !== null && v !== '';
+// Date de la 1re séance publiée (la plus ancienne valide) ou null.
+function firstSeanceDate(history) {
+  let first = null;
+  for (const s of Array.isArray(history) ? history : []) {
+    if (s && parseIsoDate(s.date) && (first === null || s.date < first)) first = s.date;
+  }
+  return first;
+}
 
-  const dateDebut = isSet(ov.date_debut) ? ov.date_debut : (auto.date_debut || null);
-  const dateFin   = isSet(ov.date_fin)   ? ov.date_fin   : (auto.date_fin_prevue || auto.date_fin || null);
-  const totalCours = isSet(ov.total_cours) ? Number(ov.total_cours) : 8;
+// Stats d'un élève à partir de son record et de son historique de séances.
+export function computeEleveStats(record, history) {
+  const ov = (record && record.stats_override) || {};
+  const isSet = (v) => v !== undefined && v !== null && v !== '';
+  const accompagnement = normalizeAccompagnement(record && record.accompagnement);
+  const nb = Array.isArray(history) ? history.length : 0;
+
+  const dateDebut = isSet(ov.date_debut) ? ov.date_debut : firstSeanceDate(history);
+  let dateFin = null;
+  if (accompagnement === 'avec_fin') {
+    dateFin = isSet(ov.date_fin) ? ov.date_fin : (dateDebut ? addDaysIso(dateDebut, DUREE_AVEC_FIN_JOURS) : null);
+  }
 
   return {
-    nb_cours: auto.nb_cours || 0,
-    total_cours: totalCours,
-    date_debut: dateDebut,
+    accompagnement,
+    nb_seances: nb,
+    nb_cours: nb,
+    total_cours: isSet(ov.total_cours) ? Number(ov.total_cours) : 8,
+    date_debut: dateDebut || null,
     date_debut_label: labelFr(dateDebut),
     date_fin: dateFin,
     date_fin_label: labelFr(dateFin),
-    progression_pct: computeProgressionPct(dateDebut, dateFin),
+    progression_pct: accompagnement === 'avec_fin' ? computeProgressionPct(dateDebut, dateFin) : null,
     override_active: {
       date_debut:  isSet(ov.date_debut),
-      date_fin:    isSet(ov.date_fin),
+      date_fin:    accompagnement === 'avec_fin' && isSet(ov.date_fin),
       total_cours: isSet(ov.total_cours),
     },
   };
+}
+
+// Lit seances:<slug> puis calcule les stats (la progression dépend du jour :
+// elle est toujours recalculée à la lecture, jamais lue depuis le KV).
+export async function loadEleveStats(env, slug, record) {
+  let history = [];
+  try {
+    const h = await env.MASTERHUB_STUDENTS.get(`seances:${slug}`, { type: 'json' });
+    if (Array.isArray(h)) history = h;
+  } catch { /* stats sans historique */ }
+  return computeEleveStats(record, history);
 }

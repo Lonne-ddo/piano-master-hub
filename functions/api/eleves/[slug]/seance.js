@@ -1,6 +1,7 @@
 // ─── POST /api/eleves/:slug/seance ───────────────────────────────
 // Formulaire post-séance (admin uniquement, cookie mh_admin_pw).
-// Body : { n?, date, titre, resume[], devoirs[], livrable?, statut?, note_coach? }
+// Body : { date, titre, resume[], devoirs[], livrable?, note_coach? }
+// Numéro de séance calculé côté serveur (séances déjà publiées + 1).
 // Validation et enregistrement : _lib/save-seance.js.
 
 import { requireAdminPassword } from '../../_lib/session.js';
@@ -39,5 +40,5 @@ export async function onRequestPost({ params, request, env }) {
     if (res.detail !== undefined) err.detail = res.detail;
     return jsonResponse(err, res.status);
   }
-  return jsonResponse({ ok: true, entry: res.entry, roadmap: res.roadmap, data: res.data, seances: res.seances });
+  return jsonResponse({ ok: true, entry: res.entry, data: res.data, seances: res.seances });
 }

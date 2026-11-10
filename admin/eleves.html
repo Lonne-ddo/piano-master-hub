@@ -402,6 +402,13 @@
       flex-direction: column;
       gap: 2px;
     }
+    .acc-select {
+      min-height: 44px; padding: 6px 10px;
+      background: var(--bg2); color: var(--text1);
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 16px; font-family: inherit;
+    }
+    .acc-select:focus { outline: none; border-color: var(--v); }
     .date-label {
       font-size: 10.5px;
       text-transform: uppercase;
@@ -534,50 +541,16 @@
     }
     .ds-quick-btn:hover { background: var(--v-dim); color: var(--v); border-color: var(--v); }
 
-    /* ── Carte Parcours (roadmap 8 séances) ─────────────────── */
-    .roadmap-card { margin-bottom: 18px; }
-    .rm-label {
+    /* ── Carte Séances publiées ───────────────────────────── */
+    .seances-card { margin-bottom: 18px; }
+    .sc-label {
       text-transform: none; letter-spacing: 0; font-weight: 500;
       color: var(--text2); font-size: 12px;
     }
-    .rm-head-actions { margin-left: auto; display: flex; gap: 6px; }
-    .rm-list {
-      list-style: none;
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-    }
-    @media (max-width: 900px) { .rm-list { grid-template-columns: repeat(2, 1fr); } }
-    .rm-item {
-      padding: 10px 12px; border-radius: 8px;
-      background: var(--bg2); border: 1px solid var(--border);
-      display: flex; flex-direction: column; gap: 3px; min-width: 0;
-    }
-    .rm-item.is-faite { border-color: rgba(94,203,139,0.35); }
-    .rm-item.is-current { border-color: var(--v); background: var(--v-dim); }
-    .rm-item-top {
-      display: flex; align-items: center; gap: 6px;
-      font-size: 10.5px; color: var(--text3); font-family: 'DM Mono', monospace;
-    }
-    .rm-item.is-faite .rm-item-top { color: var(--green); }
-    .rm-item.is-current .rm-item-top { color: var(--v); }
-    .rm-item-title { font-size: 13px; color: var(--text1); line-height: 1.3; }
-    .rm-current { font-size: 13px; color: var(--text2); line-height: 1.5; }
-    .rm-current strong { color: var(--text1); font-weight: 600; }
-    .rm-history { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-    .rm-history li { font-size: 12.5px; color: var(--text2); }
-    .rm-hdate { font-family: 'DM Mono', monospace; color: var(--text3); margin-right: 6px; }
-    .rm-edit-row {
-      border: 1px solid var(--border); border-radius: 10px;
-      padding: 12px; margin: 0;
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-    }
-    .rm-edit-row legend {
-      font-size: 11px; color: var(--v); font-family: 'DM Mono', monospace; padding: 0 6px;
-    }
-    .rm-edit-row .full { grid-column: 1 / -1; }
-    .quick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    @media (max-width: 600px) {
-      .rm-edit-row, .quick-row { grid-template-columns: 1fr; }
-    }
+    .sc-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .sc-list li { font-size: 13px; color: var(--text2); line-height: 1.4; }
+    .sc-n { font-family: 'DM Mono', monospace; color: var(--v); margin-right: 6px; }
+    .sc-date { font-family: 'DM Mono', monospace; color: var(--text3); margin-right: 6px; }
     .prefill-box {
       border: 1px dashed var(--border); border-radius: 8px;
       padding: 10px; display: flex; flex-direction: column; gap: 8px;
@@ -603,8 +576,41 @@
       min-height: 44px; cursor: pointer; color: var(--text2);
     }
     .fiche-mismatch input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--red); }
+    #quickUpdateForm { display: flex; flex-direction: column; gap: 12px; }
+    .quick-actions .hbtn { min-height: 44px; }
+    .fiche-preview {
+      border: 1px solid var(--border); border-radius: 10px;
+      background: var(--bg2); padding: 14px 16px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .fiche-preview[hidden] { display: none; }
+    .fp-label {
+      font-size: 10.5px; font-weight: 600; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--text3);
+    }
+    .fp-kicker { font-size: 12px; font-weight: 600; color: var(--v); }
+    .fp-title {
+      font-family: var(--serif); font-size: 21px; font-weight: 500;
+      color: var(--text1); line-height: 1.25;
+    }
+    .fp-missing { color: var(--red); font-family: inherit; font-size: 14px; }
+    .fp-section { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+    .fp-text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text2); }
+    .fp-empty { margin: 0; font-size: 13px; color: var(--text3); }
+    .fp-private {
+      border-top: 1px dashed var(--border); padding-top: 8px; margin-top: 8px;
+    }
+    .manual-box {
+      border: 1px dashed var(--border); border-radius: 8px; padding: 0 12px;
+    }
+    .manual-box > summary {
+      min-height: 44px; display: flex; align-items: center; gap: 6px;
+      cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text2);
+    }
+    .manual-box[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+    .manual-fields { display: flex; flex-direction: column; gap: 12px; padding-bottom: 12px; }
 
-    /* ── Modal Post-séance / Parcours ─────────────────────── */
+    /* ── Modal Post-séance ─────────────────────────────────── */
     .quick-modal-overlay {
       position: fixed; inset: 0;
       background: rgba(0,0,0,0.7);
@@ -662,7 +668,6 @@
     .quick-field input:focus,
     .quick-field textarea:focus,
     .quick-field select:focus { border-color: var(--v); }
-    .quick-modal.wide { max-width: 760px; }
     .quick-field textarea { resize: vertical; min-height: 80px; }
     .quick-field .quick-hint {
       font-size: 11px; color: var(--text3);
@@ -1021,94 +1026,68 @@
   </div>
 </div>
 
-<!-- ═══ MODAL : Post-séance (historique + parcours) ═══════════════ -->
+<!-- ═══ MODAL : Post-séance (coller une fiche → aperçu → publier) ═══ -->
 <div class="quick-modal-overlay" id="quickUpdateOverlay" style="display:none">
   <div class="quick-modal">
-    <h2>Post-s&eacute;ance</h2>
-    <div class="quick-sub" id="quickUpdateSub">Enregistre la s&eacute;ance : elle s'ajoute &agrave; l'historique, met &agrave; jour le parcours et s'affiche dans l'espace de l'&eacute;l&egrave;ve.</div>
-    <div class="prefill-box">
-      <button type="button" class="hbtn" onclick="openPrefill()">&#128229; Pr&eacute;-remplir depuis une transcription</button>
-      <div id="prefillList" class="quick-field" style="display:none">
-        <label for="prefillSelect">Transcriptions r&eacute;centes (mode s&eacute;ance)</label>
-        <select id="prefillSelect"></select>
-        <div class="quick-actions">
-          <button type="button" class="hbtn primary" onclick="applyPrefill()">Utiliser</button>
-        </div>
-      </div>
-    </div>
-    <div class="prefill-box">
-      <button type="button" class="hbtn" onclick="toggleFiche()">&#128203; Coller une fiche</button>
-      <div id="ficheBox" class="quick-field" style="display:none">
-        <label for="ficheInput">Fiche de s&eacute;ance <span class="quick-hint">(&Eacute;L&Egrave;VE, DATE, TITRE, R&Eacute;SUM&Eacute;, DEVOIRS, LIVRABLE, NOTE COACH)</span></label>
-        <textarea id="ficheInput" class="fiche-input" rows="8" spellcheck="false" placeholder="&Eacute;L&Egrave;VE: Pr&eacute;nom&#10;DATE: 2026-11-10&#10;TITRE: voicings ii-V-I&#10;R&Eacute;SUM&Eacute;:&#10;- ...&#10;DEVOIRS:&#10;- ...&#10;LIVRABLE:&#10;NOTE COACH:&#10;- ..."></textarea>
-        <div class="quick-actions">
-          <button type="button" class="hbtn primary" onclick="applyFiche()">Remplir</button>
-        </div>
-        <div id="ficheReport" class="fiche-report" role="status" aria-live="polite"></div>
-      </div>
-    </div>
+    <h2 id="quickUpdateTitle">Publier une s&eacute;ance</h2>
+    <div class="quick-sub" id="quickUpdateSub">Colle la fiche de s&eacute;ance, v&eacute;rifie l'aper&ccedil;u, puis publie : elle s'affiche dans l'espace de l'&eacute;l&egrave;ve.</div>
     <form id="quickUpdateForm" autocomplete="off">
-      <div class="quick-row">
-        <div class="quick-field">
-          <label for="quickN">S&eacute;ance du parcours *</label>
-          <select id="quickN" onchange="onQuickNChange()"></select>
-        </div>
-        <div class="quick-field">
-          <label for="quickStatut">Statut *</label>
-          <select id="quickStatut">
-            <option value="faite">Faite (la suivante passe en cours)</option>
-            <option value="en_cours">En cours</option>
-          </select>
-        </div>
-      </div>
       <div class="quick-field">
-        <label for="quickDate">Date de la s&eacute;ance *</label>
-        <input type="date" id="quickDate" required />
+        <label for="ficheInput">Fiche de s&eacute;ance <span class="quick-hint">(&Eacute;L&Egrave;VE, DATE, TITRE, R&Eacute;SUM&Eacute;, DEVOIRS, LIVRABLE, NOTE COACH)</span></label>
+        <textarea id="ficheInput" class="fiche-input" rows="7" spellcheck="false" placeholder="&Eacute;L&Egrave;VE: Pr&eacute;nom&#10;DATE: 2026-11-10&#10;TITRE: voicings ii-V-I&#10;R&Eacute;SUM&Eacute;:&#10;- ...&#10;DEVOIRS:&#10;- ...&#10;LIVRABLE:&#10;NOTE COACH:&#10;- ..."></textarea>
       </div>
-      <div class="quick-field">
-        <label for="quickTitre">Titre court * <span class="quick-hint">(ex : "accords enrichis")</span></label>
-        <input type="text" id="quickTitre" maxlength="80" required placeholder="ex : voicings ii-V-I" />
-      </div>
-      <div class="quick-field">
-        <label for="quickResume">R&eacute;sum&eacute; du cours <span class="quick-hint">(1 par ligne)</span></label>
-        <textarea id="quickResume" rows="5" placeholder="Notion d'accords enrichis (ajouts 9, 11, 13)&#10;Voicings &agrave; 4 sons en main gauche&#10;..."></textarea>
-      </div>
-      <div class="quick-field">
-        <label for="quickDevoirs">Devoirs prochaine s&eacute;ance <span class="quick-hint">(1 par ligne)</span></label>
-        <textarea id="quickDevoirs" rows="4" placeholder="Travailler Cmaj7 main droite&#10;R&eacute;p&eacute;ter cadence ii-V-I en Do&#10;..."></textarea>
-      </div>
-      <div class="quick-field">
-        <label for="quickLivrable">Livrable <span class="quick-hint">(visible par l'&eacute;l&egrave;ve dans son parcours)</span></label>
-        <input type="text" id="quickLivrable" maxlength="200" placeholder="ex : audio de la progression en 3 tonalit&eacute;s" />
-      </div>
-      <div class="quick-field">
-        <label for="quickNote">Note coach <span class="quick-hint">(priv&eacute;e, jamais montr&eacute;e &agrave; l'&eacute;l&egrave;ve)</span></label>
-        <textarea id="quickNote" rows="3" maxlength="1000"></textarea>
-      </div>
+      <div id="ficheReport" class="fiche-report" role="status" aria-live="polite"></div>
       <div class="fiche-mismatch" id="ficheMismatch" style="display:none" role="alert">
         <div id="ficheMismatchText"></div>
-        <label><input type="checkbox" id="ficheMismatchOk" onchange="onFicheMismatchOk()" /> Je confirme : enregistrer quand m&ecirc;me pour cet &eacute;l&egrave;ve</label>
+        <label><input type="checkbox" id="ficheMismatchOk" onchange="onFicheMismatchOk()" /> Je confirme : publier quand m&ecirc;me pour cet &eacute;l&egrave;ve</label>
       </div>
+
+      <section class="fiche-preview" id="fichePreview" aria-label="Aper&ccedil;u de la s&eacute;ance" hidden></section>
+
+      <details class="manual-box" id="manualBox">
+        <summary>Saisir &agrave; la main <span class="quick-hint">(ou corriger la fiche)</span></summary>
+        <div class="manual-fields">
+          <div class="prefill-box">
+            <button type="button" class="hbtn" onclick="openPrefill()">&#128229; Pr&eacute;-remplir depuis une transcription</button>
+            <div id="prefillList" class="quick-field" style="display:none">
+              <label for="prefillSelect">Transcriptions r&eacute;centes (mode s&eacute;ance)</label>
+              <select id="prefillSelect"></select>
+              <div class="quick-actions">
+                <button type="button" class="hbtn primary" onclick="applyPrefill()">Utiliser</button>
+              </div>
+            </div>
+          </div>
+          <div class="quick-field">
+            <label for="quickDate">Date de la s&eacute;ance *</label>
+            <input type="date" id="quickDate" required />
+          </div>
+          <div class="quick-field">
+            <label for="quickTitre">Titre court * <span class="quick-hint">(ex : "accords enrichis")</span></label>
+            <input type="text" id="quickTitre" maxlength="80" placeholder="ex : voicings ii-V-I" />
+          </div>
+          <div class="quick-field">
+            <label for="quickResume">R&eacute;sum&eacute; du cours <span class="quick-hint">(1 par ligne)</span></label>
+            <textarea id="quickResume" rows="5" placeholder="Notion d'accords enrichis (ajouts 9, 11, 13)&#10;Voicings &agrave; 4 sons en main gauche&#10;..."></textarea>
+          </div>
+          <div class="quick-field">
+            <label for="quickDevoirs">Devoirs prochaine s&eacute;ance <span class="quick-hint">(1 par ligne)</span></label>
+            <textarea id="quickDevoirs" rows="4" placeholder="Travailler Cmaj7 main droite&#10;R&eacute;p&eacute;ter cadence ii-V-I en Do&#10;..."></textarea>
+          </div>
+          <div class="quick-field">
+            <label for="quickLivrable">Livrable <span class="quick-hint">(visible par l'&eacute;l&egrave;ve)</span></label>
+            <input type="text" id="quickLivrable" maxlength="200" placeholder="ex : audio de la progression en 3 tonalit&eacute;s" />
+          </div>
+          <div class="quick-field">
+            <label for="quickNote">Note coach <span class="quick-hint">(priv&eacute;e, jamais montr&eacute;e &agrave; l'&eacute;l&egrave;ve)</span></label>
+            <textarea id="quickNote" rows="3" maxlength="1000"></textarea>
+          </div>
+        </div>
+      </details>
+
       <div class="quick-error" id="quickUpdateError"></div>
       <div class="quick-actions">
         <button type="button" class="hbtn" onclick="closeQuickUpdateModal()">Annuler</button>
-        <button type="submit" class="hbtn primary" id="quickUpdateSubmit">Enregistrer</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ═══ MODAL : Parcours (8 séances de l'élève) ═══════════════════ -->
-<div class="quick-modal-overlay" id="roadmapOverlay" style="display:none">
-  <div class="quick-modal wide">
-    <h2>Parcours</h2>
-    <div class="quick-sub" id="roadmapSub">Les modifications ne concernent que cet &eacute;l&egrave;ve : le parcours mod&egrave;le n'est jamais modifi&eacute;.</div>
-    <form id="roadmapForm" autocomplete="off">
-      <div id="rmSeances" style="display:flex;flex-direction:column;gap:10px;"></div>
-      <div class="quick-error" id="roadmapError"></div>
-      <div class="quick-actions">
-        <button type="button" class="hbtn" onclick="closeRoadmapModal()">Annuler</button>
-        <button type="submit" class="hbtn primary" id="roadmapSubmit">Enregistrer</button>
+        <button type="submit" class="hbtn primary" id="quickUpdateSubmit" disabled>Publier</button>
       </div>
     </form>
   </div>
@@ -1257,17 +1236,18 @@ function renderProfile(s) {
   const devoirsRecurrents = lastDevoirs.length > 0 ? lastDevoirs : ['Tonedear (ear training)'];
   const repertoireActif = repertoire.filter(r => r.statut === 'en-cours');
 
-  // Progression : priorité au stats.progression_pct (sync.js v3+), fallback aux anciens champs
+  // Stats calculées côté serveur : séances publiées + accompagnement
+  // (avec_fin : fin = 1re séance + 8 semaines ; sans_fin : ni fin ni progression)
   const stats = s.stats || null;
-  const progression = typeof stats?.progression_pct === 'number' ? stats.progression_pct
-    : typeof s.progression === 'number' ? s.progression
-    : (theorie.length ? Math.round(theorie.filter(t => t.statut === 'done').length / theorie.length * 100) : 0);
+  const accompagnement = stats?.accompagnement === 'sans_fin' ? 'sans_fin' : 'avec_fin';
+  const avecFin = accompagnement === 'avec_fin';
+  const progression = typeof stats?.progression_pct === 'number' ? stats.progression_pct : 0;
 
   // Dates ISO pour édition inline + labels français
   const debutIso = stats?.date_debut || '';
   const finIso   = stats?.date_fin   || '';
-  const debutLabel = stats?.date_debut_label || (s.premier_cours || '—');
-  const finLabel   = stats?.date_fin_label   || (s.fin_prevue     || '—');
+  const debutLabel = stats?.date_debut_label || '—';
+  const finLabel   = stats?.date_fin_label   || '—';
   const debutOverride = stats?.override_active?.date_debut || false;
   const finOverride   = stats?.override_active?.date_fin   || false;
   // Total cours : override > défaut (8). Affichage et édition inline.
@@ -1276,14 +1256,21 @@ function renderProfile(s) {
 
   const main = document.getElementById('mainContent');
   main.innerHTML = `
-    <!-- ═ Progression bar ═════════════════════════════════════ -->
-    <div class="prog-row">
+    <!-- ═ Progression bar (accompagnement avec fin uniquement) ═ -->
+    ${avecFin ? `<div class="prog-row">
       <div class="prog-bar"><div class="prog-fill" style="width:${progression}%"></div></div>
       <div class="prog-pct">${progression}%</div>
-    </div>
+    </div>` : ''}
 
-    <!-- ═ Dates éditables (stats_override via PATCH) ══════════ -->
+    <!-- ═ Accompagnement + dates éditables (PATCH) ════════════ -->
     <div class="dates-row">
+      <div class="date-edit">
+        <label class="date-label" for="accSelect">Accompagnement</label>
+        <select id="accSelect" class="acc-select" onchange="setAccompagnement('${s.id}', this.value)">
+          <option value="avec_fin"${avecFin ? ' selected' : ''}>Avec fin (8 semaines)</option>
+          <option value="sans_fin"${avecFin ? '' : ' selected'}>Sans fin</option>
+        </select>
+      </div>
       <div class="date-edit" data-field="date_debut">
         <span class="date-label">Début</span>
         <span style="display:inline-flex;align-items:center;">
@@ -1291,13 +1278,13 @@ function renderProfile(s) {
           ${debutOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','date_debut')" title="Réinitialiser au calcul auto">↺</button>` : ''}
         </span>
       </div>
-      <div class="date-edit" data-field="date_fin">
+      ${avecFin ? `<div class="date-edit" data-field="date_fin">
         <span class="date-label">Fin prévue</span>
         <span style="display:inline-flex;align-items:center;">
           <span class="date-value ${finOverride ? 'override-active' : ''}" tabindex="0" role="button" data-raw="${escapeHtml(finIso)}">${escapeHtml(finLabel)}</span>
-          ${finOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','date_fin')" title="Réinitialiser au calcul auto">↺</button>` : ''}
+          ${finOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','date_fin')" title="Réinitialiser au calcul auto (début + 8 semaines)">↺</button>` : ''}
         </span>
-      </div>
+      </div>` : ''}
       <div class="date-edit" data-field="total_cours" data-kind="number">
         <span class="date-label">Total cours</span>
         <span style="display:inline-flex;align-items:center;">
@@ -1307,10 +1294,10 @@ function renderProfile(s) {
       </div>
     </div>
 
-    <!-- ═ Parcours 8 séances (roadmap) ═══════════════════════ -->
-    <div class="card roadmap-card" id="roadmapCard">
-      <div class="card-title">🗺️ Parcours</div>
-      <p class="empty-note">Chargement du parcours…</p>
+    <!-- ═ Séances publiées (historique) ══════════════════════ -->
+    <div class="card seances-card" id="seancesCard">
+      <div class="card-title">🗓️ Séances publiées</div>
+      <p class="empty-note">Chargement des séances…</p>
     </div>
 
     <div class="card-grid">
@@ -1319,7 +1306,7 @@ function renderProfile(s) {
         <div class="card-title">
           📋 Dernière séance
           ${ds?.date ? `<span class="ds-date-pill">${escapeHtml(fmtSessionDate(ds.date))}</span>` : ''}
-          <button type="button" class="ds-quick-btn" onclick="openQuickUpdateModal('${s.id}')" title="Saisir la séance (historique + parcours)">📝 Post-séance</button>
+          <button type="button" class="ds-quick-btn" onclick="openQuickUpdateModal('${s.id}')" title="Coller la fiche de séance et la publier">📝 Publier une séance</button>
         </div>
         ${ds?.titre ? `<div class="ds-title">${escapeHtml(ds.titre)}</div>` : ''}
         ${(ds?.devoirs && ds.devoirs.length) ? `
@@ -1335,7 +1322,7 @@ function renderProfile(s) {
           </div>
         ` : ''}
         ${!ds || (!ds.devoirs?.length && !ds.resume?.length && !ds.titre)
-          ? '<p class="empty-note">Pas encore de séance enregistrée — clique sur 📝 Post-séance ou publie-la depuis Claude.</p>'
+          ? '<p class="empty-note">Pas encore de séance publiée — clique sur 📝 Publier une séance.</p>'
           : ''}
         ${docUrl ? `<a href="${escapeHtml(docUrl)}" target="_blank" rel="noopener" class="ds-doc-btn">📄 Voir le doc complet ↗</a>` : ''}
       </div>
@@ -1494,9 +1481,9 @@ function renderProfile(s) {
     </div>
   `;
 
-  // Carte Parcours : cache local sinon fetch
-  if (roadmapCache[s.id]) renderRoadmapCard(s.id);
-  else loadRoadmapCard(s.id);
+  // Carte Séances publiées : cache local sinon fetch
+  if (seancesCache[s.id]) renderSeancesCard(s.id);
+  else loadSeancesCard(s.id);
 
   // Bind les champs éditables (dates + total_cours)
   document.querySelectorAll('.date-value').forEach(el => {
@@ -1522,7 +1509,7 @@ async function selectStudent(id, forceSync = false) {
   url.searchParams.set('eleve', id);
   history.replaceState(null, '', url);
 
-  if (forceSync) delete roadmapCache[id];
+  if (forceSync) delete seancesCache[id];
   if (!forceSync && clientCache[id]) { renderProfile(clientCache[id]); return; }
   showLoader(meta.nom);
   try {
@@ -1687,213 +1674,126 @@ async function resetDateOverride(studentId, field) {
 }
 window.resetDateOverride = resetDateOverride;
 
-// ─── Parcours (roadmap 8 séances) ────────────────────────────────
-// GET /api/eleves/:id/roadmap → { roadmap, persisted, templates, seances }.
-// Élève sans roadmap enregistrée : parcours "general" déduit de nb_cours.
-const RM_STATUT_FR = { faite: 'Faite', en_cours: 'En cours', a_venir: 'À venir' };
-const roadmapCache = {};
+// Type d'accompagnement : avec_fin (fin = 1re séance + 8 semaines) | sans_fin
+async function setAccompagnement(studentId, value) {
+  showToast('Sauvegarde…');
+  try {
+    const res = await fetch(`/api/eleves/${studentId}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accompagnement: value }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload.error || !(payload.ok || payload.success)) {
+      throw new Error(payload.error || `HTTP ${res.status}`);
+    }
+    if (payload.data) {
+      clientCache[studentId] = payload.data;
+      const scrollY = window.scrollY;
+      renderProfile(payload.data);
+      window.scrollTo(0, scrollY);
+    }
+    showToast(value === 'sans_fin' ? 'Accompagnement sans fin ✓' : 'Accompagnement avec fin (8 semaines) ✓');
+  } catch (e) {
+    showToast('Erreur, réessaie');
+    if (clientCache[studentId]) renderProfile(clientCache[studentId]);
+  }
+}
+window.setAccompagnement = setAccompagnement;
+
+// ─── Séances publiées (historique, plus récente d'abord) ─────────
+// GET /api/eleves/:id/seances → { seances } (sans note_coach).
+const seancesCache = {};
+
+async function loadSeancesCard(studentId) {
+  try {
+    const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/seances`, { credentials: 'same-origin' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(data.seances)) throw new Error(data.error || `HTTP ${res.status}`);
+    seancesCache[studentId] = data.seances;
+    if (activeId === studentId) renderSeancesCard(studentId);
+    return data.seances;
+  } catch (e) {
+    const card = document.getElementById('seancesCard');
+    if (card && activeId === studentId) {
+      card.innerHTML = `<div class="card-title">🗓️ Séances publiées</div><p class="empty-note">Séances indisponibles : ${escapeHtml(e.message)}</p>`;
+    }
+    return null;
+  }
+}
+
+function renderSeancesCard(studentId) {
+  const card = document.getElementById('seancesCard');
+  const list = seancesCache[studentId];
+  if (!card || !list) return;
+  const recent = list.slice(0, 5);
+  card.innerHTML = `
+    <div class="card-title">🗓️ Séances publiées <span class="sc-label">${list.length}</span></div>
+    ${recent.length
+      ? `<ul class="sc-list">${recent.map(h => `<li>${h.n ? `<span class="sc-n">S${h.n}</span>` : ''}<span class="sc-date">${escapeHtml(fmtSessionDate(h.date))}</span>${escapeHtml(h.titre)}</li>`).join('')}</ul>`
+      : '<p class="empty-note">Aucune séance publiée pour l\'instant.</p>'}`;
+}
+
+// ─── Post-séance : coller une fiche → aperçu → Publier ───────────
+// POST /api/eleves/:id/seance : ajoute la séance à l'historique (jamais
+// écrasé). Le numéro de séance est calculé côté serveur (séances déjà
+// publiées + 1). Les champs « Saisir à la main » sont la source unique de
+// ce qui est publié : la fiche collée les remplit, l'aperçu les reflète.
+let quickUpdateActiveId = null;
+let quickNextN = null;         // numéro indicatif de la prochaine séance
+let prefillItems = [];
+let ficheMismatch = false;     // ÉLÈVE ≠ élève ouvert → publication bloquée tant que non confirmé
+let ficheParseTimer = null;
 
 function todayIso() {
   const t = new Date();
   return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
 }
 
-async function loadRoadmapCard(studentId) {
-  try {
-    const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/roadmap`, { credentials: 'same-origin' });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    roadmapCache[studentId] = data;
-    if (activeId === studentId) renderRoadmapCard(studentId);
-    return data;
-  } catch (e) {
-    const card = document.getElementById('roadmapCard');
-    if (card && activeId === studentId) {
-      card.innerHTML = `<div class="card-title">🗺️ Parcours</div><p class="empty-note">Parcours indisponible : ${escapeHtml(e.message)}</p>`;
-    }
-    return null;
-  }
+function studentDisplayName(studentId) {
+  const cached = clientCache[studentId] || {};
+  return cached.nom || (studentId.charAt(0).toUpperCase() + studentId.slice(1));
 }
-
-function renderRoadmapCard(studentId) {
-  const card = document.getElementById('roadmapCard');
-  const rc = roadmapCache[studentId];
-  if (!card || !rc) return;
-  const rm = rc.roadmap;
-  const faites = rm.seances.filter(x => x.statut === 'faite').length;
-  const current = rm.seances[rm.seance_courante - 1];
-  const items = rm.seances.map(x => {
-    const cls = 'rm-item' + (x.statut === 'faite' ? ' is-faite' : '') + (x.n === rm.seance_courante ? ' is-current' : '');
-    const icon = x.statut === 'faite' ? '✓' : x.n === rm.seance_courante ? '▶' : '○';
-    return `<li class="${cls}">
-      <div class="rm-item-top">${icon} S${x.n}${x.date ? ' · ' + escapeHtml(fmtSessionDate(x.date)) : ''}</div>
-      <div class="rm-item-title">${escapeHtml(x.titre)}</div>
-    </li>`;
-  }).join('');
-  const history = (rc.seances || []).slice(-5).reverse();
-  card.innerHTML = `
-    <div class="card-title">
-      🗺️ Parcours <span class="rm-label">${faites}/8 faites${rc.persisted ? '' : ' · déduit du nombre de cours'}</span>
-      <span class="rm-head-actions">
-        <button type="button" class="ds-quick-btn" onclick="openRoadmapModal('${studentId}')">✏️ Éditer le parcours</button>
-      </span>
-    </div>
-    <ol class="rm-list">${items}</ol>
-    ${current ? `<div class="rm-current">
-      <strong>S${current.n} — ${escapeHtml(current.titre)}</strong> (${RM_STATUT_FR[current.statut] || ''})
-      ${current.objectif ? `<br>${escapeHtml(current.objectif)}` : ''}
-      ${current.livrable ? `<br><strong>Livrable :</strong> ${escapeHtml(current.livrable)}` : ''}
-      ${current.note_coach ? `<br><strong>Note coach :</strong> ${escapeHtml(current.note_coach)}` : ''}
-    </div>` : ''}
-    ${history.length ? `<div class="card-section">
-      <div class="card-section-label">Séances saisies (${(rc.seances || []).length})</div>
-      <ul class="rm-history">${history.map(h => `<li><span class="rm-hdate">${escapeHtml(fmtSessionDate(h.date))}</span>S${h.n} · ${escapeHtml(h.titre)}${h.statut === 'en_cours' ? ' (en cours)' : ''}</li>`).join('')}</ul>
-    </div>` : ''}
-  `;
-}
-
-// ── Modal Parcours : édition des 8 séances de l'élève ──
-let roadmapEditId = null;
-let roadmapDraft = null;
-
-async function openRoadmapModal(studentId) {
-  const rc = roadmapCache[studentId] || await loadRoadmapCard(studentId);
-  if (!rc) { showToast('Parcours indisponible'); return; }
-  roadmapEditId = studentId;
-  roadmapDraft = JSON.parse(JSON.stringify(rc.roadmap));
-  document.getElementById('roadmapError').textContent = '';
-  renderRoadmapEditor();
-  document.getElementById('roadmapOverlay').style.display = 'flex';
-}
-window.openRoadmapModal = openRoadmapModal;
-
-function closeRoadmapModal() {
-  document.getElementById('roadmapOverlay').style.display = 'none';
-  roadmapEditId = null;
-  roadmapDraft = null;
-}
-window.closeRoadmapModal = closeRoadmapModal;
-
-// Champs créés vides puis remplis via .value (pas de texte libre dans les attributs)
-function renderRoadmapEditor() {
-  const box = document.getElementById('rmSeances');
-  box.innerHTML = roadmapDraft.seances.map(x => `
-    <fieldset class="rm-edit-row">
-      <legend>S${x.n}</legend>
-      <div class="quick-field full"><label for="rm-titre-${x.n}">Titre *</label><input type="text" id="rm-titre-${x.n}" maxlength="80" required /></div>
-      <div class="quick-field full"><label for="rm-objectif-${x.n}">Objectif</label><textarea id="rm-objectif-${x.n}" rows="2" maxlength="300"></textarea></div>
-      <div class="quick-field full"><label for="rm-livrable-${x.n}">Livrable</label><input type="text" id="rm-livrable-${x.n}" maxlength="200" /></div>
-      <div class="quick-field"><label for="rm-statut-${x.n}">Statut</label>
-        <select id="rm-statut-${x.n}"><option value="a_venir">À venir</option><option value="en_cours">En cours</option><option value="faite">Faite</option></select></div>
-      <div class="quick-field"><label for="rm-date-${x.n}">Date</label><input type="date" id="rm-date-${x.n}" /></div>
-      <div class="quick-field full"><label for="rm-note-${x.n}">Note coach (privée)</label><textarea id="rm-note-${x.n}" rows="2" maxlength="1000"></textarea></div>
-    </fieldset>
-  `).join('');
-  for (const x of roadmapDraft.seances) {
-    document.getElementById(`rm-titre-${x.n}`).value = x.titre || '';
-    document.getElementById(`rm-objectif-${x.n}`).value = x.objectif || '';
-    document.getElementById(`rm-livrable-${x.n}`).value = x.livrable || '';
-    document.getElementById(`rm-statut-${x.n}`).value = x.statut || 'a_venir';
-    document.getElementById(`rm-date-${x.n}`).value = x.date || '';
-    document.getElementById(`rm-note-${x.n}`).value = x.note_coach || '';
-  }
-}
-
-function readRoadmapEditor() {
-  for (const x of roadmapDraft.seances) {
-    x.titre = document.getElementById(`rm-titre-${x.n}`).value.trim();
-    x.objectif = document.getElementById(`rm-objectif-${x.n}`).value.trim();
-    x.livrable = document.getElementById(`rm-livrable-${x.n}`).value.trim();
-    x.statut = document.getElementById(`rm-statut-${x.n}`).value;
-    x.date = document.getElementById(`rm-date-${x.n}`).value;
-    x.note_coach = document.getElementById(`rm-note-${x.n}`).value.trim();
-  }
-}
-
-document.getElementById('roadmapForm').addEventListener('submit', async function (ev) {
-  ev.preventDefault();
-  if (!roadmapEditId || !roadmapDraft) return;
-  const studentId = roadmapEditId;
-  const errorEl = document.getElementById('roadmapError');
-  const submitBtn = document.getElementById('roadmapSubmit');
-  readRoadmapEditor();
-  const missing = roadmapDraft.seances.find(x => !x.titre);
-  if (missing) { errorEl.textContent = `S${missing.n} : titre requis.`; return; }
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Enregistrement…';
-  try {
-    const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/roadmap`, {
-      method: 'PATCH',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seances: roadmapDraft.seances }),
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok || !payload.ok) throw new Error(payload.error || `HTTP ${res.status}`);
-    roadmapCache[studentId] = { ...roadmapCache[studentId], roadmap: payload.roadmap, persisted: true };
-    if (payload.data) clientCache[studentId] = payload.data;
-    closeRoadmapModal();
-    if (activeId === studentId && clientCache[studentId]) {
-      const scrollY = window.scrollY;
-      renderProfile(clientCache[studentId]);
-      window.scrollTo(0, scrollY);
-    }
-    showToast('Parcours enregistré ✓');
-  } catch (e) {
-    errorEl.textContent = 'Erreur : ' + (e.message || 'réessaie');
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Enregistrer';
-  }
-});
-
-// ─── Post-séance (remplace « Mise à jour rapide ») ───────────────
-// POST /api/eleves/:id/seance : ajoute la séance à l'historique (jamais
-// écrasé), met à jour le parcours et derniere_seance (manualEdit:true).
-let quickUpdateActiveId = null;
-let prefillItems = [];
 
 async function openQuickUpdateModal(studentId) {
-  const rc = roadmapCache[studentId] || await loadRoadmapCard(studentId);
-  if (!rc) { showToast('Parcours indisponible'); return; }
   quickUpdateActiveId = studentId;
-  const cached = clientCache[studentId] || {};
-  const studentDisplay = (cached.nom || studentId.charAt(0).toUpperCase() + studentId.slice(1));
+  quickNextN = null;
+  ficheMismatch = false;
+  const name = studentDisplayName(studentId);
+  document.getElementById('quickUpdateTitle').textContent = `Publier une séance — ${name}`;
   document.getElementById('quickUpdateSub').textContent =
-    `Séance de ${studentDisplay} : elle s'ajoute à l'historique, met à jour son parcours et s'affiche dans son espace.`;
-
-  const nSel = document.getElementById('quickN');
-  nSel.innerHTML = rc.roadmap.seances.map(x =>
-    `<option value="${x.n}">S${x.n} — ${escapeHtml(x.titre)} (${RM_STATUT_FR[x.statut] || ''})</option>`).join('');
-  nSel.value = String(rc.roadmap.seance_courante);
-  document.getElementById('quickStatut').value = 'faite';
+    `Colle la fiche, vérifie l'aperçu, puis publie : la séance s'affiche dans l'espace de ${name}.`;
+  document.getElementById('ficheInput').value = '';
   document.getElementById('quickDate').value = todayIso();
-  document.getElementById('quickTitre').value = '';
-  document.getElementById('quickResume').value = '';
-  document.getElementById('quickDevoirs').value = '';
-  ficheFilled = false;
-  onQuickNChange();
-  resetFiche();
+  for (const id of ['quickTitre', 'quickResume', 'quickDevoirs', 'quickLivrable', 'quickNote']) {
+    document.getElementById(id).value = '';
+  }
+  document.getElementById('manualBox').open = false;
   document.getElementById('prefillList').style.display = 'none';
+  setFicheReport([], false);
+  showFicheMismatch(null);
   document.getElementById('quickUpdateError').textContent = '';
+  renderFichePreview();
   document.getElementById('quickUpdateOverlay').style.display = 'flex';
-  setTimeout(() => document.getElementById('quickTitre').focus(), 50);
+  setTimeout(() => document.getElementById('ficheInput').focus(), 50);
+
+  // Numéro indicatif : séances déjà publiées + 1 (le serveur fait foi)
+  try {
+    const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/seances`, { credentials: 'same-origin' });
+    const j = await res.json().catch(() => null);
+    if (res.ok && j && Array.isArray(j.seances) && quickUpdateActiveId === studentId) {
+      quickNextN = j.seances.length + 1;
+      renderFichePreview();
+    }
+  } catch (e) { /* aperçu sans numéro */ }
 }
 window.openQuickUpdateModal = openQuickUpdateModal;
-
-// Livrable et note coach pré-remplis depuis la séance choisie du parcours
-function onQuickNChange() {
-  const rc = roadmapCache[quickUpdateActiveId];
-  if (!rc || ficheFilled) return;
-  const x = rc.roadmap.seances[Number(document.getElementById('quickN').value) - 1];
-  document.getElementById('quickLivrable').value = (x && x.livrable) || '';
-  document.getElementById('quickNote').value = (x && x.note_coach) || '';
-}
-window.onQuickNChange = onQuickNChange;
 
 function closeQuickUpdateModal() {
   document.getElementById('quickUpdateOverlay').style.display = 'none';
   quickUpdateActiveId = null;
+  clearTimeout(ficheParseTimer);
 }
 window.closeQuickUpdateModal = closeQuickUpdateModal;
 
@@ -1951,16 +1851,14 @@ function applyPrefill() {
     }
   }
   document.getElementById('prefillList').style.display = 'none';
+  renderFichePreview();
   showToast('Résumé et devoirs importés ✓');
 }
 window.applyPrefill = applyPrefill;
 
-// ── Coller une fiche (parse local, sans IA, n'enregistre rien) ──
+// ── Lecture de la fiche (parse local, sans IA, ne publie rien) ──
 // Titres insensibles aux accents/casse, puces « - », « • », « * »,
-// blocs ``` tolérés. Remplit les champs ; l'enregistrement reste manuel.
-let ficheFilled = false;     // livrable/note issus de la fiche : ne pas écraser au changement de séance
-let ficheMismatch = false;   // ÉLÈVE ≠ élève ouvert → enregistrement bloqué tant que non confirmé
-
+// blocs ``` tolérés.
 const FICHE_KEYS = {
   'ELEVE': 'eleve', 'DATE': 'date', 'TITRE': 'titre', 'RESUME': 'resume',
   'DEVOIRS': 'devoirs', 'LIVRABLE': 'livrable', 'NOTE COACH': 'note',
@@ -2003,22 +1901,6 @@ function isValidIsoDate(v) {
   return !isNaN(d) && d.toISOString().slice(0, 10) === v;
 }
 
-function resetFiche() {
-  ficheMismatch = false;
-  document.getElementById('ficheInput').value = '';
-  document.getElementById('ficheBox').style.display = 'none';
-  setFicheReport([], false);
-  showFicheMismatch(null);
-}
-
-function toggleFiche() {
-  const box = document.getElementById('ficheBox');
-  const open = box.style.display === 'none';
-  box.style.display = open ? 'flex' : 'none';
-  if (open) document.getElementById('ficheInput').focus();
-}
-window.toggleFiche = toggleFiche;
-
 function setFicheReport(lines, warn) {
   const el = document.getElementById('ficheReport');
   el.classList.toggle('is-warn', !!warn);
@@ -2036,21 +1918,20 @@ function showFicheMismatch(msg) {
   box.style.display = 'flex';
 }
 
-function onFicheMismatchOk() {
-  if (document.getElementById('ficheMismatchOk').checked) {
-    document.getElementById('quickUpdateError').textContent = '';
-  }
-}
+function onFicheMismatchOk() { updatePublishState(); }
 window.onFicheMismatchOk = onFicheMismatchOk;
 
 function applyFiche() {
   const studentId = quickUpdateActiveId;
   if (!studentId) return;
-  const sec = parseFiche(document.getElementById('ficheInput').value);
-  const found = Object.keys(sec);
-  document.getElementById('quickUpdateError').textContent = '';
-  if (!found.length) {
+  const text = document.getElementById('ficheInput').value;
+  ficheMismatch = false;
+  showFicheMismatch(null);
+  if (!text.trim()) { setFicheReport([], false); renderFichePreview(); return; }
+  const sec = parseFiche(text);
+  if (!Object.keys(sec).length) {
     setFicheReport(["Aucune section reconnue : vérifie les titres (ÉLÈVE:, DATE:, TITRE:…). Rien n'a été rempli."], true);
+    renderFichePreview();
     return;
   }
   const notes = [];
@@ -2083,11 +1964,8 @@ function applyFiche() {
     if (n.length > 1000) notes.push('NOTE COACH tronquée à 1000 caractères.');
     set('quickNote', n.slice(0, 1000));
   }
-  ficheFilled = ficheFilled || 'livrable' in sec || 'note' in sec;
 
   // Contrôle élève : comparé au nom, au slug et à leur premier mot
-  ficheMismatch = false;
-  showFicheMismatch(null);
   if ('eleve' in sec) {
     const raw = sec.eleve.join(' ');
     const who = foldText(raw);
@@ -2096,86 +1974,135 @@ function applyFiche() {
     if (!who) notes.push("ÉLÈVE vide : impossible de vérifier l'élève.");
     else if (!accepted.includes(who)) {
       ficheMismatch = true;
-      showFicheMismatch(`<strong>Attention : la fiche est pour « ${escapeHtml(raw)} »</strong>, mais l'élève ouvert est <strong>${escapeHtml(nom || studentId)}</strong>. Enregistrement bloqué tant que tu n'as pas confirmé.`);
+      showFicheMismatch(`<strong>Attention : la fiche est pour « ${escapeHtml(raw)} »</strong>, mais l'élève ouvert est <strong>${escapeHtml(nom || studentId)}</strong>. Publication bloquée tant que tu n'as pas confirmé.`);
+      notes.unshift("⚠ Élève différent de l'élève ouvert : confirme avant de publier.");
     }
   }
 
-  if (ficheMismatch) notes.unshift("⚠ Élève différent de l'élève ouvert : confirmation requise avant l'enregistrement (encadré rouge en bas du formulaire).");
-  setFicheReport(notes.length ? notes : ['Fiche appliquée ✓ Vérifie les champs puis clique sur Enregistrer.'], notes.length > 0);
-  showToast(ficheMismatch ? "⚠ Fiche d'un autre élève" : notes.length ? 'Fiche appliquée, avec remarques' : 'Fiche appliquée ✓');
+  setFicheReport(notes, notes.length > 0);
+  renderFichePreview();
 }
 window.applyFiche = applyFiche;
 
-document.getElementById('quickUpdateForm').addEventListener('submit', async function (ev) {
-  ev.preventDefault();
-  if (!quickUpdateActiveId) return;
-  const studentId = quickUpdateActiveId;
-  const errorEl = document.getElementById('quickUpdateError');
-  const submitBtn = document.getElementById('quickUpdateSubmit');
-  errorEl.textContent = '';
-  if (ficheMismatch && !document.getElementById('ficheMismatchOk').checked) {
-    errorEl.textContent = "La fiche collée concerne un autre élève : coche la confirmation avant d'enregistrer.";
-    document.getElementById('ficheMismatch').scrollIntoView({ block: 'center' });
-    return;
-  }
-
-  const date = document.getElementById('quickDate').value.trim();
-  const titre = document.getElementById('quickTitre').value.trim();
+// Valeurs qui seront publiées (lues dans les champs)
+function readSeanceFields() {
   const lines = id => document.getElementById(id).value.split('\n').map(x => x.trim()).filter(Boolean);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { errorEl.textContent = 'Date invalide.'; return; }
-  if (!titre || titre.length > 80) { errorEl.textContent = 'Titre requis (1-80 caractères).'; return; }
-
-  const body = {
-    n: Number(document.getElementById('quickN').value),
-    statut: document.getElementById('quickStatut').value,
-    date,
-    titre,
+  return {
+    date: document.getElementById('quickDate').value.trim(),
+    titre: document.getElementById('quickTitre').value.trim(),
     resume: lines('quickResume'),
     devoirs: lines('quickDevoirs'),
     livrable: document.getElementById('quickLivrable').value.trim(),
     note_coach: document.getElementById('quickNote').value.trim(),
   };
+}
 
+// Raison qui empêche de publier (null si publiable)
+function publishBlocker(f) {
+  if (!f.titre) return 'Titre manquant : ajoute « TITRE: … » à la fiche ou saisis-le à la main.';
+  if (f.titre.length > 80) return 'Titre trop long (80 caractères max).';
+  if (!isValidIsoDate(f.date)) return 'Date invalide : attendu AAAA-MM-JJ.';
+  if (ficheMismatch && !document.getElementById('ficheMismatchOk').checked) {
+    return "La fiche concerne un autre élève : coche la confirmation avant de publier.";
+  }
+  return null;
+}
+
+function updatePublishState() {
+  const f = readSeanceFields();
+  const blocker = publishBlocker(f);
+  const btn = document.getElementById('quickUpdateSubmit');
+  if (btn.dataset.busy !== '1') btn.disabled = !!blocker;
+  const hasContent = f.titre || f.resume.length || f.devoirs.length;
+  document.getElementById('quickUpdateError').textContent = hasContent && blocker ? blocker : '';
+}
+
+function renderFichePreview() {
+  const box = document.getElementById('fichePreview');
+  const f = readSeanceFields();
+  const hasContent = f.titre || f.resume.length || f.devoirs.length || f.livrable || f.note_coach;
+  if (!hasContent) { box.hidden = true; box.innerHTML = ''; updatePublishState(); return; }
+  const list = items => '<ul class="bullets">' + items.map(x => `<li>${escapeHtml(x)}</li>`).join('') + '</ul>';
+  const kicker = [quickNextN ? `Séance ${quickNextN}` : 'Nouvelle séance',
+    isValidIsoDate(f.date) ? fmtSessionDate(f.date) : 'date à corriger'].join(' · ');
+  box.innerHTML = `
+    <div class="fp-label">Aperçu</div>
+    <div class="fp-kicker">${escapeHtml(kicker)}</div>
+    <div class="fp-title">${f.titre ? escapeHtml(f.titre) : '<span class="fp-missing">Titre manquant</span>'}</div>
+    <div class="fp-section"><div class="ds-section-label">Résumé</div>${f.resume.length ? list(f.resume) : '<p class="fp-empty">—</p>'}</div>
+    <div class="fp-section"><div class="ds-section-label">Devoirs</div>${f.devoirs.length ? list(f.devoirs) : '<p class="fp-empty">—</p>'}</div>
+    <div class="fp-section"><div class="ds-section-label">Livrable</div><p class="fp-text">${f.livrable ? escapeHtml(f.livrable) : '—'}</p></div>
+    <div class="fp-section fp-private"><div class="ds-section-label">🔒 Note coach <span class="quick-hint">(privée, jamais montrée à l'élève)</span></div>${f.note_coach ? `<p class="fp-text">${escapeHtml(f.note_coach).replace(/\n/g, '<br>')}</p>` : '<p class="fp-empty">—</p>'}</div>`;
+  box.hidden = false;
+  updatePublishState();
+}
+
+// Collage / frappe dans la fiche : lecture automatique (aucune publication)
+document.getElementById('ficheInput').addEventListener('input', function () {
+  clearTimeout(ficheParseTimer);
+  ficheParseTimer = setTimeout(applyFiche, 200);
+});
+// Correction à la main : l'aperçu suit les champs
+for (const id of ['quickDate', 'quickTitre', 'quickResume', 'quickDevoirs', 'quickLivrable', 'quickNote']) {
+  document.getElementById(id).addEventListener('input', renderFichePreview);
+}
+
+document.getElementById('quickUpdateForm').addEventListener('submit', async function (ev) {
+  ev.preventDefault();
+  if (!quickUpdateActiveId) return;
+  clearTimeout(ficheParseTimer);
+  if (document.getElementById('ficheInput').value.trim()) applyFiche();
+  const studentId = quickUpdateActiveId;
+  const errorEl = document.getElementById('quickUpdateError');
+  const submitBtn = document.getElementById('quickUpdateSubmit');
+  const f = readSeanceFields();
+  const blocker = publishBlocker(f);
+  if (blocker) {
+    errorEl.textContent = blocker;
+    if (ficheMismatch) document.getElementById('ficheMismatch').scrollIntoView({ block: 'center' });
+    return;
+  }
+
+  submitBtn.dataset.busy = '1';
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Enregistrement…';
+  submitBtn.textContent = 'Publication…';
   try {
     const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/seance`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(f),
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok || !payload.ok) throw new Error(payload.error || `HTTP ${res.status}`);
-    roadmapCache[studentId] = {
-      ...roadmapCache[studentId],
-      roadmap: payload.roadmap,
-      seances: payload.seances || [],
-      persisted: true,
-    };
     if (payload.data) clientCache[studentId] = payload.data;
+    onSeancePublished(studentId, payload);
     closeQuickUpdateModal();
     if (activeId === studentId && clientCache[studentId]) {
       const scrollY = window.scrollY;
       renderProfile(clientCache[studentId]);
       window.scrollTo(0, scrollY);
     }
-    showToast('Séance enregistrée ✓');
+    showToast(`Séance ${payload.entry && payload.entry.n ? payload.entry.n + ' ' : ''}publiée ✓`);
   } catch (e) {
     errorEl.textContent = 'Erreur : ' + (e.message || 'réessaie');
   } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Enregistrer';
+    delete submitBtn.dataset.busy;
+    submitBtn.textContent = 'Publier';
+    updatePublishState();
   }
 });
 
-// Esc ferme les modales post-séance / parcours
+// Après publication : la carte Séances publiées se recharge
+function onSeancePublished(studentId) {
+  delete seancesCache[studentId];
+}
+
+// Esc ferme la modale post-séance
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') {
     const overlay = document.getElementById('quickUpdateOverlay');
     if (overlay && overlay.style.display !== 'none') closeQuickUpdateModal();
-    const rmOverlay = document.getElementById('roadmapOverlay');
-    if (rmOverlay && rmOverlay.style.display !== 'none') closeRoadmapModal();
   }
 });
 
