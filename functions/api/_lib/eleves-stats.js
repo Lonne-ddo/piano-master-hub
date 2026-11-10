@@ -1,4 +1,4 @@
-// ─── Helpers stats élèves partagés (eleves/[id].js + eleves/sync.js) ─
+// ─── Helpers stats élèves partagés (eleves/[id].js + roadmap.js) ─
 // C6 dedup : avant ce module, mergeStats + parseIsoDate + labelFr + computeProgressionPct
 // + MONTHS_LONG_FR étaient dupliqués à l'identique entre les 2 fichiers.
 

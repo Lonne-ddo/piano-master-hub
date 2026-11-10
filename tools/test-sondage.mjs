@@ -171,7 +171,7 @@ async function categoryA() {
   for (const s of SLUGS) {
     // auth-gated : on vérifie que l'auth est BIEN exigée (401), body non vérifiable
     for (const [ep, lbl] of [['', 'GET /api/eleves/:slug'], ['/public', 'GET /public'],
-                             ['/devoirs', 'GET /devoirs'], ['/analyse', 'GET /analyse']]) {
+                             ['/seances', 'GET /seances'], ['/analyse', 'GET /analyse']]) {
       const r = await http(`/api/eleves/${s}${ep}`);
       if (r.status === 401) skip(C, `[${s}] ${lbl}`, 'auth exigée (401) ✓ — body succès non vérifiable sans session');
       else if (r.status === 200) ok(C, `[${s}] ${lbl}`, 'accessible (200, inattendu mais ok)');
@@ -462,15 +462,15 @@ function categoryD() {
       else ko(C, 'quiz-engine.js exports', 'QuizEngine ou noteToFr absent');
     } catch (e) { ko(C, 'quiz-engine.js s\'exécute', String(e && e.message || e)); }
   }
-  // _lib/devoirs-parser.js
+  // _lib/save-seance.js (formulaire post-séance)
   {
-    const f = 'functions/api/_lib/devoirs-parser.js';
+    const f = 'functions/api/_lib/save-seance.js';
     const src = exists(f) ? rd(f) : '';
     const err = exists(f) ? checkJsFile(f, true) : 'introuvable';
-    if (err) ko(C, 'devoirs-parser', err);
-    else if (/export\s+function\s+parseDevoirsFromDoc/.test(src) && /export\s+(async\s+)?function\s+fetchAndParseDevoirs/.test(src))
-      ok(C, 'devoirs-parser exporte parseDevoirsFromDoc + fetchAndParseDevoirs', '');
-    else warn(C, 'devoirs-parser exports', 'noms attendus non trouvés');
+    if (err) ko(C, 'save-seance', err);
+    else if (/export\s+async\s+function\s+saveSeance/.test(src) && /export\s+async\s+function\s+readSeances/.test(src))
+      ok(C, 'save-seance exporte saveSeance + readSeances', '');
+    else warn(C, 'save-seance exports', 'noms attendus non trouvés');
   }
   // _lib/repertoire.js (dormant)
   {

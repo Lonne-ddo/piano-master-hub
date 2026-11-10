@@ -210,62 +210,52 @@
         }
         .mh-roadmap-livrable .mh-section-label { margin: 0 0 4px; }
 
-        /* ── Devoirs refresh button (inline dans le label devoirs) ── */
-        .mh-devoirs-label-row {
+        /* ── Mes séances (historique, la plus récente dépliée) ── */
+        .mh-seances-list { margin-top: 2px; }
+        .mh-seance { border-bottom: 1px solid var(--mh-border-card); }
+        .mh-seance:last-child { border-bottom: none; }
+        .mh-seance-summary {
+            list-style: none;
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-bottom: 0.7rem;
-        }
-        .mh-devoirs-label-row .mh-section-label { margin: 0; }
-
-        .mh-devoirs-refresh {
-            background: transparent;
-            border: none;
-            color: var(--mh-text-label);
+            gap: 12px;
+            min-height: 44px;
+            padding: 10px 0;
             cursor: pointer;
-            padding: 4px;
-            border-radius: 6px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 150ms ease, background 150ms ease;
         }
-        .mh-devoirs-refresh:hover {
-            color: var(--mh-gold);
-            background: rgba(255, 255, 255, 0.04);
+        .mh-seance-summary::-webkit-details-marker { display: none; }
+        .mh-seance-summary:focus-visible {
+            outline: 2px solid var(--mh-violet-border);
+            outline-offset: 2px;
+            border-radius: var(--mh-radius-sm);
         }
-        .mh-devoirs-refresh.spinning svg { animation: mh-devoirs-spin 0.8s linear infinite; }
-        @keyframes mh-devoirs-spin {
-            from { transform: rotate(0deg); }
-            to   { transform: rotate(360deg); }
-        }
-
-        /* Toast devoirs */
-        .mh-toast {
-            position: fixed;
-            bottom: 24px;
-            left: 50%;
-            transform: translateX(-50%) translateY(8px);
-            padding: 9px 16px;
-            background: rgba(15, 15, 20, 0.95);
-            border: 1px solid var(--mh-border-card-strong);
-            border-radius: 10px;
-            color: var(--mh-text-primary);
+        .mh-seance-head { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .mh-seance-date {
             font-family: var(--mh-font-sans);
-            font-size: 12.5px;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s, transform 0.2s;
-            z-index: 9999;
+            font-size: 11.5px;
+            font-weight: 500;
+            color: var(--mh-gold);
+            font-variant-numeric: tabular-nums;
         }
-        .mh-toast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
+        .mh-seance-title {
+            font-family: var(--mh-font-serif);
+            font-size: 17px;
+            font-weight: 500;
+            line-height: 1.25;
+            color: var(--mh-text-primary);
         }
-        .mh-toast.success { border-color: rgba(94, 203, 139, 0.45); color: #5ecb8b; }
-        .mh-toast.error   { border-color: rgba(224, 92, 107, 0.5);  color: #f87171; }
+        .mh-seance-chevron {
+            color: var(--mh-text-label);
+            font-size: 16px;
+            transition: transform 200ms ease;
+        }
+        .mh-seance[open] .mh-seance-chevron { transform: rotate(180deg); }
+        .mh-seance-body { padding: 2px 0 16px; }
+        .mh-seance-body .mh-section-label { margin: 14px 0 8px; }
+        .mh-seance-body .mh-section-label:first-child { margin-top: 4px; }
+        @media (prefers-reduced-motion: reduce) {
+            .mh-seance-chevron { transition: none; }
+        }
 
         /* ── Empty/error states ── */
         .mh-empty {
@@ -885,8 +875,8 @@
             '<div id="impersonation-banner-host"></div>' +
             '<div class="mh-stack mh-stagger" style="margin-top:24px">' +
                 '<div id="hero-zone"></div>' +
+                '<div id="seances-zone"></div>' +
                 '<div id="parcours-zone"></div>' +
-                '<div id="resume-zone"></div>' +
                 '<div id="analyse-zone"></div>' +
             '</div>' +
             '<div class="mh-section">' +
@@ -1299,9 +1289,9 @@
                 '<div class="mh-skeleton" style="width:65%"></div>' +
                 '<div class="mh-skeleton" style="width:90%; margin-bottom:0"></div>' +
             '</div>';
-        document.getElementById("resume-zone").innerHTML =
+        document.getElementById("seances-zone").innerHTML =
             '<div class="mh-card">' +
-                '<div class="mh-section-label">Dernier cours</div>' +
+                '<div class="mh-section-label">Mes séances</div>' +
                 '<div class="mh-skeleton" style="width:55%; height:16px; margin-bottom:14px"></div>' +
                 '<div class="mh-skeleton" style="width:92%"></div>' +
                 '<div class="mh-skeleton" style="width:70%; margin-bottom:0"></div>' +
@@ -1323,9 +1313,8 @@
                 _lastRoadmap = (data && data.roadmap) || null;
                 renderHero(data && data.stats, data && data.derniere_seance);
                 renderParcours(_lastRoadmap);
-                renderResume(data && data.derniere_seance, data && data.doc_url);
+                fetchSeances(eleve.slug);
                 renderResourceCards(eleve, data);
-                fetchAutoSyncedDevoirs(eleve.slug, data && data.derniere_seance, data && data.stats);
             })
             .catch(function(e) {
                 if (e && e.unauthorized) {
@@ -1338,16 +1327,15 @@
                         '<div class="mh-section-label">Programme en cours</div>' +
                         '<p class="mh-empty">Données momentanément indisponibles. Réessaie plus tard.</p>' +
                     '</div>';
-                document.getElementById("resume-zone").innerHTML = '';
+                document.getElementById("seances-zone").innerHTML = '';
             });
     }
 
-    // Cache pour devoirs auto-syncés depuis Google Doc.
-    var _autoSyncedDevoirs = null;
-    var _devoirsRefreshAvailable = true;
     var _lastDerniereSeance = null;
     var _lastStats = null;
     var _lastRoadmap = null;
+    // Historique des séances (plus récente d'abord) ; null = pas encore chargé.
+    var _lastSeances = null;
 
     // ──────────────────────────────────────────────
     //  Hero card (fusion programme + devoirs)
@@ -1399,26 +1387,16 @@
             progressHtml = '<div class="mh-progress mh-hero-progress"><div class="mh-progress-fill" style="width:0%"></div></div>';
         }
 
-        // Devoirs : édition manuelle du coach (manualEdit) en priorité absolue,
-        // puis auto-syncés depuis le Doc, puis fallback LLM.
+        // Devoirs : ceux de la dernière séance enregistrée (historique) ;
+        // repli sur derniere_seance pour un élève sans historique.
         var devoirs = null;
         var derniereDevoirs = (derniere && Array.isArray(derniere.devoirs)) ? derniere.devoirs.filter(Boolean) : [];
-        if (derniere && derniere.manualEdit === true && derniereDevoirs.length > 0) {
-            devoirs = derniereDevoirs;
-        } else if (Array.isArray(_autoSyncedDevoirs) && _autoSyncedDevoirs.length > 0) {
-            devoirs = _autoSyncedDevoirs;
+        if (Array.isArray(_lastSeances) && _lastSeances.length > 0) {
+            var latestDevoirs = (_lastSeances[0].devoirs || []).filter(Boolean);
+            devoirs = latestDevoirs.length ? latestDevoirs : null;
         } else if (derniereDevoirs.length > 0) {
             devoirs = derniereDevoirs;
         }
-
-        var refreshBtn = _devoirsRefreshAvailable
-            ? '<button type="button" id="devoirs-refresh-btn" class="mh-devoirs-refresh" title="Synchroniser depuis le Google Doc" aria-label="Synchroniser les devoirs">'
-              + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-              + '<polyline points="23 4 23 10 17 10"></polyline>'
-              + '<polyline points="1 20 1 14 7 14"></polyline>'
-              + '<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>'
-              + '</svg></button>'
-            : '';
 
         var devoirsHtml = '';
         if (!devoirs) {
@@ -1439,15 +1417,9 @@
                 '</div>' +
                 titleHtml +
                 progressHtml +
-                '<div class="mh-devoirs-label-row">' +
-                    '<div class="mh-section-label">Devoirs à préparer</div>' +
-                    refreshBtn +
-                '</div>' +
+                '<div class="mh-section-label mh-hero-devoirs-label">Devoirs à préparer</div>' +
                 devoirsHtml +
             '</div>';
-
-        var btn = document.getElementById('devoirs-refresh-btn');
-        if (btn) btn.addEventListener('click', function () { triggerDevoirsRefresh(btn); });
     }
 
     // ──────────────────────────────────────────────
@@ -1498,110 +1470,79 @@
             '</div>';
     }
 
-    function getCurrentSlugForDevoirs() {
-        var params = new URLSearchParams(window.location.search);
-        var slug = (params.get('eleve') || '').toLowerCase();
-        if (slug) return slug;
-        var pathSlug = (window.location.pathname.replace(/^\/+/, '').split('/')[0] || '').toLowerCase();
-        return pathSlug;
-    }
-
-    function fetchAutoSyncedDevoirs(slug, derniere, stats) {
-        if (!slug) return;
-        fetch('/api/eleves/' + encodeURIComponent(slug) + '/devoirs', { credentials: 'include' })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (j) {
-                if (!j) return;
-                if (j.status === 'no_doc_id') { _devoirsRefreshAvailable = false; }
-                _autoSyncedDevoirs = Array.isArray(j.bullets) ? j.bullets : [];
-                renderHero(stats || _lastStats, derniere || _lastDerniereSeance);
-            })
-            .catch(function () { /* silent — fallback LLM préservé */ });
-    }
-
-    function triggerDevoirsRefresh(btn) {
-        var slug = getCurrentSlugForDevoirs();
-        if (!slug) return;
-        if (btn.classList.contains('spinning')) return;
-        btn.classList.add('spinning');
-        fetch('/api/eleves/' + encodeURIComponent(slug) + '/devoirs', {
-            method: 'POST', credentials: 'include',
-            headers: { 'Content-Type': 'application/json' }
-        })
+    // ──────────────────────────────────────────────
+    //  Mes séances (historique, la plus récente dépliée)
+    // ──────────────────────────────────────────────
+    function fetchSeances(slug) {
+        fetch('/api/eleves/' + encodeURIComponent(slug) + '/seances', { credentials: 'include' })
             .then(function (r) {
-                return r.json().catch(function () { return {}; }).then(function (j) {
-                    return { ok: r.ok, status: r.status, body: j };
-                });
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.json();
             })
-            .then(function (resp) {
-                btn.classList.remove('spinning');
-                if (resp.status === 404 && resp.body && resp.body.error === 'no_drive_url') {
-                    _devoirsRefreshAvailable = false;
-                    renderHero(_lastStats, _lastDerniereSeance);
-                    return;
-                }
-                if (!resp.ok) {
-                    showDevoirsToast('Sync impossible, réessaie plus tard', 'error');
-                    return;
-                }
-                _autoSyncedDevoirs = Array.isArray(resp.body.bullets) ? resp.body.bullets : [];
+            .then(function (j) {
+                _lastSeances = (j && Array.isArray(j.seances)) ? j.seances : [];
                 renderHero(_lastStats, _lastDerniereSeance);
-                showDevoirsToast('À jour ✓', 'success');
+                renderSeances(_lastSeances, _lastDerniereSeance);
             })
-            .catch(function () {
-                btn.classList.remove('spinning');
-                showDevoirsToast('Erreur réseau', 'error');
+            .catch(function (e) {
+                console.error('[espace] seances fetch failed:', e && e.message ? e.message : e);
+                renderSeances([], _lastDerniereSeance);
             });
     }
 
-    function showDevoirsToast(msg, type) {
-        var t = document.querySelector('.mh-toast');
-        if (!t) { t = document.createElement('div'); t.className = 'mh-toast'; document.body.appendChild(t); }
-        t.className = 'mh-toast' + (type ? ' ' + type : '');
-        t.textContent = msg;
-        requestAnimationFrame(function () { t.classList.add('show'); });
-        clearTimeout(showDevoirsToast._tid);
-        showDevoirsToast._tid = setTimeout(function () { t.classList.remove('show'); }, 2200);
+    function bulletsHtml(items, accent) {
+        var html = '<ul class="mh-bullets mh-bullets-' + accent + '">';
+        for (var i = 0; i < items.length; i++) {
+            html += '<li>' + escapeHtml(String(items[i])) + '</li>';
+        }
+        return html + '</ul>';
     }
 
-    // ──────────────────────────────────────────────
-    //  Dernier cours
-    // ──────────────────────────────────────────────
-    function renderResume(derniere, docUrl) {
-        var zone = document.getElementById("resume-zone");
-        var resume = (derniere && Array.isArray(derniere.resume))
-            ? derniere.resume.filter(Boolean)
-            : null;
-        var date = derniere && derniere.date ? formatDate(derniere.date) : null;
-        var titre = derniere && derniere.titre ? String(derniere.titre).trim() : null;
-        var metaBits = [];
-        if (date) metaBits.push(date);
-        if (titre) metaBits.push(titre);
-        var meta = metaBits.join(' · ');
+    function seanceItemHtml(s, open) {
+        var titre = s.titre ? String(s.titre).trim() : 'Séance';
+        var date = s.date ? formatDate(s.date) : '';
+        var resume = Array.isArray(s.resume) ? s.resume.filter(Boolean) : [];
+        var devoirs = Array.isArray(s.devoirs) ? s.devoirs.filter(Boolean) : [];
+        var body = '';
+        if (resume.length) body += '<div class="mh-section-label">Résumé</div>' + bulletsHtml(resume, 'violet');
+        if (devoirs.length) body += '<div class="mh-section-label">Devoirs</div>' + bulletsHtml(devoirs, 'gold');
+        if (s.livrable) {
+            body += '<div class="mh-roadmap-livrable"><div class="mh-section-label">Livrable</div>' + escapeHtml(String(s.livrable)) + '</div>';
+        }
+        if (!body) body = '<p class="mh-empty">Pas de détail pour cette séance.</p>';
+        return '<details class="mh-seance"' + (open ? ' open' : '') + '>' +
+                '<summary class="mh-seance-summary">' +
+                    '<span class="mh-seance-head">' +
+                        (date ? '<span class="mh-seance-date">' + escapeHtml(date) + '</span>' : '') +
+                        '<span class="mh-seance-title">' + escapeHtml(titre) + '</span>' +
+                    '</span>' +
+                    '<i class="ti ti-chevron-down mh-seance-chevron" aria-hidden="true"></i>' +
+                '</summary>' +
+                '<div class="mh-seance-body">' + body + '</div>' +
+            '</details>';
+    }
 
+    function renderSeances(seances, derniere) {
+        var zone = document.getElementById('seances-zone');
+        if (!zone) return;
+        var list = Array.isArray(seances) ? seances.slice() : [];
+        // Élève suivi avant l'historique : on montre au moins la dernière séance connue.
+        if (!list.length && derniere && (derniere.titre || (derniere.resume && derniere.resume.length))) {
+            list.push({ date: derniere.date, titre: derniere.titre, resume: derniere.resume, devoirs: derniere.devoirs, livrable: '' });
+        }
         var html = '<div class="mh-card">' +
-            '<div class="mh-section-label">Dernier cours</div>' +
-            '<h3 class="mh-title-section">' + (titre ? escapeHtml(titre) : 'Résumé') + '</h3>';
-        if (date && !titre) html += '<div class="mh-meta">' + escapeHtml(date) + '</div>';
-        else if (date) html += '<div class="mh-meta">' + escapeHtml(date) + '</div>';
-
-        if (!resume || resume.length === 0) {
-            html += '<p class="mh-empty" style="margin-top:12px">Pas encore de résumé disponible. Reviens après ton prochain cours.</p>';
+            '<div class="mh-hero-head">' +
+                '<div class="mh-section-label">Mes séances</div>' +
+                (list.length ? '<span class="mh-inline-stat">' + list.length + (list.length > 1 ? ' séances' : ' séance') + '</span>' : '') +
+            '</div>';
+        if (!list.length) {
+            html += '<p class="mh-empty">Pas encore de séance publiée. Reviens après ton prochain cours.</p>';
         } else {
-            html += '<ul class="mh-bullets mh-bullets-violet" style="margin-top:14px">';
-            for (var i = 0; i < resume.length; i++) {
-                html += '<li>' + escapeHtml(String(resume[i])) + '</li>';
-            }
-            html += '</ul>';
+            html += '<div class="mh-seances-list">';
+            for (var i = 0; i < list.length; i++) html += seanceItemHtml(list[i], i === 0);
+            html += '</div>';
         }
-
-        if (docUrl) {
-            html += '<a class="mh-btn-secondary" style="margin-top:16px" href="' + escapeHtml(docUrl) + '" target="_blank" rel="noopener noreferrer">' +
-                'Voir mes notes complètes <i class="ti ti-arrow-right" aria-hidden="true"></i>' +
-            '</a>';
-        }
-        html += '</div>';
-        zone.innerHTML = html;
+        zone.innerHTML = html + '</div>';
     }
 
     function formatDate(iso) {
@@ -1620,16 +1561,11 @@
         if (!grid) return;
         var slug = eleve.slug;
 
-        var docUrl = data && data.doc_url;
         var telegramUrl = data && data.links && data.links.telegram;
 
         var html = '';
 
-        // 1. Suivi (Google Doc) — accent violet
-        if (docUrl) {
-            html += resourceCardHtml(docUrl, 'ti-file-text', 'violet', 'Suivi', 'Google Doc', true);
-        }
-        // 2. Telegram — neutral
+        // 1. Telegram — neutral
         if (telegramUrl) {
             html += resourceCardHtml(telegramUrl, 'ti-brand-telegram', 'neutral', 'Telegram', 'Discussions avec Lonne', true);
         }

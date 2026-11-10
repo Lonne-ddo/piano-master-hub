@@ -136,18 +136,6 @@
     .hbtn:hover { border-color: var(--v); color: var(--text1); }
     .hbtn[disabled] { opacity: 0.5; cursor: wait; }
     .hbtn .icon { font-size: 13px; line-height: 1; display: inline-block; }
-    .sync-btn.syncing .icon {
-      animation: spin 1s linear infinite;
-    }
-    @keyframes stalePulse {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(240, 180, 41, 0); }
-      50%      { transform: scale(1.06); box-shadow: 0 0 0 6px rgba(240, 180, 41, 0.18); }
-    }
-    .sync-btn.stale-pulse {
-      animation: stalePulse 1.1s ease-in-out 2;
-      border-color: var(--amber);
-      color: var(--amber);
-    }
     .add-btn { color: var(--v); border-color: var(--v); }
     .add-btn:hover { background: var(--v-dim); }
     .hbtn.primary {
@@ -277,8 +265,6 @@
     .archive-eleve-btn.unarchive:hover { background: rgba(139,111,232,0.12); }
 
     @media (max-width: 500px) {
-      .sync-btn .label { display: none; }
-      .sync-btn { padding: 7px 9px; }
       .hbtn { font-size: 10.5px; padding: 6px 9px; }
     }
 
@@ -547,31 +533,6 @@
       transition: all .15s;
     }
     .ds-quick-btn:hover { background: var(--v-dim); color: var(--v); border-color: var(--v); }
-    .ds-manual-banner {
-      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-      margin: 6px 0 10px;
-    }
-    .ds-manual-badge {
-      font-size: 11px;
-      padding: 3px 9px;
-      border-radius: 20px;
-      background: rgba(251,146,60,0.12);
-      color: #FB923C;
-      border: 1px solid rgba(251,146,60,0.35);
-      cursor: help;
-    }
-    .ds-resync-btn {
-      font-size: 11px;
-      padding: 3px 9px;
-      border-radius: 6px;
-      background: transparent;
-      color: var(--text3);
-      border: 1px solid var(--border);
-      cursor: pointer;
-      font-family: inherit;
-      transition: all .15s;
-    }
-    .ds-resync-btn:hover { color: var(--v); border-color: var(--v); }
 
     /* ── Carte Parcours (roadmap 8 séances) ─────────────────── */
     .roadmap-card { margin-bottom: 18px; }
@@ -621,6 +582,27 @@
       border: 1px dashed var(--border); border-radius: 8px;
       padding: 10px; display: flex; flex-direction: column; gap: 8px;
     }
+    .prefill-box .hbtn { min-height: 44px; }
+    .quick-field textarea.fiche-input {
+      font-size: 16px; min-height: 160px;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    .fiche-report { font-size: 13px; line-height: 1.45; color: var(--text2); }
+    .fiche-report:empty { display: none; }
+    .fiche-report ul { margin: 4px 0 0; padding-left: 18px; }
+    .fiche-report.is-warn { color: var(--amber); }
+    .fiche-mismatch {
+      border: 1px solid var(--red); border-radius: 8px;
+      background: var(--bg2); color: var(--text1);
+      padding: 10px 12px; font-size: 13px; line-height: 1.45;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .fiche-mismatch strong { color: var(--red); }
+    .fiche-mismatch label {
+      display: flex; align-items: center; gap: 8px;
+      min-height: 44px; cursor: pointer; color: var(--text2);
+    }
+    .fiche-mismatch input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--red); }
 
     /* ── Modal Post-séance / Parcours ─────────────────────── */
     .quick-modal-overlay {
@@ -1001,9 +983,6 @@
       <button type="button" class="hbtn add-btn" id="addEleveBtn" onclick="openAddEleveModal()" title="Créer un élève">
         <span class="icon">&#43;</span><span class="label">Ajouter</span>
       </button>
-      <button type="button" class="hbtn sync-btn" id="syncAllBtn" onclick="syncFromGDocs()" title="Sync depuis Google Docs">
-        <span class="icon">&#128260;</span><span class="label">Sync All</span>
-      </button>
       <a class="hbtn" href="/admin/" title="Retour aux outils admin">&larr; Outils</a>
       <button type="button" class="hbtn impersonate-header-btn" id="header-impersonate-btn" disabled title="Sélectionne un élève d'abord" onclick="impersonateActiveEleve()">
         <span class="icon">&#128065;</span><span class="label">Voir son espace</span>
@@ -1057,6 +1036,17 @@
         </div>
       </div>
     </div>
+    <div class="prefill-box">
+      <button type="button" class="hbtn" onclick="toggleFiche()">&#128203; Coller une fiche</button>
+      <div id="ficheBox" class="quick-field" style="display:none">
+        <label for="ficheInput">Fiche de s&eacute;ance <span class="quick-hint">(&Eacute;L&Egrave;VE, DATE, TITRE, R&Eacute;SUM&Eacute;, DEVOIRS, LIVRABLE, NOTE COACH)</span></label>
+        <textarea id="ficheInput" class="fiche-input" rows="8" spellcheck="false" placeholder="&Eacute;L&Egrave;VE: Pr&eacute;nom&#10;DATE: 2026-11-10&#10;TITRE: voicings ii-V-I&#10;R&Eacute;SUM&Eacute;:&#10;- ...&#10;DEVOIRS:&#10;- ...&#10;LIVRABLE:&#10;NOTE COACH:&#10;- ..."></textarea>
+        <div class="quick-actions">
+          <button type="button" class="hbtn primary" onclick="applyFiche()">Remplir</button>
+        </div>
+        <div id="ficheReport" class="fiche-report" role="status" aria-live="polite"></div>
+      </div>
+    </div>
     <form id="quickUpdateForm" autocomplete="off">
       <div class="quick-row">
         <div class="quick-field">
@@ -1094,6 +1084,10 @@
       <div class="quick-field">
         <label for="quickNote">Note coach <span class="quick-hint">(priv&eacute;e, jamais montr&eacute;e &agrave; l'&eacute;l&egrave;ve)</span></label>
         <textarea id="quickNote" rows="3" maxlength="1000"></textarea>
+      </div>
+      <div class="fiche-mismatch" id="ficheMismatch" style="display:none" role="alert">
+        <div id="ficheMismatchText"></div>
+        <label><input type="checkbox" id="ficheMismatchOk" onchange="onFicheMismatchOk()" /> Je confirme : enregistrer quand m&ecirc;me pour cet &eacute;l&egrave;ve</label>
       </div>
       <div class="quick-error" id="quickUpdateError"></div>
       <div class="quick-actions">
@@ -1184,15 +1178,6 @@ function toggleArchived() {
   renderTabs();
 }
 window.toggleArchived = toggleArchived;
-
-function triggerStalePulse() {
-  const btn = document.getElementById('syncAllBtn');
-  if (!btn) return;
-  btn.classList.remove('stale-pulse');
-  void btn.offsetWidth; // force reflow
-  btn.classList.add('stale-pulse');
-  setTimeout(() => btn.classList.remove('stale-pulse'), 2400);
-}
 
 function renderEmpty() {
   document.getElementById('mainContent').innerHTML = `
@@ -1336,12 +1321,6 @@ function renderProfile(s) {
           ${ds?.date ? `<span class="ds-date-pill">${escapeHtml(fmtSessionDate(ds.date))}</span>` : ''}
           <button type="button" class="ds-quick-btn" onclick="openQuickUpdateModal('${s.id}')" title="Saisir la séance (historique + parcours)">📝 Post-séance</button>
         </div>
-        ${ds?.manualEdit ? `
-          <div class="ds-manual-banner">
-            <span class="ds-manual-badge" title="Cette séance a été éditée manuellement et sera préservée par Sync All.">✋ Édité manuellement</span>
-            <button type="button" class="ds-resync-btn" onclick="resyncSeanceFromDoc('${s.id}')" title="Efface le flag et relance la cascade LLM depuis le Google Doc">↺ Re-sync depuis Doc</button>
-          </div>
-        ` : ''}
         ${ds?.titre ? `<div class="ds-title">${escapeHtml(ds.titre)}</div>` : ''}
         ${(ds?.devoirs && ds.devoirs.length) ? `
           <div class="ds-section devoirs">
@@ -1356,7 +1335,7 @@ function renderProfile(s) {
           </div>
         ` : ''}
         ${!ds || (!ds.devoirs?.length && !ds.resume?.length && !ds.titre)
-          ? '<p class="empty-note">Pas encore de séance synchronisée — clique sur 🔄 Sync All ou 📝 Post-séance.</p>'
+          ? '<p class="empty-note">Pas encore de séance enregistrée — clique sur 📝 Post-séance ou publie-la depuis Claude.</p>'
           : ''}
         ${docUrl ? `<a href="${escapeHtml(docUrl)}" target="_blank" rel="noopener" class="ds-doc-btn">📄 Voir le doc complet ↗</a>` : ''}
       </div>
@@ -1556,7 +1535,6 @@ async function selectStudent(id, forceSync = false) {
     if (!data || (data.error && data.source !== 'stale')) { showError(data.error || `Erreur ${res.status}`, data.details); return; }
     clientCache[id] = data;
     renderProfile(data);
-    if (data.source === 'stale') triggerStalePulse();
   } catch (e) {
     showError('Erreur réseau. Vérifie ta connexion et réessaie.', e.message);
   }
@@ -1568,39 +1546,6 @@ function syncStudent() {
 }
 window.syncStudent = syncStudent;
 
-async function syncFromGDocs() {
-  const btn = document.getElementById('syncAllBtn');
-  if (!btn) return;
-  btn.classList.add('syncing');
-  btn.disabled = true;
-  try {
-    const res = await fetch('/api/eleves/sync', {
-      method: 'POST',
-      credentials: 'same-origin'
-    });
-    const data = await res.json();
-    if (data.success) {
-      const summary = Object.entries(data.results)
-        .map(([name, r]) => r.ok
-          ? `✓ ${capitalize(name)} (${r.sessions} séances)`
-          : `✗ ${capitalize(name)}: ${r.error}`)
-        .join('\n');
-      alert('Sync terminé :\n' + summary);
-      clientCache = {};
-      if (activeId) selectStudent(activeId);
-    } else {
-      alert('Erreur sync');
-    }
-  } catch (e) {
-    alert('Erreur sync: ' + e.message);
-  } finally {
-    btn.classList.remove('syncing');
-    btn.disabled = false;
-  }
-}
-window.syncFromGDocs = syncFromGDocs;
-
-function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 function showToast(msg) {
   let t = document.querySelector('.pk-toast');
@@ -1904,8 +1849,7 @@ document.getElementById('roadmapForm').addEventListener('submit', async function
 
 // ─── Post-séance (remplace « Mise à jour rapide ») ───────────────
 // POST /api/eleves/:id/seance : ajoute la séance à l'historique (jamais
-// écrasé), met à jour le parcours et derniere_seance (manualEdit:true,
-// prioritaire sur la sync du Google Doc jusqu'au "Re-sync depuis Doc").
+// écrasé), met à jour le parcours et derniere_seance (manualEdit:true).
 let quickUpdateActiveId = null;
 let prefillItems = [];
 
@@ -1927,7 +1871,9 @@ async function openQuickUpdateModal(studentId) {
   document.getElementById('quickTitre').value = '';
   document.getElementById('quickResume').value = '';
   document.getElementById('quickDevoirs').value = '';
+  ficheFilled = false;
   onQuickNChange();
+  resetFiche();
   document.getElementById('prefillList').style.display = 'none';
   document.getElementById('quickUpdateError').textContent = '';
   document.getElementById('quickUpdateOverlay').style.display = 'flex';
@@ -1938,7 +1884,7 @@ window.openQuickUpdateModal = openQuickUpdateModal;
 // Livrable et note coach pré-remplis depuis la séance choisie du parcours
 function onQuickNChange() {
   const rc = roadmapCache[quickUpdateActiveId];
-  if (!rc) return;
+  if (!rc || ficheFilled) return;
   const x = rc.roadmap.seances[Number(document.getElementById('quickN').value) - 1];
   document.getElementById('quickLivrable').value = (x && x.livrable) || '';
   document.getElementById('quickNote').value = (x && x.note_coach) || '';
@@ -2009,6 +1955,157 @@ function applyPrefill() {
 }
 window.applyPrefill = applyPrefill;
 
+// ── Coller une fiche (parse local, sans IA, n'enregistre rien) ──
+// Titres insensibles aux accents/casse, puces « - », « • », « * »,
+// blocs ``` tolérés. Remplit les champs ; l'enregistrement reste manuel.
+let ficheFilled = false;     // livrable/note issus de la fiche : ne pas écraser au changement de séance
+let ficheMismatch = false;   // ÉLÈVE ≠ élève ouvert → enregistrement bloqué tant que non confirmé
+
+const FICHE_KEYS = {
+  'ELEVE': 'eleve', 'DATE': 'date', 'TITRE': 'titre', 'RESUME': 'resume',
+  'DEVOIRS': 'devoirs', 'LIVRABLE': 'livrable', 'NOTE COACH': 'note',
+};
+const FICHE_LABELS = {
+  eleve: 'ÉLÈVE', date: 'DATE', titre: 'TITRE', resume: 'RÉSUMÉ',
+  devoirs: 'DEVOIRS', livrable: 'LIVRABLE', note: 'NOTE COACH',
+};
+
+function foldText(str) {
+  return String(str || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+function parseFiche(text) {
+  const sections = {};
+  let current = null;
+  for (const raw of String(text || '').replace(/\r/g, '').split('\n')) {
+    if (/^\s*```/.test(raw)) continue;
+    // Titre : « ÉLÈVE: x », « **Élève :** x », « ## Résumé: »
+    const m = raw.match(/^\s*(?:#+\s*)?(?:\*\*)?\s*([^:*#]+?)\s*(?:\*\*)?\s*:\s*(?:\*\*)?(.*)$/);
+    const key = m && FICHE_KEYS[foldText(m[1])];
+    if (key) {
+      current = key;
+      sections[key] = [];
+      const rest = m[2].trim();
+      if (rest) sections[key].push(rest);
+      continue;
+    }
+    if (!current) continue;
+    const item = raw.replace(/^\s*(?:[-•*]|\d+[.)])\s+/, '').trim();
+    if (item) sections[current].push(item);
+  }
+  return sections;
+}
+
+function isValidIsoDate(v) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(v + 'T00:00:00Z');
+  return !isNaN(d) && d.toISOString().slice(0, 10) === v;
+}
+
+function resetFiche() {
+  ficheMismatch = false;
+  document.getElementById('ficheInput').value = '';
+  document.getElementById('ficheBox').style.display = 'none';
+  setFicheReport([], false);
+  showFicheMismatch(null);
+}
+
+function toggleFiche() {
+  const box = document.getElementById('ficheBox');
+  const open = box.style.display === 'none';
+  box.style.display = open ? 'flex' : 'none';
+  if (open) document.getElementById('ficheInput').focus();
+}
+window.toggleFiche = toggleFiche;
+
+function setFicheReport(lines, warn) {
+  const el = document.getElementById('ficheReport');
+  el.classList.toggle('is-warn', !!warn);
+  el.innerHTML = lines.length
+    ? (lines.length === 1 ? escapeHtml(lines[0])
+      : '<ul>' + lines.map(l => `<li>${escapeHtml(l)}</li>`).join('') + '</ul>')
+    : '';
+}
+
+function showFicheMismatch(msg) {
+  const box = document.getElementById('ficheMismatch');
+  document.getElementById('ficheMismatchOk').checked = false;
+  if (!msg) { box.style.display = 'none'; return; }
+  document.getElementById('ficheMismatchText').innerHTML = msg;
+  box.style.display = 'flex';
+}
+
+function onFicheMismatchOk() {
+  if (document.getElementById('ficheMismatchOk').checked) {
+    document.getElementById('quickUpdateError').textContent = '';
+  }
+}
+window.onFicheMismatchOk = onFicheMismatchOk;
+
+function applyFiche() {
+  const studentId = quickUpdateActiveId;
+  if (!studentId) return;
+  const sec = parseFiche(document.getElementById('ficheInput').value);
+  const found = Object.keys(sec);
+  document.getElementById('quickUpdateError').textContent = '';
+  if (!found.length) {
+    setFicheReport(["Aucune section reconnue : vérifie les titres (ÉLÈVE:, DATE:, TITRE:…). Rien n'a été rempli."], true);
+    return;
+  }
+  const notes = [];
+  const missing = Object.values(FICHE_KEYS).filter(k => !(k in sec));
+  if (missing.length) notes.push('Sections manquantes (champs laissés tels quels) : ' + missing.map(k => FICHE_LABELS[k]).join(', ') + '.');
+
+  const set = (id, v) => { document.getElementById(id).value = v; };
+  if ('date' in sec) {
+    const d = (sec.date[0] || '').trim();
+    if (isValidIsoDate(d)) set('quickDate', d);
+    else notes.push(`DATE invalide (« ${d || 'vide'} », attendu AAAA-MM-JJ) : date non remplie.`);
+  }
+  if ('titre' in sec) {
+    const t = sec.titre.join(' ').trim();
+    if (!t) notes.push('TITRE vide.');
+    else {
+      if (t.length > 80) notes.push('TITRE tronqué à 80 caractères.');
+      set('quickTitre', t.slice(0, 80));
+    }
+  }
+  if ('resume' in sec) set('quickResume', sec.resume.join('\n'));
+  if ('devoirs' in sec) set('quickDevoirs', sec.devoirs.join('\n'));
+  if ('livrable' in sec) {
+    const l = sec.livrable.join(' ').trim();
+    if (l.length > 200) notes.push('LIVRABLE tronqué à 200 caractères.');
+    set('quickLivrable', l.slice(0, 200));
+  }
+  if ('note' in sec) {
+    const n = sec.note.join('\n');
+    if (n.length > 1000) notes.push('NOTE COACH tronquée à 1000 caractères.');
+    set('quickNote', n.slice(0, 1000));
+  }
+  ficheFilled = ficheFilled || 'livrable' in sec || 'note' in sec;
+
+  // Contrôle élève : comparé au nom, au slug et à leur premier mot
+  ficheMismatch = false;
+  showFicheMismatch(null);
+  if ('eleve' in sec) {
+    const raw = sec.eleve.join(' ');
+    const who = foldText(raw);
+    const nom = (clientCache[studentId] || {}).nom || '';
+    const accepted = [studentId, studentId.split('-')[0], nom, nom.split(/\s+/)[0]].map(foldText).filter(Boolean);
+    if (!who) notes.push("ÉLÈVE vide : impossible de vérifier l'élève.");
+    else if (!accepted.includes(who)) {
+      ficheMismatch = true;
+      showFicheMismatch(`<strong>Attention : la fiche est pour « ${escapeHtml(raw)} »</strong>, mais l'élève ouvert est <strong>${escapeHtml(nom || studentId)}</strong>. Enregistrement bloqué tant que tu n'as pas confirmé.`);
+    }
+  }
+
+  if (ficheMismatch) notes.unshift("⚠ Élève différent de l'élève ouvert : confirmation requise avant l'enregistrement (encadré rouge en bas du formulaire).");
+  setFicheReport(notes.length ? notes : ['Fiche appliquée ✓ Vérifie les champs puis clique sur Enregistrer.'], notes.length > 0);
+  showToast(ficheMismatch ? "⚠ Fiche d'un autre élève" : notes.length ? 'Fiche appliquée, avec remarques' : 'Fiche appliquée ✓');
+}
+window.applyFiche = applyFiche;
+
 document.getElementById('quickUpdateForm').addEventListener('submit', async function (ev) {
   ev.preventDefault();
   if (!quickUpdateActiveId) return;
@@ -2016,6 +2113,11 @@ document.getElementById('quickUpdateForm').addEventListener('submit', async func
   const errorEl = document.getElementById('quickUpdateError');
   const submitBtn = document.getElementById('quickUpdateSubmit');
   errorEl.textContent = '';
+  if (ficheMismatch && !document.getElementById('ficheMismatchOk').checked) {
+    errorEl.textContent = "La fiche collée concerne un autre élève : coche la confirmation avant d'enregistrer.";
+    document.getElementById('ficheMismatch').scrollIntoView({ block: 'center' });
+    return;
+  }
 
   const date = document.getElementById('quickDate').value.trim();
   const titre = document.getElementById('quickTitre').value.trim();
@@ -2066,42 +2168,6 @@ document.getElementById('quickUpdateForm').addEventListener('submit', async func
     submitBtn.textContent = 'Enregistrer';
   }
 });
-
-async function resyncSeanceFromDoc(studentId) {
-  if (!confirm("Remplacer la séance éditée manuellement par celle extraite du Google Doc ?\n\nCela va lancer Sync All (5-15s) et écraser tes modifications manuelles.")) return;
-  showToast('Re-sync en cours…');
-  try {
-    // 1. Unflag le manualEdit
-    const r1 = await fetch(`/api/eleves/${studentId}`, {
-      method: 'PATCH',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ derniere_seance_unflag: true }),
-    });
-    if (!r1.ok) throw new Error('unflag failed (HTTP ' + r1.status + ')');
-    // 2. Lance Sync All (resync TOUS — l'API n'a pas de single-eleve sync POST)
-    const r2 = await fetch('/api/eleves/sync', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    const j2 = await r2.json().catch(() => ({}));
-    if (!r2.ok && r2.status !== 503) throw new Error('sync failed (HTTP ' + r2.status + ')');
-    // 3. Refetch profil pour render à jour
-    const r3 = await fetch(`/api/eleves/${studentId}`, { credentials: 'same-origin' });
-    const fresh = await r3.json();
-    if (r3.ok && !fresh.error) {
-      clientCache[studentId] = fresh;
-      const scrollY = window.scrollY;
-      renderProfile(fresh);
-      window.scrollTo(0, scrollY);
-    }
-    showToast('Re-sync terminé ✓');
-  } catch (e) {
-    showToast('Erreur : ' + (e.message || 'réessaie'));
-  }
-}
-window.resyncSeanceFromDoc = resyncSeanceFromDoc;
 
 // Esc ferme les modales post-séance / parcours
 document.addEventListener('keydown', function (e) {
