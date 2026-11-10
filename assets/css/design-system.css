@@ -20,6 +20,7 @@
   --mh-gold: #d5b048;
   --mh-gold-glow: rgba(213, 176, 72, 0.14);
   --mh-gold-border: rgba(213, 176, 72, 0.22);
+  --mh-gold-tint: rgba(213, 176, 72, 0.06);
 
   /* ── Accent : VIOLET (pédagogie, secondaire) ── */
   --mh-violet: #b9aef8;
@@ -120,7 +121,7 @@
 
 /* Hero (or premium) card */
 .mh-card-hero {
-  background: rgba(213, 176, 72, 0.06);
+  background: var(--mh-gold-tint);
   border-color: var(--mh-gold-border);
   box-shadow: var(--mh-shadow-hero);
 }
