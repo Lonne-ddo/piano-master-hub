@@ -178,16 +178,6 @@ async function categoryA() {
       else warn(C, `[${s}] ${lbl}`, `status ${r.status} (ni 401 ni 200)`);
     }
   }
-
-  // Connecteur MCP : un token faux doit répondre 404 (endpoint invisible)
-  {
-    const r = await http('/api/mcp/sondage-token-invalide', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
-    });
-    if (r.status === 404) ok(C, 'POST /api/mcp/<token faux> → 404', '');
-    else ko(C, 'POST /api/mcp/<token faux> → 404', `status ${r.status}`);
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -472,7 +462,7 @@ function categoryD() {
       else ko(C, 'quiz-engine.js exports', 'QuizEngine ou noteToFr absent');
     } catch (e) { ko(C, 'quiz-engine.js s\'exécute', String(e && e.message || e)); }
   }
-  // _lib/save-seance.js (partagé formulaire post-séance + connecteur MCP)
+  // _lib/save-seance.js (formulaire post-séance)
   {
     const f = 'functions/api/_lib/save-seance.js';
     const src = exists(f) ? rd(f) : '';

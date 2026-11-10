@@ -1,8 +1,7 @@
 // ─── POST /api/eleves/:slug/seance ───────────────────────────────
 // Formulaire post-séance (admin uniquement, cookie mh_admin_pw).
 // Body : { n?, date, titre, resume[], devoirs[], livrable?, statut?, note_coach? }
-// Validation et enregistrement : _lib/save-seance.js (partagé avec le
-// connecteur MCP /api/mcp/:token).
+// Validation et enregistrement : _lib/save-seance.js.
 
 import { requireAdminPassword } from '../../_lib/session.js';
 import { saveSeance, SLUG_RE } from '../../_lib/save-seance.js';

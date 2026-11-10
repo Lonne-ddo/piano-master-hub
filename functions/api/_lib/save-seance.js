@@ -1,7 +1,5 @@
 // ─── Enregistrement d'une séance (logique partagée) ──────────────
-// Utilisé par :
-//   - POST /api/eleves/:slug/seance  (formulaire post-séance admin)
-//   - /api/mcp/:token, outil publish_session (connecteur claude.ai)
+// Utilisé par POST /api/eleves/:slug/seance (formulaire post-séance admin).
 //
 // Entrée : { n?, date, titre, resume[], devoirs[], livrable?, statut?, note_coach? }
 //   n       : numéro de la séance du parcours (1..8, défaut = séance courante)

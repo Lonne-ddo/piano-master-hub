@@ -1,6 +1,6 @@
 // ─── GET /api/eleves/:slug/seances ───────────────────────────────
-// Historique des séances publiées (formulaire post-séance ou connecteur
-// MCP), de la plus récente à la plus ancienne.
+// Historique des séances publiées (formulaire post-séance), de la plus
+// récente à la plus ancienne.
 // Auth : élève sur sa propre fiche (mh_session) ou admin (mh_admin_pw).
 // Whitelist des champs : JAMAIS de note_coach (privée coach).
 
