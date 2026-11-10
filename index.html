@@ -1280,31 +1280,34 @@
         var titleHtml = '';
         var progressHtml = '';
         var headDateHtml = '';
-        if (stats && stats.nb_cours != null) {
-            // Label : juste "Cours N" (plus de "sur M" ni de "· prolongation").
-            var label = 'Cours ' + stats.nb_cours;
+        if (stats && (stats.nb_seances != null || stats.nb_cours != null)) {
+            // « Séance N » : N = nombre de séances publiées
+            var nb = stats.nb_seances != null ? stats.nb_seances : stats.nb_cours;
+            var label = nb > 0 ? 'Séance ' + nb : 'Première séance à venir';
             titleHtml = '<h2 class="mh-title-hero mh-hero-title">' + escapeHtml(label) + '</h2>';
-            // Progress bar = % de temps écoulé entre date_debut et date_fin du programme.
-            // Programme terminé/prolongé (now > date_fin) → bar pleine + couleur violet.
-            var startMs = parseIsoMs(stats.date_debut);
-            var endMs = parseIsoMs(stats.date_fin);
-            var pct = 0;
-            var over = false;
-            if (startMs != null && endMs != null && endMs > startMs) {
-                var totalMs = endMs - startMs;
-                var nowMs = Date.now();
-                over = nowMs > endMs;
-                var elapsedMs = Math.min(Math.max(nowMs - startMs, 0), totalMs);
-                pct = (elapsedMs / totalMs) * 100;
-            } else if (typeof stats.progression_pct === 'number') {
-                pct = Math.max(0, Math.min(100, stats.progression_pct));
-            }
-            if (over) pct = 100;
-            var fillClass = 'mh-progress-fill' + (over ? ' mh-progress-fill--over' : '');
-            progressHtml = '<div class="mh-progress mh-hero-progress"><div class="' + fillClass + '" style="width:' + pct + '%"></div></div>';
-            // Date à droite : borne de fin de programme.
-            if (stats.date_fin_label) {
-                headDateHtml = '<span class="mh-hero-head-date">Jusqu\'au ' + escapeHtml(stats.date_fin_label) + '</span>';
+            // Accompagnement avec fin : « Jusqu'au <date_fin> » + barre de
+            // progression (% de temps écoulé entre date_debut et date_fin ;
+            // terminé → barre pleine violette). Sans fin : rien de plus.
+            if (stats.accompagnement !== 'sans_fin') {
+                var startMs = parseIsoMs(stats.date_debut);
+                var endMs = parseIsoMs(stats.date_fin);
+                var pct = 0;
+                var over = false;
+                if (startMs != null && endMs != null && endMs > startMs) {
+                    var totalMs = endMs - startMs;
+                    var nowMs = Date.now();
+                    over = nowMs > endMs;
+                    var elapsedMs = Math.min(Math.max(nowMs - startMs, 0), totalMs);
+                    pct = (elapsedMs / totalMs) * 100;
+                } else if (typeof stats.progression_pct === 'number') {
+                    pct = Math.max(0, Math.min(100, stats.progression_pct));
+                }
+                if (over) pct = 100;
+                var fillClass = 'mh-progress-fill' + (over ? ' mh-progress-fill--over' : '');
+                progressHtml = '<div class="mh-progress mh-hero-progress"><div class="' + fillClass + '" style="width:' + pct + '%"></div></div>';
+                if (stats.date_fin_label) {
+                    headDateHtml = '<span class="mh-hero-head-date">Jusqu’au ' + escapeHtml(stats.date_fin_label) + '</span>';
+                }
             }
         } else {
             titleHtml = '<h2 class="mh-title-hero mh-hero-title">À planifier</h2>';
