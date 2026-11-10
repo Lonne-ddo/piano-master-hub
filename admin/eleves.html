@@ -136,18 +136,6 @@
     .hbtn:hover { border-color: var(--v); color: var(--text1); }
     .hbtn[disabled] { opacity: 0.5; cursor: wait; }
     .hbtn .icon { font-size: 13px; line-height: 1; display: inline-block; }
-    .sync-btn.syncing .icon {
-      animation: spin 1s linear infinite;
-    }
-    @keyframes stalePulse {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(240, 180, 41, 0); }
-      50%      { transform: scale(1.06); box-shadow: 0 0 0 6px rgba(240, 180, 41, 0.18); }
-    }
-    .sync-btn.stale-pulse {
-      animation: stalePulse 1.1s ease-in-out 2;
-      border-color: var(--amber);
-      color: var(--amber);
-    }
     .add-btn { color: var(--v); border-color: var(--v); }
     .add-btn:hover { background: var(--v-dim); }
     .hbtn.primary {
@@ -277,8 +265,6 @@
     .archive-eleve-btn.unarchive:hover { background: rgba(139,111,232,0.12); }
 
     @media (max-width: 500px) {
-      .sync-btn .label { display: none; }
-      .sync-btn { padding: 7px 9px; }
       .hbtn { font-size: 10.5px; padding: 6px 9px; }
     }
 
@@ -547,31 +533,6 @@
       transition: all .15s;
     }
     .ds-quick-btn:hover { background: var(--v-dim); color: var(--v); border-color: var(--v); }
-    .ds-manual-banner {
-      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-      margin: 6px 0 10px;
-    }
-    .ds-manual-badge {
-      font-size: 11px;
-      padding: 3px 9px;
-      border-radius: 20px;
-      background: rgba(251,146,60,0.12);
-      color: #FB923C;
-      border: 1px solid rgba(251,146,60,0.35);
-      cursor: help;
-    }
-    .ds-resync-btn {
-      font-size: 11px;
-      padding: 3px 9px;
-      border-radius: 6px;
-      background: transparent;
-      color: var(--text3);
-      border: 1px solid var(--border);
-      cursor: pointer;
-      font-family: inherit;
-      transition: all .15s;
-    }
-    .ds-resync-btn:hover { color: var(--v); border-color: var(--v); }
 
     /* ── Carte Parcours (roadmap 8 séances) ─────────────────── */
     .roadmap-card { margin-bottom: 18px; }
@@ -1001,9 +962,6 @@
       <button type="button" class="hbtn add-btn" id="addEleveBtn" onclick="openAddEleveModal()" title="Créer un élève">
         <span class="icon">&#43;</span><span class="label">Ajouter</span>
       </button>
-      <button type="button" class="hbtn sync-btn" id="syncAllBtn" onclick="syncFromGDocs()" title="Sync depuis Google Docs">
-        <span class="icon">&#128260;</span><span class="label">Sync All</span>
-      </button>
       <a class="hbtn" href="/admin/" title="Retour aux outils admin">&larr; Outils</a>
       <button type="button" class="hbtn impersonate-header-btn" id="header-impersonate-btn" disabled title="Sélectionne un élève d'abord" onclick="impersonateActiveEleve()">
         <span class="icon">&#128065;</span><span class="label">Voir son espace</span>
@@ -1185,15 +1143,6 @@ function toggleArchived() {
 }
 window.toggleArchived = toggleArchived;
 
-function triggerStalePulse() {
-  const btn = document.getElementById('syncAllBtn');
-  if (!btn) return;
-  btn.classList.remove('stale-pulse');
-  void btn.offsetWidth; // force reflow
-  btn.classList.add('stale-pulse');
-  setTimeout(() => btn.classList.remove('stale-pulse'), 2400);
-}
-
 function renderEmpty() {
   document.getElementById('mainContent').innerHTML = `
     <div class="empty-state">
@@ -1336,12 +1285,6 @@ function renderProfile(s) {
           ${ds?.date ? `<span class="ds-date-pill">${escapeHtml(fmtSessionDate(ds.date))}</span>` : ''}
           <button type="button" class="ds-quick-btn" onclick="openQuickUpdateModal('${s.id}')" title="Saisir la séance (historique + parcours)">📝 Post-séance</button>
         </div>
-        ${ds?.manualEdit ? `
-          <div class="ds-manual-banner">
-            <span class="ds-manual-badge" title="Cette séance a été éditée manuellement et sera préservée par Sync All.">✋ Édité manuellement</span>
-            <button type="button" class="ds-resync-btn" onclick="resyncSeanceFromDoc('${s.id}')" title="Efface le flag et relance la cascade LLM depuis le Google Doc">↺ Re-sync depuis Doc</button>
-          </div>
-        ` : ''}
         ${ds?.titre ? `<div class="ds-title">${escapeHtml(ds.titre)}</div>` : ''}
         ${(ds?.devoirs && ds.devoirs.length) ? `
           <div class="ds-section devoirs">
@@ -1356,7 +1299,7 @@ function renderProfile(s) {
           </div>
         ` : ''}
         ${!ds || (!ds.devoirs?.length && !ds.resume?.length && !ds.titre)
-          ? '<p class="empty-note">Pas encore de séance synchronisée — clique sur 🔄 Sync All ou 📝 Post-séance.</p>'
+          ? '<p class="empty-note">Pas encore de séance enregistrée — clique sur 📝 Post-séance ou publie-la depuis Claude.</p>'
           : ''}
         ${docUrl ? `<a href="${escapeHtml(docUrl)}" target="_blank" rel="noopener" class="ds-doc-btn">📄 Voir le doc complet ↗</a>` : ''}
       </div>
@@ -1556,7 +1499,6 @@ async function selectStudent(id, forceSync = false) {
     if (!data || (data.error && data.source !== 'stale')) { showError(data.error || `Erreur ${res.status}`, data.details); return; }
     clientCache[id] = data;
     renderProfile(data);
-    if (data.source === 'stale') triggerStalePulse();
   } catch (e) {
     showError('Erreur réseau. Vérifie ta connexion et réessaie.', e.message);
   }
@@ -1568,39 +1510,6 @@ function syncStudent() {
 }
 window.syncStudent = syncStudent;
 
-async function syncFromGDocs() {
-  const btn = document.getElementById('syncAllBtn');
-  if (!btn) return;
-  btn.classList.add('syncing');
-  btn.disabled = true;
-  try {
-    const res = await fetch('/api/eleves/sync', {
-      method: 'POST',
-      credentials: 'same-origin'
-    });
-    const data = await res.json();
-    if (data.success) {
-      const summary = Object.entries(data.results)
-        .map(([name, r]) => r.ok
-          ? `✓ ${capitalize(name)} (${r.sessions} séances)`
-          : `✗ ${capitalize(name)}: ${r.error}`)
-        .join('\n');
-      alert('Sync terminé :\n' + summary);
-      clientCache = {};
-      if (activeId) selectStudent(activeId);
-    } else {
-      alert('Erreur sync');
-    }
-  } catch (e) {
-    alert('Erreur sync: ' + e.message);
-  } finally {
-    btn.classList.remove('syncing');
-    btn.disabled = false;
-  }
-}
-window.syncFromGDocs = syncFromGDocs;
-
-function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 function showToast(msg) {
   let t = document.querySelector('.pk-toast');
@@ -1904,8 +1813,7 @@ document.getElementById('roadmapForm').addEventListener('submit', async function
 
 // ─── Post-séance (remplace « Mise à jour rapide ») ───────────────
 // POST /api/eleves/:id/seance : ajoute la séance à l'historique (jamais
-// écrasé), met à jour le parcours et derniere_seance (manualEdit:true,
-// prioritaire sur la sync du Google Doc jusqu'au "Re-sync depuis Doc").
+// écrasé), met à jour le parcours et derniere_seance (manualEdit:true).
 let quickUpdateActiveId = null;
 let prefillItems = [];
 
@@ -2066,42 +1974,6 @@ document.getElementById('quickUpdateForm').addEventListener('submit', async func
     submitBtn.textContent = 'Enregistrer';
   }
 });
-
-async function resyncSeanceFromDoc(studentId) {
-  if (!confirm("Remplacer la séance éditée manuellement par celle extraite du Google Doc ?\n\nCela va lancer Sync All (5-15s) et écraser tes modifications manuelles.")) return;
-  showToast('Re-sync en cours…');
-  try {
-    // 1. Unflag le manualEdit
-    const r1 = await fetch(`/api/eleves/${studentId}`, {
-      method: 'PATCH',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ derniere_seance_unflag: true }),
-    });
-    if (!r1.ok) throw new Error('unflag failed (HTTP ' + r1.status + ')');
-    // 2. Lance Sync All (resync TOUS — l'API n'a pas de single-eleve sync POST)
-    const r2 = await fetch('/api/eleves/sync', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    const j2 = await r2.json().catch(() => ({}));
-    if (!r2.ok && r2.status !== 503) throw new Error('sync failed (HTTP ' + r2.status + ')');
-    // 3. Refetch profil pour render à jour
-    const r3 = await fetch(`/api/eleves/${studentId}`, { credentials: 'same-origin' });
-    const fresh = await r3.json();
-    if (r3.ok && !fresh.error) {
-      clientCache[studentId] = fresh;
-      const scrollY = window.scrollY;
-      renderProfile(fresh);
-      window.scrollTo(0, scrollY);
-    }
-    showToast('Re-sync terminé ✓');
-  } catch (e) {
-    showToast('Erreur : ' + (e.message || 'réessaie'));
-  }
-}
-window.resyncSeanceFromDoc = resyncSeanceFromDoc;
 
 // Esc ferme les modales post-séance / parcours
 document.addEventListener('keydown', function (e) {

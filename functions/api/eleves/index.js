@@ -175,7 +175,7 @@ export async function onRequestPost({ request, env }) {
   };
   if (docUrl) {
     // Si l'admin colle une URL Google Doc complète, on extrait l'id pour
-    // permettre la sync ultérieure (cf api/eleves/sync.js qui utilise doc_id).
+    // garder le lien du Doc sur la fiche (la synchro auto a été retirée).
     eleve.doc_url = docUrl;
     const m = docUrl.match(/\/document\/d\/([A-Za-z0-9_-]{20,})/);
     if (m) eleve.doc_id = m[1];

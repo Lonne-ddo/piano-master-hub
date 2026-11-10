@@ -257,63 +257,6 @@
             .mh-seance-chevron { transition: none; }
         }
 
-        /* ── Devoirs refresh button (inline dans le label devoirs) ── */
-        .mh-devoirs-label-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 0.7rem;
-        }
-        .mh-devoirs-label-row .mh-section-label { margin: 0; }
-
-        .mh-devoirs-refresh {
-            background: transparent;
-            border: none;
-            color: var(--mh-text-label);
-            cursor: pointer;
-            padding: 4px;
-            border-radius: 6px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 150ms ease, background 150ms ease;
-        }
-        .mh-devoirs-refresh:hover {
-            color: var(--mh-gold);
-            background: rgba(255, 255, 255, 0.04);
-        }
-        .mh-devoirs-refresh.spinning svg { animation: mh-devoirs-spin 0.8s linear infinite; }
-        @keyframes mh-devoirs-spin {
-            from { transform: rotate(0deg); }
-            to   { transform: rotate(360deg); }
-        }
-
-        /* Toast devoirs */
-        .mh-toast {
-            position: fixed;
-            bottom: 24px;
-            left: 50%;
-            transform: translateX(-50%) translateY(8px);
-            padding: 9px 16px;
-            background: rgba(15, 15, 20, 0.95);
-            border: 1px solid var(--mh-border-card-strong);
-            border-radius: 10px;
-            color: var(--mh-text-primary);
-            font-family: var(--mh-font-sans);
-            font-size: 12.5px;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s, transform 0.2s;
-            z-index: 9999;
-        }
-        .mh-toast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-        .mh-toast.success { border-color: rgba(94, 203, 139, 0.45); color: #5ecb8b; }
-        .mh-toast.error   { border-color: rgba(224, 92, 107, 0.5);  color: #f87171; }
-
         /* ── Empty/error states ── */
         .mh-empty {
             font-family: var(--mh-font-sans);
@@ -1372,7 +1315,6 @@
                 renderParcours(_lastRoadmap);
                 fetchSeances(eleve.slug);
                 renderResourceCards(eleve, data);
-                fetchAutoSyncedDevoirs(eleve.slug, data && data.derniere_seance, data && data.stats);
             })
             .catch(function(e) {
                 if (e && e.unauthorized) {
@@ -1389,9 +1331,6 @@
             });
     }
 
-    // Cache pour devoirs auto-syncés depuis Google Doc.
-    var _autoSyncedDevoirs = null;
-    var _devoirsRefreshAvailable = true;
     var _lastDerniereSeance = null;
     var _lastStats = null;
     var _lastRoadmap = null;
@@ -1448,30 +1387,16 @@
             progressHtml = '<div class="mh-progress mh-hero-progress"><div class="mh-progress-fill" style="width:0%"></div></div>';
         }
 
-        // Devoirs : ceux de la dernière séance enregistrée (historique) en
-        // priorité absolue ; sinon édition manuelle du coach, puis auto-syncés
-        // depuis le Doc, puis fallback LLM.
+        // Devoirs : ceux de la dernière séance enregistrée (historique) ;
+        // repli sur derniere_seance pour un élève sans historique.
         var devoirs = null;
         var derniereDevoirs = (derniere && Array.isArray(derniere.devoirs)) ? derniere.devoirs.filter(Boolean) : [];
         if (Array.isArray(_lastSeances) && _lastSeances.length > 0) {
             var latestDevoirs = (_lastSeances[0].devoirs || []).filter(Boolean);
             devoirs = latestDevoirs.length ? latestDevoirs : null;
-        } else if (derniere && derniere.manualEdit === true && derniereDevoirs.length > 0) {
-            devoirs = derniereDevoirs;
-        } else if (Array.isArray(_autoSyncedDevoirs) && _autoSyncedDevoirs.length > 0) {
-            devoirs = _autoSyncedDevoirs;
         } else if (derniereDevoirs.length > 0) {
             devoirs = derniereDevoirs;
         }
-
-        var refreshBtn = _devoirsRefreshAvailable
-            ? '<button type="button" id="devoirs-refresh-btn" class="mh-devoirs-refresh" title="Synchroniser depuis le Google Doc" aria-label="Synchroniser les devoirs">'
-              + '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-              + '<polyline points="23 4 23 10 17 10"></polyline>'
-              + '<polyline points="1 20 1 14 7 14"></polyline>'
-              + '<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>'
-              + '</svg></button>'
-            : '';
 
         var devoirsHtml = '';
         if (!devoirs) {
@@ -1492,15 +1417,9 @@
                 '</div>' +
                 titleHtml +
                 progressHtml +
-                '<div class="mh-devoirs-label-row">' +
-                    '<div class="mh-section-label">Devoirs à préparer</div>' +
-                    refreshBtn +
-                '</div>' +
+                '<div class="mh-section-label mh-hero-devoirs-label">Devoirs à préparer</div>' +
                 devoirsHtml +
             '</div>';
-
-        var btn = document.getElementById('devoirs-refresh-btn');
-        if (btn) btn.addEventListener('click', function () { triggerDevoirsRefresh(btn); });
     }
 
     // ──────────────────────────────────────────────
@@ -1549,72 +1468,6 @@
                 '<ol class="mh-roadmap-steps">' + stepsHtml + '</ol>' +
                 currentHtml +
             '</div>';
-    }
-
-    function getCurrentSlugForDevoirs() {
-        var params = new URLSearchParams(window.location.search);
-        var slug = (params.get('eleve') || '').toLowerCase();
-        if (slug) return slug;
-        var pathSlug = (window.location.pathname.replace(/^\/+/, '').split('/')[0] || '').toLowerCase();
-        return pathSlug;
-    }
-
-    function fetchAutoSyncedDevoirs(slug, derniere, stats) {
-        if (!slug) return;
-        fetch('/api/eleves/' + encodeURIComponent(slug) + '/devoirs', { credentials: 'include' })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (j) {
-                if (!j) return;
-                if (j.status === 'no_doc_id') { _devoirsRefreshAvailable = false; }
-                _autoSyncedDevoirs = Array.isArray(j.bullets) ? j.bullets : [];
-                renderHero(stats || _lastStats, derniere || _lastDerniereSeance);
-            })
-            .catch(function () { /* silent — fallback LLM préservé */ });
-    }
-
-    function triggerDevoirsRefresh(btn) {
-        var slug = getCurrentSlugForDevoirs();
-        if (!slug) return;
-        if (btn.classList.contains('spinning')) return;
-        btn.classList.add('spinning');
-        fetch('/api/eleves/' + encodeURIComponent(slug) + '/devoirs', {
-            method: 'POST', credentials: 'include',
-            headers: { 'Content-Type': 'application/json' }
-        })
-            .then(function (r) {
-                return r.json().catch(function () { return {}; }).then(function (j) {
-                    return { ok: r.ok, status: r.status, body: j };
-                });
-            })
-            .then(function (resp) {
-                btn.classList.remove('spinning');
-                if (resp.status === 404 && resp.body && resp.body.error === 'no_drive_url') {
-                    _devoirsRefreshAvailable = false;
-                    renderHero(_lastStats, _lastDerniereSeance);
-                    return;
-                }
-                if (!resp.ok) {
-                    showDevoirsToast('Sync impossible, réessaie plus tard', 'error');
-                    return;
-                }
-                _autoSyncedDevoirs = Array.isArray(resp.body.bullets) ? resp.body.bullets : [];
-                renderHero(_lastStats, _lastDerniereSeance);
-                showDevoirsToast('À jour ✓', 'success');
-            })
-            .catch(function () {
-                btn.classList.remove('spinning');
-                showDevoirsToast('Erreur réseau', 'error');
-            });
-    }
-
-    function showDevoirsToast(msg, type) {
-        var t = document.querySelector('.mh-toast');
-        if (!t) { t = document.createElement('div'); t.className = 'mh-toast'; document.body.appendChild(t); }
-        t.className = 'mh-toast' + (type ? ' ' + type : '');
-        t.textContent = msg;
-        requestAnimationFrame(function () { t.classList.add('show'); });
-        clearTimeout(showDevoirsToast._tid);
-        showDevoirsToast._tid = setTimeout(function () { t.classList.remove('show'); }, 2200);
     }
 
     // ──────────────────────────────────────────────
@@ -1708,16 +1561,11 @@
         if (!grid) return;
         var slug = eleve.slug;
 
-        var docUrl = data && data.doc_url;
         var telegramUrl = data && data.links && data.links.telegram;
 
         var html = '';
 
-        // 1. Suivi (Google Doc) — accent violet
-        if (docUrl) {
-            html += resourceCardHtml(docUrl, 'ti-file-text', 'violet', 'Suivi', 'Google Doc', true);
-        }
-        // 2. Telegram — neutral
+        // 1. Telegram — neutral
         if (telegramUrl) {
             html += resourceCardHtml(telegramUrl, 'ti-brand-telegram', 'neutral', 'Telegram', 'Discussions avec Lonne', true);
         }
