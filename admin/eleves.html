@@ -582,6 +582,27 @@
       border: 1px dashed var(--border); border-radius: 8px;
       padding: 10px; display: flex; flex-direction: column; gap: 8px;
     }
+    .prefill-box .hbtn { min-height: 44px; }
+    .quick-field textarea.fiche-input {
+      font-size: 16px; min-height: 160px;
+      font-family: ui-monospace, Menlo, Consolas, monospace;
+    }
+    .fiche-report { font-size: 13px; line-height: 1.45; color: var(--text2); }
+    .fiche-report:empty { display: none; }
+    .fiche-report ul { margin: 4px 0 0; padding-left: 18px; }
+    .fiche-report.is-warn { color: var(--amber); }
+    .fiche-mismatch {
+      border: 1px solid var(--red); border-radius: 8px;
+      background: var(--bg2); color: var(--text1);
+      padding: 10px 12px; font-size: 13px; line-height: 1.45;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .fiche-mismatch strong { color: var(--red); }
+    .fiche-mismatch label {
+      display: flex; align-items: center; gap: 8px;
+      min-height: 44px; cursor: pointer; color: var(--text2);
+    }
+    .fiche-mismatch input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--red); }
 
     /* ── Modal Post-séance / Parcours ─────────────────────── */
     .quick-modal-overlay {
@@ -1015,6 +1036,17 @@
         </div>
       </div>
     </div>
+    <div class="prefill-box">
+      <button type="button" class="hbtn" onclick="toggleFiche()">&#128203; Coller une fiche</button>
+      <div id="ficheBox" class="quick-field" style="display:none">
+        <label for="ficheInput">Fiche de s&eacute;ance <span class="quick-hint">(&Eacute;L&Egrave;VE, DATE, TITRE, R&Eacute;SUM&Eacute;, DEVOIRS, LIVRABLE, NOTE COACH)</span></label>
+        <textarea id="ficheInput" class="fiche-input" rows="8" spellcheck="false" placeholder="&Eacute;L&Egrave;VE: Pr&eacute;nom&#10;DATE: 2026-11-10&#10;TITRE: voicings ii-V-I&#10;R&Eacute;SUM&Eacute;:&#10;- ...&#10;DEVOIRS:&#10;- ...&#10;LIVRABLE:&#10;NOTE COACH:&#10;- ..."></textarea>
+        <div class="quick-actions">
+          <button type="button" class="hbtn primary" onclick="applyFiche()">Remplir</button>
+        </div>
+        <div id="ficheReport" class="fiche-report" role="status" aria-live="polite"></div>
+      </div>
+    </div>
     <form id="quickUpdateForm" autocomplete="off">
       <div class="quick-row">
         <div class="quick-field">
@@ -1052,6 +1084,10 @@
       <div class="quick-field">
         <label for="quickNote">Note coach <span class="quick-hint">(priv&eacute;e, jamais montr&eacute;e &agrave; l'&eacute;l&egrave;ve)</span></label>
         <textarea id="quickNote" rows="3" maxlength="1000"></textarea>
+      </div>
+      <div class="fiche-mismatch" id="ficheMismatch" style="display:none" role="alert">
+        <div id="ficheMismatchText"></div>
+        <label><input type="checkbox" id="ficheMismatchOk" onchange="onFicheMismatchOk()" /> Je confirme : enregistrer quand m&ecirc;me pour cet &eacute;l&egrave;ve</label>
       </div>
       <div class="quick-error" id="quickUpdateError"></div>
       <div class="quick-actions">
@@ -1835,7 +1871,9 @@ async function openQuickUpdateModal(studentId) {
   document.getElementById('quickTitre').value = '';
   document.getElementById('quickResume').value = '';
   document.getElementById('quickDevoirs').value = '';
+  ficheFilled = false;
   onQuickNChange();
+  resetFiche();
   document.getElementById('prefillList').style.display = 'none';
   document.getElementById('quickUpdateError').textContent = '';
   document.getElementById('quickUpdateOverlay').style.display = 'flex';
@@ -1846,7 +1884,7 @@ window.openQuickUpdateModal = openQuickUpdateModal;
 // Livrable et note coach pré-remplis depuis la séance choisie du parcours
 function onQuickNChange() {
   const rc = roadmapCache[quickUpdateActiveId];
-  if (!rc) return;
+  if (!rc || ficheFilled) return;
   const x = rc.roadmap.seances[Number(document.getElementById('quickN').value) - 1];
   document.getElementById('quickLivrable').value = (x && x.livrable) || '';
   document.getElementById('quickNote').value = (x && x.note_coach) || '';
@@ -1917,6 +1955,157 @@ function applyPrefill() {
 }
 window.applyPrefill = applyPrefill;
 
+// ── Coller une fiche (parse local, sans IA, n'enregistre rien) ──
+// Titres insensibles aux accents/casse, puces « - », « • », « * »,
+// blocs ``` tolérés. Remplit les champs ; l'enregistrement reste manuel.
+let ficheFilled = false;     // livrable/note issus de la fiche : ne pas écraser au changement de séance
+let ficheMismatch = false;   // ÉLÈVE ≠ élève ouvert → enregistrement bloqué tant que non confirmé
+
+const FICHE_KEYS = {
+  'ELEVE': 'eleve', 'DATE': 'date', 'TITRE': 'titre', 'RESUME': 'resume',
+  'DEVOIRS': 'devoirs', 'LIVRABLE': 'livrable', 'NOTE COACH': 'note',
+};
+const FICHE_LABELS = {
+  eleve: 'ÉLÈVE', date: 'DATE', titre: 'TITRE', resume: 'RÉSUMÉ',
+  devoirs: 'DEVOIRS', livrable: 'LIVRABLE', note: 'NOTE COACH',
+};
+
+function foldText(str) {
+  return String(str || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+function parseFiche(text) {
+  const sections = {};
+  let current = null;
+  for (const raw of String(text || '').replace(/\r/g, '').split('\n')) {
+    if (/^\s*```/.test(raw)) continue;
+    // Titre : « ÉLÈVE: x », « **Élève :** x », « ## Résumé: »
+    const m = raw.match(/^\s*(?:#+\s*)?(?:\*\*)?\s*([^:*#]+?)\s*(?:\*\*)?\s*:\s*(?:\*\*)?(.*)$/);
+    const key = m && FICHE_KEYS[foldText(m[1])];
+    if (key) {
+      current = key;
+      sections[key] = [];
+      const rest = m[2].trim();
+      if (rest) sections[key].push(rest);
+      continue;
+    }
+    if (!current) continue;
+    const item = raw.replace(/^\s*(?:[-•*]|\d+[.)])\s+/, '').trim();
+    if (item) sections[current].push(item);
+  }
+  return sections;
+}
+
+function isValidIsoDate(v) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(v + 'T00:00:00Z');
+  return !isNaN(d) && d.toISOString().slice(0, 10) === v;
+}
+
+function resetFiche() {
+  ficheMismatch = false;
+  document.getElementById('ficheInput').value = '';
+  document.getElementById('ficheBox').style.display = 'none';
+  setFicheReport([], false);
+  showFicheMismatch(null);
+}
+
+function toggleFiche() {
+  const box = document.getElementById('ficheBox');
+  const open = box.style.display === 'none';
+  box.style.display = open ? 'flex' : 'none';
+  if (open) document.getElementById('ficheInput').focus();
+}
+window.toggleFiche = toggleFiche;
+
+function setFicheReport(lines, warn) {
+  const el = document.getElementById('ficheReport');
+  el.classList.toggle('is-warn', !!warn);
+  el.innerHTML = lines.length
+    ? (lines.length === 1 ? escapeHtml(lines[0])
+      : '<ul>' + lines.map(l => `<li>${escapeHtml(l)}</li>`).join('') + '</ul>')
+    : '';
+}
+
+function showFicheMismatch(msg) {
+  const box = document.getElementById('ficheMismatch');
+  document.getElementById('ficheMismatchOk').checked = false;
+  if (!msg) { box.style.display = 'none'; return; }
+  document.getElementById('ficheMismatchText').innerHTML = msg;
+  box.style.display = 'flex';
+}
+
+function onFicheMismatchOk() {
+  if (document.getElementById('ficheMismatchOk').checked) {
+    document.getElementById('quickUpdateError').textContent = '';
+  }
+}
+window.onFicheMismatchOk = onFicheMismatchOk;
+
+function applyFiche() {
+  const studentId = quickUpdateActiveId;
+  if (!studentId) return;
+  const sec = parseFiche(document.getElementById('ficheInput').value);
+  const found = Object.keys(sec);
+  document.getElementById('quickUpdateError').textContent = '';
+  if (!found.length) {
+    setFicheReport(["Aucune section reconnue : vérifie les titres (ÉLÈVE:, DATE:, TITRE:…). Rien n'a été rempli."], true);
+    return;
+  }
+  const notes = [];
+  const missing = Object.values(FICHE_KEYS).filter(k => !(k in sec));
+  if (missing.length) notes.push('Sections manquantes (champs laissés tels quels) : ' + missing.map(k => FICHE_LABELS[k]).join(', ') + '.');
+
+  const set = (id, v) => { document.getElementById(id).value = v; };
+  if ('date' in sec) {
+    const d = (sec.date[0] || '').trim();
+    if (isValidIsoDate(d)) set('quickDate', d);
+    else notes.push(`DATE invalide (« ${d || 'vide'} », attendu AAAA-MM-JJ) : date non remplie.`);
+  }
+  if ('titre' in sec) {
+    const t = sec.titre.join(' ').trim();
+    if (!t) notes.push('TITRE vide.');
+    else {
+      if (t.length > 80) notes.push('TITRE tronqué à 80 caractères.');
+      set('quickTitre', t.slice(0, 80));
+    }
+  }
+  if ('resume' in sec) set('quickResume', sec.resume.join('\n'));
+  if ('devoirs' in sec) set('quickDevoirs', sec.devoirs.join('\n'));
+  if ('livrable' in sec) {
+    const l = sec.livrable.join(' ').trim();
+    if (l.length > 200) notes.push('LIVRABLE tronqué à 200 caractères.');
+    set('quickLivrable', l.slice(0, 200));
+  }
+  if ('note' in sec) {
+    const n = sec.note.join('\n');
+    if (n.length > 1000) notes.push('NOTE COACH tronquée à 1000 caractères.');
+    set('quickNote', n.slice(0, 1000));
+  }
+  ficheFilled = ficheFilled || 'livrable' in sec || 'note' in sec;
+
+  // Contrôle élève : comparé au nom, au slug et à leur premier mot
+  ficheMismatch = false;
+  showFicheMismatch(null);
+  if ('eleve' in sec) {
+    const raw = sec.eleve.join(' ');
+    const who = foldText(raw);
+    const nom = (clientCache[studentId] || {}).nom || '';
+    const accepted = [studentId, studentId.split('-')[0], nom, nom.split(/\s+/)[0]].map(foldText).filter(Boolean);
+    if (!who) notes.push("ÉLÈVE vide : impossible de vérifier l'élève.");
+    else if (!accepted.includes(who)) {
+      ficheMismatch = true;
+      showFicheMismatch(`<strong>Attention : la fiche est pour « ${escapeHtml(raw)} »</strong>, mais l'élève ouvert est <strong>${escapeHtml(nom || studentId)}</strong>. Enregistrement bloqué tant que tu n'as pas confirmé.`);
+    }
+  }
+
+  if (ficheMismatch) notes.unshift("⚠ Élève différent de l'élève ouvert : confirmation requise avant l'enregistrement (encadré rouge en bas du formulaire).");
+  setFicheReport(notes.length ? notes : ['Fiche appliquée ✓ Vérifie les champs puis clique sur Enregistrer.'], notes.length > 0);
+  showToast(ficheMismatch ? "⚠ Fiche d'un autre élève" : notes.length ? 'Fiche appliquée, avec remarques' : 'Fiche appliquée ✓');
+}
+window.applyFiche = applyFiche;
+
 document.getElementById('quickUpdateForm').addEventListener('submit', async function (ev) {
   ev.preventDefault();
   if (!quickUpdateActiveId) return;
@@ -1924,6 +2113,11 @@ document.getElementById('quickUpdateForm').addEventListener('submit', async func
   const errorEl = document.getElementById('quickUpdateError');
   const submitBtn = document.getElementById('quickUpdateSubmit');
   errorEl.textContent = '';
+  if (ficheMismatch && !document.getElementById('ficheMismatchOk').checked) {
+    errorEl.textContent = "La fiche collée concerne un autre élève : coche la confirmation avant d'enregistrer.";
+    document.getElementById('ficheMismatch').scrollIntoView({ block: 'center' });
+    return;
+  }
 
   const date = document.getElementById('quickDate').value.trim();
   const titre = document.getElementById('quickTitre').value.trim();
