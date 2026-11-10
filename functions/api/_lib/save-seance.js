@@ -9,9 +9,9 @@
 //   - seances:<slug>  : la séance est AJOUTÉE à l'historique (jamais écrasé)
 //   - roadmap         : jamais touchée (parcours retiré ; données KV ignorées)
 //   - derniere_seance : la plus récente de l'historique, manualEdit:true
-//   - stats.nb_cours  : nombre total de séances enregistrées (sans plafond)
+//   - stats           : recalculées depuis l'historique (cf. _lib/eleves-stats.js)
 
-import { parseIsoDate, withSeanceStats } from './eleves-stats.js';
+import { parseIsoDate, computeEleveStats } from './eleves-stats.js';
 
 export const SEANCE_LIMITS = {
   titre: 80,
@@ -92,7 +92,14 @@ export async function saveSeance(env, slug, body) {
   const existingDs = record.derniere_seance;
   const keepDocSeance = existingDs && existingDs.manualEdit !== true
     && typeof existingDs.date === 'string' && existingDs.date > latest.date;
-  const updated = { ...withSeanceStats(record, history.length), _patchedAt: new Date().toISOString() };
+  const stats = computeEleveStats(record, history);
+  const updated = {
+    ...record,
+    stats,
+    nb_seances: history.length,
+    sessionCount: history.length,
+    _patchedAt: new Date().toISOString(),
+  };
   if (!keepDocSeance) {
     updated.derniere_seance = {
       date: latest.date,

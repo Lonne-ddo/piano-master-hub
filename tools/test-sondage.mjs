@@ -271,6 +271,17 @@ async function seanceRoundTrip(C, H) {
     const nb = pub.body?.stats?.nb_cours;
     if (nb === 9) ok(C, 'Post-séance : nb_cours non plafonné', `nb_cours=${nb}`);
     else ko(C, 'Post-séance : nb_cours non plafonné', `nb_cours=${nb}`);
+    // Accompagnement avec_fin (défaut) : fin = 1re séance + 8 semaines
+    const st = pub.body?.stats || {};
+    if (st.accompagnement === 'avec_fin' && st.date_debut === '2026-09-01' && st.date_fin === '2026-10-27')
+      ok(C, 'Accompagnement avec_fin : début = 1re séance, fin = +8 semaines', `${st.date_debut} → ${st.date_fin}`);
+    else ko(C, 'Accompagnement avec_fin : début = 1re séance, fin = +8 semaines', JSON.stringify(st));
+    const pa = await http(`/api/eleves/${slug}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ accompagnement: 'sans_fin' }) });
+    const pub2 = await http(`/api/eleves/${slug}/public`, H);
+    const st2 = pub2.body?.stats || {};
+    if (pa.status === 200 && st2.accompagnement === 'sans_fin' && st2.date_fin === null && st2.progression_pct === null)
+      ok(C, 'Accompagnement sans_fin : ni date de fin ni progression', '');
+    else ko(C, 'Accompagnement sans_fin : ni date de fin ni progression', `PATCH ${pa.status} ${JSON.stringify(st2)}`);
   } finally {
     await http(`/api/eleves/${slug}`, { method: 'DELETE', headers: H.headers });
   }

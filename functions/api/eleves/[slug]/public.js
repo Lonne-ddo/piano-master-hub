@@ -4,6 +4,7 @@
 // Whitelist STRICTE des champs exposés. PAS d'observations (privé coach).
 
 import { requireEleveOrAdmin } from '../../_lib/session.js';
+import { loadEleveStats } from '../../_lib/eleves-stats.js';
 
 // Source primaire : KV `eleves:list`. FALLBACK_SLUGS pour dégradation gracieuse.
 const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
@@ -60,15 +61,19 @@ export async function onRequestGet({ params, request, env }) {
     });
   }
 
+  // Stats recalculées à chaque lecture (séances publiées + accompagnement).
   // Whitelist STRICTE des champs exposés (sécurité côté élève)
-  const stats = data.stats ? {
-    nb_cours: data.stats.nb_cours ?? null,
-    date_debut: data.stats.date_debut ?? null,
-    date_debut_label: data.stats.date_debut_label ?? null,
-    date_fin: data.stats.date_fin ?? null,
-    date_fin_label: data.stats.date_fin_label ?? null,
-    progression_pct: data.stats.progression_pct ?? null,
-  } : null;
+  const live = await loadEleveStats(env, slug, data);
+  const stats = {
+    accompagnement: live.accompagnement,
+    nb_seances: live.nb_seances,
+    nb_cours: live.nb_cours,
+    date_debut: live.date_debut,
+    date_debut_label: live.date_debut_label,
+    date_fin: live.date_fin,
+    date_fin_label: live.date_fin_label,
+    progression_pct: live.progression_pct,
+  };
 
   const derniere_seance = data.derniere_seance ? {
     date: data.derniere_seance.date ?? null,

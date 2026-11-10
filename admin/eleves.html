@@ -402,6 +402,13 @@
       flex-direction: column;
       gap: 2px;
     }
+    .acc-select {
+      min-height: 44px; padding: 6px 10px;
+      background: var(--bg2); color: var(--text1);
+      border: 1px solid var(--border); border-radius: 8px;
+      font-size: 16px; font-family: inherit;
+    }
+    .acc-select:focus { outline: none; border-color: var(--v); }
     .date-label {
       font-size: 10.5px;
       text-transform: uppercase;
@@ -1229,17 +1236,18 @@ function renderProfile(s) {
   const devoirsRecurrents = lastDevoirs.length > 0 ? lastDevoirs : ['Tonedear (ear training)'];
   const repertoireActif = repertoire.filter(r => r.statut === 'en-cours');
 
-  // Progression : priorité au stats.progression_pct (sync.js v3+), fallback aux anciens champs
+  // Stats calculées côté serveur : séances publiées + accompagnement
+  // (avec_fin : fin = 1re séance + 8 semaines ; sans_fin : ni fin ni progression)
   const stats = s.stats || null;
-  const progression = typeof stats?.progression_pct === 'number' ? stats.progression_pct
-    : typeof s.progression === 'number' ? s.progression
-    : (theorie.length ? Math.round(theorie.filter(t => t.statut === 'done').length / theorie.length * 100) : 0);
+  const accompagnement = stats?.accompagnement === 'sans_fin' ? 'sans_fin' : 'avec_fin';
+  const avecFin = accompagnement === 'avec_fin';
+  const progression = typeof stats?.progression_pct === 'number' ? stats.progression_pct : 0;
 
   // Dates ISO pour édition inline + labels français
   const debutIso = stats?.date_debut || '';
   const finIso   = stats?.date_fin   || '';
-  const debutLabel = stats?.date_debut_label || (s.premier_cours || '—');
-  const finLabel   = stats?.date_fin_label   || (s.fin_prevue     || '—');
+  const debutLabel = stats?.date_debut_label || '—';
+  const finLabel   = stats?.date_fin_label   || '—';
   const debutOverride = stats?.override_active?.date_debut || false;
   const finOverride   = stats?.override_active?.date_fin   || false;
   // Total cours : override > défaut (8). Affichage et édition inline.
@@ -1248,14 +1256,21 @@ function renderProfile(s) {
 
   const main = document.getElementById('mainContent');
   main.innerHTML = `
-    <!-- ═ Progression bar ═════════════════════════════════════ -->
-    <div class="prog-row">
+    <!-- ═ Progression bar (accompagnement avec fin uniquement) ═ -->
+    ${avecFin ? `<div class="prog-row">
       <div class="prog-bar"><div class="prog-fill" style="width:${progression}%"></div></div>
       <div class="prog-pct">${progression}%</div>
-    </div>
+    </div>` : ''}
 
-    <!-- ═ Dates éditables (stats_override via PATCH) ══════════ -->
+    <!-- ═ Accompagnement + dates éditables (PATCH) ════════════ -->
     <div class="dates-row">
+      <div class="date-edit">
+        <label class="date-label" for="accSelect">Accompagnement</label>
+        <select id="accSelect" class="acc-select" onchange="setAccompagnement('${s.id}', this.value)">
+          <option value="avec_fin"${avecFin ? ' selected' : ''}>Avec fin (8 semaines)</option>
+          <option value="sans_fin"${avecFin ? '' : ' selected'}>Sans fin</option>
+        </select>
+      </div>
       <div class="date-edit" data-field="date_debut">
         <span class="date-label">Début</span>
         <span style="display:inline-flex;align-items:center;">
@@ -1263,13 +1278,13 @@ function renderProfile(s) {
           ${debutOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','date_debut')" title="Réinitialiser au calcul auto">↺</button>` : ''}
         </span>
       </div>
-      <div class="date-edit" data-field="date_fin">
+      ${avecFin ? `<div class="date-edit" data-field="date_fin">
         <span class="date-label">Fin prévue</span>
         <span style="display:inline-flex;align-items:center;">
           <span class="date-value ${finOverride ? 'override-active' : ''}" tabindex="0" role="button" data-raw="${escapeHtml(finIso)}">${escapeHtml(finLabel)}</span>
-          ${finOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','date_fin')" title="Réinitialiser au calcul auto">↺</button>` : ''}
+          ${finOverride ? `<button type="button" class="date-reset-btn" onclick="resetDateOverride('${s.id}','date_fin')" title="Réinitialiser au calcul auto (début + 8 semaines)">↺</button>` : ''}
         </span>
-      </div>
+      </div>` : ''}
       <div class="date-edit" data-field="total_cours" data-kind="number">
         <span class="date-label">Total cours</span>
         <span style="display:inline-flex;align-items:center;">
@@ -1658,6 +1673,34 @@ async function resetDateOverride(studentId, field) {
   }
 }
 window.resetDateOverride = resetDateOverride;
+
+// Type d'accompagnement : avec_fin (fin = 1re séance + 8 semaines) | sans_fin
+async function setAccompagnement(studentId, value) {
+  showToast('Sauvegarde…');
+  try {
+    const res = await fetch(`/api/eleves/${studentId}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accompagnement: value }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload.error || !(payload.ok || payload.success)) {
+      throw new Error(payload.error || `HTTP ${res.status}`);
+    }
+    if (payload.data) {
+      clientCache[studentId] = payload.data;
+      const scrollY = window.scrollY;
+      renderProfile(payload.data);
+      window.scrollTo(0, scrollY);
+    }
+    showToast(value === 'sans_fin' ? 'Accompagnement sans fin ✓' : 'Accompagnement avec fin (8 semaines) ✓');
+  } catch (e) {
+    showToast('Erreur, réessaie');
+    if (clientCache[studentId]) renderProfile(clientCache[studentId]);
+  }
+}
+window.setAccompagnement = setAccompagnement;
 
 // ─── Séances publiées (historique, plus récente d'abord) ─────────
 // GET /api/eleves/:id/seances → { seances } (sans note_coach).
