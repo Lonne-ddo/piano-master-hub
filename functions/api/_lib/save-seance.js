@@ -1,9 +1,9 @@
 // ─── Enregistrement d'une séance (logique partagée) ──────────────
 // Utilisé par POST /api/eleves/:slug/seance (formulaire post-séance admin).
 //
-// Entrée : { n?, date, titre, resume[], devoirs[], livrable?, statut?, note_coach? }
-//   n       : numéro de la séance du parcours (1..8, défaut = séance courante)
-//   statut  : 'faite' (défaut) | 'en_cours' — faite → la suivante passe en cours
+// Entrée : { date, titre, resume[], devoirs[], livrable?, note_coach? }
+//   n : calculé ici = nombre de séances déjà enregistrées + 1 (un `n`
+//       envoyé par le client est ignoré).
 //
 // Effets :
 //   - seances:<slug>  : la séance est AJOUTÉE à l'historique (jamais écrasé)
@@ -65,33 +65,32 @@ export async function saveSeance(env, slug, body) {
   const resume = cleanList(body.resume ?? []);
   const devoirs = cleanList(body.devoirs ?? []);
   if (!resume || !devoirs) return { ok: false, status: 400, error: 'resume et devoirs : listes attendues' };
-  const statut = body.statut === 'en_cours' ? 'en_cours' : 'faite';
   const livrable = cleanText(body.livrable, SEANCE_LIMITS.livrable);
   const noteCoach = cleanText(body.note_coach, SEANCE_LIMITS.note_coach);
 
   const record = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`, { type: 'json' });
   if (!record) return { ok: false, status: 404, error: 'Élève introuvable' };
 
-  const roadmap = ensureRoadmap(record);
-  const n = body.n === undefined || body.n === null ? roadmap.seance_courante : Number(body.n);
-  if (!Number.isInteger(n) || n < 1 || n > ROADMAP_SIZE) {
-    return { ok: false, status: 400, error: `n invalide (1..${ROADMAP_SIZE})` };
-  }
+  // ── Numéro : séances déjà enregistrées + 1 ──
+  const historyKey = `seances:${slug}`;
+  let history = await readSeances(env, slug);
+  const n = history.length + 1;
 
-  // ── Roadmap : séance n ──
-  const seance = roadmap.seances[n - 1];
-  seance.statut = statut;
-  seance.date = date;
-  if (livrable) seance.livrable = livrable;
-  if (noteCoach) seance.note_coach = noteCoach;
+  // ── Roadmap : séance n si elle existe dans le parcours ──
+  const roadmap = ensureRoadmap(record);
+  if (n <= ROADMAP_SIZE) {
+    const seance = roadmap.seances[n - 1];
+    seance.statut = 'faite';
+    seance.date = date;
+    if (livrable) seance.livrable = livrable;
+    if (noteCoach) seance.note_coach = noteCoach;
+  }
   const nextRoadmap = normalizeRoadmap(roadmap);
 
   // ── Historique : ajout, jamais d'écrasement ──
-  const historyKey = `seances:${slug}`;
-  let history = await readSeances(env, slug);
   const entry = {
     id: crypto.randomUUID(),
-    n, date, titre, resume, devoirs, livrable, statut,
+    n, date, titre, resume, devoirs, livrable,
     note_coach: noteCoach,
     createdAt: new Date().toISOString(),
   };
