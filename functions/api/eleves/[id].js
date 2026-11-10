@@ -62,6 +62,7 @@ const PROTECTED_FIELDS = [
   'roadmap',      // parcours retiré : donnée héritée conservée, ignorée
   'nb_seances',
   'accompagnement',
+  'seances_anterieures',
   '_patchedAt',
 ];
 
@@ -170,6 +171,7 @@ async function callLLM(prompt, env, opts) {
 import { extractJSON } from '../_lib/json-extract.js';
 import {
   parseIsoDate, computeEleveStats, loadEleveStats, ACCOMPAGNEMENTS,
+  SEANCES_ANTERIEURES_MAX,
 } from '../_lib/eleves-stats.js';
 
 // ─── Sanitization post-LLM des années (anti-hallucination) ───────
@@ -409,7 +411,7 @@ export async function onRequestGet({ params, request, env }) {
 
 // ─── PATCH /api/eleves/{id} ──────────────────────────────────────
 // Body : { stats_override?: { date_debut?: "YYYY-MM-DD"|null, date_fin?: "YYYY-MM-DD"|null, total_cours?: int|null },
-//         accompagnement?: 'avec_fin' | 'sans_fin' }
+//         accompagnement?: 'avec_fin' | 'sans_fin', seances_anterieures?: int ≥ 0 }
 // - Champs présents dans body.stats_override sont mergés avec l'override existant.
 // - Valeur null = supprime le champ d'override (revient au calcul auto/défaut).
 // - date_debut/date_fin : ISO YYYY-MM-DD uniquement.
@@ -484,6 +486,15 @@ export async function onRequestPatch({ params, request, env }) {
       return jsonResponse({ error: 'accompagnement invalide (avec_fin | sans_fin)' }, 400);
     }
     updated.accompagnement = body.accompagnement;
+  }
+
+  // ── Handle seances_anterieures (séances faites avant la publication) ──
+  if (body.seances_anterieures !== undefined) {
+    const n = Number(body.seances_anterieures);
+    if (!Number.isInteger(n) || n < 0 || n > SEANCES_ANTERIEURES_MAX) {
+      return jsonResponse({ error: `seances_anterieures invalide (entier 0..${SEANCES_ANTERIEURES_MAX})` }, 400);
+    }
+    updated.seances_anterieures = n;
   }
 
   // ── Handle doc_id patch (admin édite l'URL Google Doc) ──────
