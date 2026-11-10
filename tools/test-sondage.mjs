@@ -136,7 +136,6 @@ async function categoryA() {
   for (const s of SLUGS) {
     protectedRoutes.push(['GET', `/api/eleves/${s}/onboarded`], ['POST', `/api/eleves/${s}/onboarded`, {}],
                          ['GET', `/api/eleves/${s}/repertoire`], ['GET', `/api/eleves/${s}/repertoire/x`],
-                         ['GET', `/api/eleves/${s}/roadmap`], ['PATCH', `/api/eleves/${s}/roadmap`, { seances: [] }],
                          ['POST', `/api/eleves/${s}/seance`, { date: '2026-01-01', titre: 'x', resume: [], devoirs: [] }]);
   }
   for (const [method, path, body] of protectedRoutes) {
@@ -216,17 +215,12 @@ async function categoryB() {
         const rp = await http(`/api/eleves/${s}/repertoire`, H);
         if (rp.status === 200 && Array.isArray(rp.body?.morceaux)) ok(C, `[${s}] GET /repertoire (admin)`, `${rp.body.morceaux.length} morceaux`);
         else ko(C, `[${s}] GET /repertoire (admin)`, `status ${rp.status}`);
-        // Roadmap : 8 séances côté admin ; /public la renvoie sans note_coach
-        const rm = await http(`/api/eleves/${s}/roadmap`, H);
-        if (rm.status === 200 && rm.body?.roadmap?.seances?.length === 8) ok(C, `[${s}] GET /roadmap (admin)`, `${rm.body.roadmap.parcours}, séance ${rm.body.roadmap.seance_courante}`);
-        else if (rm.status === 404) skip(C, `[${s}] GET /roadmap (admin)`, 'pas de record eleve:<slug> en KV');
-        else ko(C, `[${s}] GET /roadmap (admin)`, `status ${rm.status}`);
+        // /public : ni parcours (retiré) ni note_coach (privée coach)
         const pub = await http(`/api/eleves/${s}/public`, H);
         const pubTxt = JSON.stringify(pub.body || {});
-        if (pub.status === 200 && pub.body?.roadmap?.seances?.length === 8 && !pubTxt.includes('note_coach'))
-          ok(C, `[${s}] /public : roadmap sans note_coach`, '');
-        else if (pub.status === 200 && rm.status === 404 && !pubTxt.includes('note_coach')) skip(C, `[${s}] /public : roadmap`, 'pas de record eleve:<slug> en KV');
-        else ko(C, `[${s}] /public : roadmap sans note_coach`, `status ${pub.status}, note_coach ${pubTxt.includes('note_coach') ? 'présente' : 'absente'}`);
+        if (pub.status === 200 && !('roadmap' in (pub.body || {})) && !pubTxt.includes('note_coach'))
+          ok(C, `[${s}] /public : sans parcours ni note_coach`, '');
+        else ko(C, `[${s}] /public : sans parcours ni note_coach`, `status ${pub.status}, roadmap ${'roadmap' in (pub.body || {}) ? 'présente' : 'absente'}, note_coach ${pubTxt.includes('note_coach') ? 'présente' : 'absente'}`);
       }
       if (IS_PROD) skip(C, 'Post-séance : encodage + nb_cours > 8', 'écrit en KV → exécuté hors prod uniquement');
       else await seanceRoundTrip(C, H);
@@ -247,9 +241,9 @@ async function categoryB() {
   } else skip(C, 'POST /api/admin/login → 429', 'RL_LOGIN_TEST=1 pour tester (bloque l’IP 15 min)');
 }
 
-// Élève jetable : 9 séances post-séance (la 1re avec accents et
+// Élève jetable : 9 séances publiées (la dernière avec accents et
 // apostrophes typographiques) → /public doit rendre le résumé à
-// l'identique et nb_cours = 9 (non plafonné), progression parcours 8/8.
+// l'identique, nb_cours = 9 et numéros attribués 1..9 par le serveur.
 async function seanceRoundTrip(C, H) {
   const TXT = "Différence « maj7 » ’ noms d'accords — œuvre é";
   const nom = 'Sondage Encodage';
@@ -260,19 +254,23 @@ async function seanceRoundTrip(C, H) {
     body: JSON.stringify({ nom, email: 'sondage-encodage@example.com' }) });
   if (cr.status !== 201) { ko(C, 'Post-séance : création élève de test', `status ${cr.status}`); return; }
   try {
+    const nums = [];
     for (let i = 1; i <= 9; i++) {
       const r = await http(`/api/eleves/${slug}/seance`, { method: 'POST', headers: auth, body: JSON.stringify({
-        n: Math.min(i, 8), date: `2026-09-${String(i).padStart(2, '0')}`, titre: `Séance ${i}`,
+        n: 1, date: `2026-09-${String(i).padStart(2, '0')}`, titre: `Séance ${i}`,
         resume: i === 9 ? [TXT] : ['x'], devoirs: [] }) });
       if (r.status !== 200) { ko(C, `Post-séance : POST /seance n°${i}`, `status ${r.status}`); return; }
+      nums.push(r.body?.entry?.n);
     }
+    if (nums.join(',') === '1,2,3,4,5,6,7,8,9') ok(C, 'Post-séance : numéro calculé côté serveur', '1..9 (n client ignoré)');
+    else ko(C, 'Post-séance : numéro calculé côté serveur', nums.join(','));
     const pub = await http(`/api/eleves/${slug}/public`, H);
     const got = pub.body?.derniere_seance?.resume?.[0];
     if (got === TXT) ok(C, "Post-séance : « é ' « » ’ œ » identique dans /public", '');
     else ko(C, "Post-séance : « é ' « » ’ œ » identique dans /public", JSON.stringify(got));
-    const nb = pub.body?.stats?.nb_cours, faites = pub.body?.roadmap?.faites;
-    if (nb === 9 && faites === 8) ok(C, 'Post-séance : nb_cours non plafonné', `nb_cours=${nb}, parcours ${faites}/8`);
-    else ko(C, 'Post-séance : nb_cours non plafonné', `nb_cours=${nb}, parcours ${faites}/8`);
+    const nb = pub.body?.stats?.nb_cours;
+    if (nb === 9) ok(C, 'Post-séance : nb_cours non plafonné', `nb_cours=${nb}`);
+    else ko(C, 'Post-séance : nb_cours non plafonné', `nb_cours=${nb}`);
   } finally {
     await http(`/api/eleves/${slug}`, { method: 'DELETE', headers: H.headers });
   }

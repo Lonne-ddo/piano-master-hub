@@ -59,7 +59,7 @@ const PROTECTED_FIELDS = [
   'canaux',
   'email',
   'archived',
-  'roadmap',
+  'roadmap',      // parcours retiré : donnée héritée conservée, ignorée
   'nb_seances',
   '_patchedAt',
 ];
@@ -168,7 +168,7 @@ async function callLLM(prompt, env, opts) {
 // sont importés de _lib/ (C6+D2 dedup avec sync.js).
 import { extractJSON } from '../_lib/json-extract.js';
 import { mergeStats, parseIsoDate } from '../_lib/eleves-stats.js';
-import { applySeanceStats } from '../_lib/roadmap.js';
+import { applySeanceStats } from '../_lib/eleves-stats.js';
 
 // ─── Sanitization post-LLM des années (anti-hallucination) ───────
 // Le LLM peut produire "08/03/2024" sur un doc qui ne dit que "08/03". On corrige

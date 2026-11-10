@@ -534,50 +534,16 @@
     }
     .ds-quick-btn:hover { background: var(--v-dim); color: var(--v); border-color: var(--v); }
 
-    /* ── Carte Parcours (roadmap 8 séances) ─────────────────── */
-    .roadmap-card { margin-bottom: 18px; }
-    .rm-label {
+    /* ── Carte Séances publiées ───────────────────────────── */
+    .seances-card { margin-bottom: 18px; }
+    .sc-label {
       text-transform: none; letter-spacing: 0; font-weight: 500;
       color: var(--text2); font-size: 12px;
     }
-    .rm-head-actions { margin-left: auto; display: flex; gap: 6px; }
-    .rm-list {
-      list-style: none;
-      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
-    }
-    @media (max-width: 900px) { .rm-list { grid-template-columns: repeat(2, 1fr); } }
-    .rm-item {
-      padding: 10px 12px; border-radius: 8px;
-      background: var(--bg2); border: 1px solid var(--border);
-      display: flex; flex-direction: column; gap: 3px; min-width: 0;
-    }
-    .rm-item.is-faite { border-color: rgba(94,203,139,0.35); }
-    .rm-item.is-current { border-color: var(--v); background: var(--v-dim); }
-    .rm-item-top {
-      display: flex; align-items: center; gap: 6px;
-      font-size: 10.5px; color: var(--text3); font-family: 'DM Mono', monospace;
-    }
-    .rm-item.is-faite .rm-item-top { color: var(--green); }
-    .rm-item.is-current .rm-item-top { color: var(--v); }
-    .rm-item-title { font-size: 13px; color: var(--text1); line-height: 1.3; }
-    .rm-current { font-size: 13px; color: var(--text2); line-height: 1.5; }
-    .rm-current strong { color: var(--text1); font-weight: 600; }
-    .rm-history { list-style: none; display: flex; flex-direction: column; gap: 4px; }
-    .rm-history li { font-size: 12.5px; color: var(--text2); }
-    .rm-hdate { font-family: 'DM Mono', monospace; color: var(--text3); margin-right: 6px; }
-    .rm-edit-row {
-      border: 1px solid var(--border); border-radius: 10px;
-      padding: 12px; margin: 0;
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-    }
-    .rm-edit-row legend {
-      font-size: 11px; color: var(--v); font-family: 'DM Mono', monospace; padding: 0 6px;
-    }
-    .rm-edit-row .full { grid-column: 1 / -1; }
-    .quick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    @media (max-width: 600px) {
-      .rm-edit-row, .quick-row { grid-template-columns: 1fr; }
-    }
+    .sc-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .sc-list li { font-size: 13px; color: var(--text2); line-height: 1.4; }
+    .sc-n { font-family: 'DM Mono', monospace; color: var(--v); margin-right: 6px; }
+    .sc-date { font-family: 'DM Mono', monospace; color: var(--text3); margin-right: 6px; }
     .prefill-box {
       border: 1px dashed var(--border); border-radius: 8px;
       padding: 10px; display: flex; flex-direction: column; gap: 8px;
@@ -637,7 +603,7 @@
     .manual-box[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 12px; }
     .manual-fields { display: flex; flex-direction: column; gap: 12px; padding-bottom: 12px; }
 
-    /* ── Modal Post-séance / Parcours ─────────────────────── */
+    /* ── Modal Post-séance ─────────────────────────────────── */
     .quick-modal-overlay {
       position: fixed; inset: 0;
       background: rgba(0,0,0,0.7);
@@ -695,7 +661,6 @@
     .quick-field input:focus,
     .quick-field textarea:focus,
     .quick-field select:focus { border-color: var(--v); }
-    .quick-modal.wide { max-width: 760px; }
     .quick-field textarea { resize: vertical; min-height: 80px; }
     .quick-field .quick-hint {
       font-size: 11px; color: var(--text3);
@@ -1121,22 +1086,6 @@
   </div>
 </div>
 
-<!-- ═══ MODAL : Parcours (8 séances de l'élève) ═══════════════════ -->
-<div class="quick-modal-overlay" id="roadmapOverlay" style="display:none">
-  <div class="quick-modal wide">
-    <h2>Parcours</h2>
-    <div class="quick-sub" id="roadmapSub">Les modifications ne concernent que cet &eacute;l&egrave;ve : le parcours mod&egrave;le n'est jamais modifi&eacute;.</div>
-    <form id="roadmapForm" autocomplete="off">
-      <div id="rmSeances" style="display:flex;flex-direction:column;gap:10px;"></div>
-      <div class="quick-error" id="roadmapError"></div>
-      <div class="quick-actions">
-        <button type="button" class="hbtn" onclick="closeRoadmapModal()">Annuler</button>
-        <button type="submit" class="hbtn primary" id="roadmapSubmit">Enregistrer</button>
-      </div>
-    </form>
-  </div>
-</div>
-
 <!-- ═══ SCRIPTS ═══════════════════════════════════════════════ -->
 <script>
 // ─── App logic ─────────────────────────────────────────────────
@@ -1330,10 +1279,10 @@ function renderProfile(s) {
       </div>
     </div>
 
-    <!-- ═ Parcours 8 séances (roadmap) ═══════════════════════ -->
-    <div class="card roadmap-card" id="roadmapCard">
-      <div class="card-title">🗺️ Parcours</div>
-      <p class="empty-note">Chargement du parcours…</p>
+    <!-- ═ Séances publiées (historique) ══════════════════════ -->
+    <div class="card seances-card" id="seancesCard">
+      <div class="card-title">🗓️ Séances publiées</div>
+      <p class="empty-note">Chargement des séances…</p>
     </div>
 
     <div class="card-grid">
@@ -1517,9 +1466,9 @@ function renderProfile(s) {
     </div>
   `;
 
-  // Carte Parcours : cache local sinon fetch
-  if (roadmapCache[s.id]) renderRoadmapCard(s.id);
-  else loadRoadmapCard(s.id);
+  // Carte Séances publiées : cache local sinon fetch
+  if (seancesCache[s.id]) renderSeancesCard(s.id);
+  else loadSeancesCard(s.id);
 
   // Bind les champs éditables (dates + total_cours)
   document.querySelectorAll('.date-value').forEach(el => {
@@ -1545,7 +1494,7 @@ async function selectStudent(id, forceSync = false) {
   url.searchParams.set('eleve', id);
   history.replaceState(null, '', url);
 
-  if (forceSync) delete roadmapCache[id];
+  if (forceSync) delete seancesCache[id];
   if (!forceSync && clientCache[id]) { renderProfile(clientCache[id]); return; }
   showLoader(meta.nom);
   try {
@@ -1710,160 +1659,38 @@ async function resetDateOverride(studentId, field) {
 }
 window.resetDateOverride = resetDateOverride;
 
-// ─── Parcours (roadmap 8 séances) ────────────────────────────────
-// GET /api/eleves/:id/roadmap → { roadmap, persisted, templates, seances }.
-// Élève sans roadmap enregistrée : parcours "general" déduit de nb_cours.
-const RM_STATUT_FR = { faite: 'Faite', en_cours: 'En cours', a_venir: 'À venir' };
-const roadmapCache = {};
+// ─── Séances publiées (historique, plus récente d'abord) ─────────
+// GET /api/eleves/:id/seances → { seances } (sans note_coach).
+const seancesCache = {};
 
-async function loadRoadmapCard(studentId) {
+async function loadSeancesCard(studentId) {
   try {
-    const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/roadmap`, { credentials: 'same-origin' });
+    const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/seances`, { credentials: 'same-origin' });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
-    roadmapCache[studentId] = data;
-    if (activeId === studentId) renderRoadmapCard(studentId);
-    return data;
+    if (!res.ok || !Array.isArray(data.seances)) throw new Error(data.error || `HTTP ${res.status}`);
+    seancesCache[studentId] = data.seances;
+    if (activeId === studentId) renderSeancesCard(studentId);
+    return data.seances;
   } catch (e) {
-    const card = document.getElementById('roadmapCard');
+    const card = document.getElementById('seancesCard');
     if (card && activeId === studentId) {
-      card.innerHTML = `<div class="card-title">🗺️ Parcours</div><p class="empty-note">Parcours indisponible : ${escapeHtml(e.message)}</p>`;
+      card.innerHTML = `<div class="card-title">🗓️ Séances publiées</div><p class="empty-note">Séances indisponibles : ${escapeHtml(e.message)}</p>`;
     }
     return null;
   }
 }
 
-function renderRoadmapCard(studentId) {
-  const card = document.getElementById('roadmapCard');
-  const rc = roadmapCache[studentId];
-  if (!card || !rc) return;
-  const rm = rc.roadmap;
-  const faites = rm.seances.filter(x => x.statut === 'faite').length;
-  const current = rm.seances[rm.seance_courante - 1];
-  const items = rm.seances.map(x => {
-    const cls = 'rm-item' + (x.statut === 'faite' ? ' is-faite' : '') + (x.n === rm.seance_courante ? ' is-current' : '');
-    const icon = x.statut === 'faite' ? '✓' : x.n === rm.seance_courante ? '▶' : '○';
-    return `<li class="${cls}">
-      <div class="rm-item-top">${icon} S${x.n}${x.date ? ' · ' + escapeHtml(fmtSessionDate(x.date)) : ''}</div>
-      <div class="rm-item-title">${escapeHtml(x.titre)}</div>
-    </li>`;
-  }).join('');
-  const history = (rc.seances || []).slice(-5).reverse();
+function renderSeancesCard(studentId) {
+  const card = document.getElementById('seancesCard');
+  const list = seancesCache[studentId];
+  if (!card || !list) return;
+  const recent = list.slice(0, 5);
   card.innerHTML = `
-    <div class="card-title">
-      🗺️ Parcours <span class="rm-label">${faites}/8 faites${rc.persisted ? '' : ' · déduit du nombre de cours'}</span>
-      <span class="rm-head-actions">
-        <button type="button" class="ds-quick-btn" onclick="openRoadmapModal('${studentId}')">✏️ Éditer le parcours</button>
-      </span>
-    </div>
-    <ol class="rm-list">${items}</ol>
-    ${current ? `<div class="rm-current">
-      <strong>S${current.n} — ${escapeHtml(current.titre)}</strong> (${RM_STATUT_FR[current.statut] || ''})
-      ${current.objectif ? `<br>${escapeHtml(current.objectif)}` : ''}
-      ${current.livrable ? `<br><strong>Livrable :</strong> ${escapeHtml(current.livrable)}` : ''}
-      ${current.note_coach ? `<br><strong>Note coach :</strong> ${escapeHtml(current.note_coach)}` : ''}
-    </div>` : ''}
-    ${history.length ? `<div class="card-section">
-      <div class="card-section-label">Séances saisies (${(rc.seances || []).length})</div>
-      <ul class="rm-history">${history.map(h => `<li><span class="rm-hdate">${escapeHtml(fmtSessionDate(h.date))}</span>S${h.n} · ${escapeHtml(h.titre)}${h.statut === 'en_cours' ? ' (en cours)' : ''}</li>`).join('')}</ul>
-    </div>` : ''}
-  `;
+    <div class="card-title">🗓️ Séances publiées <span class="sc-label">${list.length}</span></div>
+    ${recent.length
+      ? `<ul class="sc-list">${recent.map(h => `<li>${h.n ? `<span class="sc-n">S${h.n}</span>` : ''}<span class="sc-date">${escapeHtml(fmtSessionDate(h.date))}</span>${escapeHtml(h.titre)}</li>`).join('')}</ul>`
+      : '<p class="empty-note">Aucune séance publiée pour l\'instant.</p>'}`;
 }
-
-// ── Modal Parcours : édition des 8 séances de l'élève ──
-let roadmapEditId = null;
-let roadmapDraft = null;
-
-async function openRoadmapModal(studentId) {
-  const rc = roadmapCache[studentId] || await loadRoadmapCard(studentId);
-  if (!rc) { showToast('Parcours indisponible'); return; }
-  roadmapEditId = studentId;
-  roadmapDraft = JSON.parse(JSON.stringify(rc.roadmap));
-  document.getElementById('roadmapError').textContent = '';
-  renderRoadmapEditor();
-  document.getElementById('roadmapOverlay').style.display = 'flex';
-}
-window.openRoadmapModal = openRoadmapModal;
-
-function closeRoadmapModal() {
-  document.getElementById('roadmapOverlay').style.display = 'none';
-  roadmapEditId = null;
-  roadmapDraft = null;
-}
-window.closeRoadmapModal = closeRoadmapModal;
-
-// Champs créés vides puis remplis via .value (pas de texte libre dans les attributs)
-function renderRoadmapEditor() {
-  const box = document.getElementById('rmSeances');
-  box.innerHTML = roadmapDraft.seances.map(x => `
-    <fieldset class="rm-edit-row">
-      <legend>S${x.n}</legend>
-      <div class="quick-field full"><label for="rm-titre-${x.n}">Titre *</label><input type="text" id="rm-titre-${x.n}" maxlength="80" required /></div>
-      <div class="quick-field full"><label for="rm-objectif-${x.n}">Objectif</label><textarea id="rm-objectif-${x.n}" rows="2" maxlength="300"></textarea></div>
-      <div class="quick-field full"><label for="rm-livrable-${x.n}">Livrable</label><input type="text" id="rm-livrable-${x.n}" maxlength="200" /></div>
-      <div class="quick-field"><label for="rm-statut-${x.n}">Statut</label>
-        <select id="rm-statut-${x.n}"><option value="a_venir">À venir</option><option value="en_cours">En cours</option><option value="faite">Faite</option></select></div>
-      <div class="quick-field"><label for="rm-date-${x.n}">Date</label><input type="date" id="rm-date-${x.n}" /></div>
-      <div class="quick-field full"><label for="rm-note-${x.n}">Note coach (privée)</label><textarea id="rm-note-${x.n}" rows="2" maxlength="1000"></textarea></div>
-    </fieldset>
-  `).join('');
-  for (const x of roadmapDraft.seances) {
-    document.getElementById(`rm-titre-${x.n}`).value = x.titre || '';
-    document.getElementById(`rm-objectif-${x.n}`).value = x.objectif || '';
-    document.getElementById(`rm-livrable-${x.n}`).value = x.livrable || '';
-    document.getElementById(`rm-statut-${x.n}`).value = x.statut || 'a_venir';
-    document.getElementById(`rm-date-${x.n}`).value = x.date || '';
-    document.getElementById(`rm-note-${x.n}`).value = x.note_coach || '';
-  }
-}
-
-function readRoadmapEditor() {
-  for (const x of roadmapDraft.seances) {
-    x.titre = document.getElementById(`rm-titre-${x.n}`).value.trim();
-    x.objectif = document.getElementById(`rm-objectif-${x.n}`).value.trim();
-    x.livrable = document.getElementById(`rm-livrable-${x.n}`).value.trim();
-    x.statut = document.getElementById(`rm-statut-${x.n}`).value;
-    x.date = document.getElementById(`rm-date-${x.n}`).value;
-    x.note_coach = document.getElementById(`rm-note-${x.n}`).value.trim();
-  }
-}
-
-document.getElementById('roadmapForm').addEventListener('submit', async function (ev) {
-  ev.preventDefault();
-  if (!roadmapEditId || !roadmapDraft) return;
-  const studentId = roadmapEditId;
-  const errorEl = document.getElementById('roadmapError');
-  const submitBtn = document.getElementById('roadmapSubmit');
-  readRoadmapEditor();
-  const missing = roadmapDraft.seances.find(x => !x.titre);
-  if (missing) { errorEl.textContent = `S${missing.n} : titre requis.`; return; }
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Enregistrement…';
-  try {
-    const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/roadmap`, {
-      method: 'PATCH',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ seances: roadmapDraft.seances }),
-    });
-    const payload = await res.json().catch(() => ({}));
-    if (!res.ok || !payload.ok) throw new Error(payload.error || `HTTP ${res.status}`);
-    roadmapCache[studentId] = { ...roadmapCache[studentId], roadmap: payload.roadmap, persisted: true };
-    if (payload.data) clientCache[studentId] = payload.data;
-    closeRoadmapModal();
-    if (activeId === studentId && clientCache[studentId]) {
-      const scrollY = window.scrollY;
-      renderProfile(clientCache[studentId]);
-      window.scrollTo(0, scrollY);
-    }
-    showToast('Parcours enregistré ✓');
-  } catch (e) {
-    errorEl.textContent = 'Erreur : ' + (e.message || 'réessaie');
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Enregistrer';
-  }
-});
 
 // ─── Post-séance : coller une fiche → aperçu → Publier ───────────
 // POST /api/eleves/:id/seance : ajoute la séance à l'historique (jamais
@@ -2223,18 +2050,16 @@ document.getElementById('quickUpdateForm').addEventListener('submit', async func
   }
 });
 
-// Après publication : la carte Parcours se recharge (numéro, historique)
+// Après publication : la carte Séances publiées se recharge
 function onSeancePublished(studentId) {
-  delete roadmapCache[studentId];
+  delete seancesCache[studentId];
 }
 
-// Esc ferme les modales post-séance / parcours
+// Esc ferme la modale post-séance
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') {
     const overlay = document.getElementById('quickUpdateOverlay');
     if (overlay && overlay.style.display !== 'none') closeQuickUpdateModal();
-    const rmOverlay = document.getElementById('roadmapOverlay');
-    if (rmOverlay && rmOverlay.style.display !== 'none') closeRoadmapModal();
   }
 });
 

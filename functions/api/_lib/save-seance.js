@@ -7,22 +7,19 @@
 //
 // Effets :
 //   - seances:<slug>  : la séance est AJOUTÉE à l'historique (jamais écrasé)
-//   - roadmap         : statut/date (+ livrable, note coach si fournis) de la séance n
+//   - roadmap         : jamais touchée (parcours retiré ; données KV ignorées)
 //   - derniere_seance : la plus récente de l'historique, manualEdit:true
 //   - stats.nb_cours  : nombre total de séances enregistrées (sans plafond)
 
-import { parseIsoDate } from './eleves-stats.js';
-import {
-  ROADMAP_SIZE, ROADMAP_LIMITS, ensureRoadmap, normalizeRoadmap, withRoadmap,
-} from './roadmap.js';
+import { parseIsoDate, withSeanceStats } from './eleves-stats.js';
 
 export const SEANCE_LIMITS = {
   titre: 80,
   item: 500,       // caractères par puce (résumés issus du transcripteur)
   items: 30,       // puces max par liste
   history: 200,    // séances conservées dans seances:<slug>
-  livrable: ROADMAP_LIMITS.livrable,
-  note_coach: ROADMAP_LIMITS.note_coach,
+  livrable: 200,
+  note_coach: 1000,
 };
 
 export const SLUG_RE = /^[a-z0-9-]{1,40}$/;
@@ -48,7 +45,7 @@ export async function readSeances(env, slug) {
 }
 
 // Valide et enregistre une séance.
-// Retourne { ok: true, entry, roadmap, data, seances }
+// Retourne { ok: true, entry, data, seances }
 //       ou { ok: false, status, error, detail? }.
 export async function saveSeance(env, slug, body) {
   slug = String(slug || '').toLowerCase();
@@ -76,17 +73,6 @@ export async function saveSeance(env, slug, body) {
   let history = await readSeances(env, slug);
   const n = history.length + 1;
 
-  // ── Roadmap : séance n si elle existe dans le parcours ──
-  const roadmap = ensureRoadmap(record);
-  if (n <= ROADMAP_SIZE) {
-    const seance = roadmap.seances[n - 1];
-    seance.statut = 'faite';
-    seance.date = date;
-    if (livrable) seance.livrable = livrable;
-    if (noteCoach) seance.note_coach = noteCoach;
-  }
-  const nextRoadmap = normalizeRoadmap(roadmap);
-
   // ── Historique : ajout, jamais d'écrasement ──
   const entry = {
     id: crypto.randomUUID(),
@@ -106,7 +92,7 @@ export async function saveSeance(env, slug, body) {
   const existingDs = record.derniere_seance;
   const keepDocSeance = existingDs && existingDs.manualEdit !== true
     && typeof existingDs.date === 'string' && existingDs.date > latest.date;
-  const updated = { ...withRoadmap(record, nextRoadmap, history.length), _patchedAt: new Date().toISOString() };
+  const updated = { ...withSeanceStats(record, history.length), _patchedAt: new Date().toISOString() };
   if (!keepDocSeance) {
     updated.derniere_seance = {
       date: latest.date,
@@ -125,5 +111,5 @@ export async function saveSeance(env, slug, body) {
     return { ok: false, status: 500, error: 'kv_put_failed', detail: e?.message || '' };
   }
 
-  return { ok: true, entry, roadmap: nextRoadmap, data: updated, seances: history };
+  return { ok: true, entry, data: updated, seances: history };
 }

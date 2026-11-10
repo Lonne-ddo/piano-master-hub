@@ -40,5 +40,5 @@ export async function onRequestPost({ params, request, env }) {
     if (res.detail !== undefined) err.detail = res.detail;
     return jsonResponse(err, res.status);
   }
-  return jsonResponse({ ok: true, entry: res.entry, roadmap: res.roadmap, data: res.data, seances: res.seances });
+  return jsonResponse({ ok: true, entry: res.entry, data: res.data, seances: res.seances });
 }

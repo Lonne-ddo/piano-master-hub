@@ -1,4 +1,4 @@
-// ─── Helpers stats élèves partagés (eleves/[id].js + roadmap.js) ─
+// ─── Helpers stats élèves partagés (eleves/[id].js + save-seance.js) ─
 // C6 dedup : avant ce module, mergeStats + parseIsoDate + labelFr + computeProgressionPct
 // + MONTHS_LONG_FR étaient dupliqués à l'identique entre les 2 fichiers.
 
@@ -56,4 +56,24 @@ export function mergeStats(autoRaw, override) {
       total_cours: isSet(ov.total_cours),
     },
   };
+}
+
+// nb_cours = nombre total de séances enregistrées dans seances:<slug>
+// (record.nb_seances), sans plafond. Le compte du Google Doc reste pris
+// en compte tant qu'il est supérieur (élèves suivis avant la publication).
+export function applySeanceStats(stats, nbSeances) {
+  if (!stats) return stats;
+  const n = Number(nbSeances) || 0;
+  if (n > 0) stats.nb_cours = Math.max(Number(stats.nb_cours) || 0, n);
+  return stats;
+}
+
+// Recalcule les stats d'un record élève (copie) après une séance publiée.
+export function withSeanceStats(record, nbSeances = record.nb_seances) {
+  const stats = mergeStats(record.stats_auto_raw || { nb_cours: 0 }, record.stats_override || {});
+  if (!record.stats_auto_raw && record.stats) stats.nb_cours = Number(record.stats.nb_cours) || 0;
+  applySeanceStats(stats, nbSeances);
+  const out = { ...record, stats, sessionCount: stats.nb_cours };
+  if (Number(nbSeances) > 0) out.nb_seances = Number(nbSeances);
+  return out;
 }
