@@ -144,26 +144,16 @@
         }
         .mh-seance-livrable .mh-section-label { margin: 0 0 4px; }
 
-        /* ── Mes séances (historique, la plus récente dépliée) ── */
+        /* ── Mes séances : devoirs d'abord (style carte principale),
+              résumé replié pour les séances plus anciennes ── */
         .mh-seances-list { margin-top: 2px; }
-        .mh-seance { border-bottom: 1px solid var(--mh-border-card); }
-        .mh-seance:last-child { border-bottom: none; }
-        .mh-seance-summary {
-            list-style: none;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-height: 44px;
-            padding: 10px 0;
-            cursor: pointer;
+        .mh-seance {
+            border-bottom: 1px solid var(--mh-border-card);
+            padding: 14px 0 16px;
         }
-        .mh-seance-summary::-webkit-details-marker { display: none; }
-        .mh-seance-summary:focus-visible {
-            outline: 2px solid var(--mh-violet-border);
-            outline-offset: 2px;
-            border-radius: var(--mh-radius-sm);
-        }
-        .mh-seance-head { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .mh-seance:first-child { padding-top: 4px; }
+        .mh-seance:last-child { border-bottom: none; padding-bottom: 0; }
+        .mh-seance-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 12px; }
         .mh-seance-date {
             font-family: var(--mh-font-sans);
             font-size: 11.5px;
@@ -177,18 +167,42 @@
             font-weight: 500;
             line-height: 1.25;
             color: var(--mh-text-primary);
+            margin: 0;
         }
-        .mh-seance-chevron {
-            color: var(--mh-text-label);
-            font-size: 16px;
-            transition: transform 200ms ease;
+        .mh-seance-devoirs {
+            background: var(--mh-gold-tint);
+            border: 1px solid var(--mh-gold-border);
+            border-radius: var(--mh-radius-sm);
+            padding: 12px 14px;
         }
-        .mh-seance[open] .mh-seance-chevron { transform: rotate(180deg); }
-        .mh-seance-body { padding: 2px 0 16px; }
-        .mh-seance-body .mh-section-label { margin: 14px 0 8px; }
-        .mh-seance-body .mh-section-label:first-child { margin-top: 4px; }
+        .mh-seance-devoirs .mh-bullets { margin: 0; }
+        .mh-seance-resume { margin-top: 14px; }
+        .mh-seance-resume .mh-section-label { margin: 0 0 8px; }
+        .mh-seance-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 44px;
+            margin-top: 6px;
+            padding: 0 2px;
+            background: none;
+            border: none;
+            font-family: var(--mh-font-sans);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--mh-text-secondary);
+            cursor: pointer;
+        }
+        .mh-seance-toggle:focus-visible {
+            outline: 2px solid var(--mh-violet-border);
+            outline-offset: 2px;
+            border-radius: var(--mh-radius-sm);
+        }
+        .mh-seance-toggle .ti { transition: transform 200ms ease; }
+        .mh-seance-toggle[aria-expanded="true"] .ti { transform: rotate(180deg); }
+        .mh-seance-toggle + .mh-seance-resume { margin-top: 4px; }
         @media (prefers-reduced-motion: reduce) {
-            .mh-seance-chevron { transition: none; }
+            .mh-seance-toggle .ti { transition: none; }
         }
 
         /* ── Empty/error states ── */
@@ -1377,28 +1391,57 @@
         return html + '</ul>';
     }
 
-    function seanceItemHtml(s, open) {
+    // Ordre : devoirs (mis en avant, style carte principale) → livrable →
+    // résumé. La séance la plus récente montre tout ; les plus anciennes
+    // replient le résumé derrière « Voir le résumé ».
+    function seanceItemHtml(s, index) {
+        var latest = index === 0;
         var titre = s.titre ? String(s.titre).trim() : 'Séance';
         var date = s.date ? formatDate(s.date) : '';
         var resume = Array.isArray(s.resume) ? s.resume.filter(Boolean) : [];
         var devoirs = Array.isArray(s.devoirs) ? s.devoirs.filter(Boolean) : [];
         var body = '';
-        if (resume.length) body += '<div class="mh-section-label">Résumé</div>' + bulletsHtml(resume, 'violet');
-        if (devoirs.length) body += '<div class="mh-section-label">Devoirs</div>' + bulletsHtml(devoirs, 'gold');
+        if (devoirs.length) {
+            body += '<div class="mh-seance-devoirs">' +
+                '<div class="mh-section-label mh-hero-devoirs-label">' + (latest ? 'Devoirs à préparer' : 'Devoirs') + '</div>' +
+                bulletsHtml(devoirs, 'gold') +
+            '</div>';
+        }
         if (s.livrable) {
             body += '<div class="mh-seance-livrable"><div class="mh-section-label">Livrable</div>' + escapeHtml(String(s.livrable)) + '</div>';
         }
+        if (resume.length) {
+            var resumeHtml = '<div class="mh-section-label">Résumé</div>' + bulletsHtml(resume, 'violet');
+            if (latest) {
+                body += '<div class="mh-seance-resume">' + resumeHtml + '</div>';
+            } else {
+                var rid = 'seance-resume-' + index;
+                body += '<button type="button" class="mh-seance-toggle" aria-expanded="false" aria-controls="' + rid + '">' +
+                        '<span>Voir le résumé</span><i class="ti ti-chevron-down" aria-hidden="true"></i>' +
+                    '</button>' +
+                    '<div class="mh-seance-resume" id="' + rid + '" hidden>' + resumeHtml + '</div>';
+            }
+        }
         if (!body) body = '<p class="mh-empty">Pas de détail pour cette séance.</p>';
-        return '<details class="mh-seance"' + (open ? ' open' : '') + '>' +
-                '<summary class="mh-seance-summary">' +
-                    '<span class="mh-seance-head">' +
-                        (date ? '<span class="mh-seance-date">' + escapeHtml(date) + '</span>' : '') +
-                        '<span class="mh-seance-title">' + escapeHtml(titre) + '</span>' +
-                    '</span>' +
-                    '<i class="ti ti-chevron-down mh-seance-chevron" aria-hidden="true"></i>' +
-                '</summary>' +
-                '<div class="mh-seance-body">' + body + '</div>' +
-            '</details>';
+        return '<article class="mh-seance">' +
+                '<div class="mh-seance-head">' +
+                    (date ? '<span class="mh-seance-date">' + escapeHtml(date) + '</span>' : '') +
+                    '<h3 class="mh-seance-title">' + escapeHtml(titre) + '</h3>' +
+                '</div>' +
+                body +
+            '</article>';
+    }
+
+    // « Voir le résumé » / « Masquer le résumé » (délégation sur la zone)
+    function onSeanceToggle(e) {
+        var btn = e.target.closest ? e.target.closest('.mh-seance-toggle') : null;
+        if (!btn) return;
+        var panel = document.getElementById(btn.getAttribute('aria-controls'));
+        if (!panel) return;
+        var open = btn.getAttribute('aria-expanded') !== 'true';
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btn.querySelector('span').textContent = open ? 'Masquer le résumé' : 'Voir le résumé';
+        panel.hidden = !open;
     }
 
     function renderSeances(seances, derniere) {
@@ -1418,10 +1461,11 @@
             html += '<p class="mh-empty">Pas encore de séance publiée. Reviens après ton prochain cours.</p>';
         } else {
             html += '<div class="mh-seances-list">';
-            for (var i = 0; i < list.length; i++) html += seanceItemHtml(list[i], i === 0);
+            for (var i = 0; i < list.length; i++) html += seanceItemHtml(list[i], i);
             html += '</div>';
         }
         zone.innerHTML = html + '</div>';
+        zone.onclick = onSeanceToggle;
     }
 
     function formatDate(iso) {

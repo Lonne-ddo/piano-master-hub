@@ -49,6 +49,8 @@
       --border:  #25233a;
       --green:   #5ecb8b;
       --amber:   #f0b429;
+      --amber-tint:   #f0b42910;
+      --amber-border: #f0b42938;
       --red:     #e05c6b;
       --serif:   'Cormorant Garamond', Georgia, serif;
     }
@@ -598,6 +600,11 @@
     .fp-section { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
     .fp-text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text2); }
     .fp-empty { margin: 0; font-size: 13px; color: var(--text3); }
+    .fp-devoirs {
+      background: var(--amber-tint); border: 1px solid var(--amber-border);
+      border-radius: 10px; padding: 10px 12px; margin-top: 6px;
+    }
+    .fp-devoirs .ds-section-label { color: var(--amber); }
     .fp-private {
       border-top: 1px dashed var(--border); padding-top: 8px; margin-top: 8px;
     }
@@ -2076,9 +2083,9 @@ function renderFichePreview() {
     <div class="fp-label">Aperçu</div>
     <div class="fp-kicker">${escapeHtml(kicker)}</div>
     <div class="fp-title">${f.titre ? escapeHtml(f.titre) : '<span class="fp-missing">Titre manquant</span>'}</div>
-    <div class="fp-section"><div class="ds-section-label">Résumé</div>${f.resume.length ? list(f.resume) : '<p class="fp-empty">—</p>'}</div>
-    <div class="fp-section"><div class="ds-section-label">Devoirs</div>${f.devoirs.length ? list(f.devoirs) : '<p class="fp-empty">—</p>'}</div>
+    <div class="fp-section fp-devoirs"><div class="ds-section-label">Devoirs à préparer</div>${f.devoirs.length ? list(f.devoirs) : '<p class="fp-empty">—</p>'}</div>
     <div class="fp-section"><div class="ds-section-label">Livrable</div><p class="fp-text">${f.livrable ? escapeHtml(f.livrable) : '—'}</p></div>
+    <div class="fp-section"><div class="ds-section-label">Résumé</div>${f.resume.length ? list(f.resume) : '<p class="fp-empty">—</p>'}</div>
     <div class="fp-section fp-private"><div class="ds-section-label">🔒 Note coach <span class="quick-hint">(privée, jamais montrée à l'élève)</span></div>${f.note_coach ? `<p class="fp-text">${escapeHtml(f.note_coach).replace(/\n/g, '<br>')}</p>` : '<p class="fp-empty">—</p>'}</div>`;
   box.hidden = false;
   updatePublishState();
