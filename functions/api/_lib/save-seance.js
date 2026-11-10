@@ -2,8 +2,8 @@
 // Utilisé par POST /api/eleves/:slug/seance (formulaire post-séance admin).
 //
 // Entrée : { date, titre, resume[], devoirs[], livrable?, note_coach? }
-//   n : calculé ici = nombre de séances déjà enregistrées + 1 (un `n`
-//       envoyé par le client est ignoré).
+//   n : calculé ici = séances antérieures + séances déjà publiées + 1
+//       (un `n` envoyé par le client est ignoré).
 //
 // Effets :
 //   - seances:<slug>  : la séance est AJOUTÉE à l'historique (jamais écrasé)
@@ -11,7 +11,7 @@
 //   - derniere_seance : la plus récente de l'historique, manualEdit:true
 //   - stats           : recalculées depuis l'historique (cf. _lib/eleves-stats.js)
 
-import { parseIsoDate, computeEleveStats } from './eleves-stats.js';
+import { parseIsoDate, computeEleveStats, seancesAnterieures } from './eleves-stats.js';
 
 export const SEANCE_LIMITS = {
   titre: 80,
@@ -68,10 +68,10 @@ export async function saveSeance(env, slug, body) {
   const record = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`, { type: 'json' });
   if (!record) return { ok: false, status: 404, error: 'Élève introuvable' };
 
-  // ── Numéro : séances déjà enregistrées + 1 ──
+  // ── Numéro : séances antérieures + séances déjà publiées + 1 ──
   const historyKey = `seances:${slug}`;
   let history = await readSeances(env, slug);
-  const n = history.length + 1;
+  const n = seancesAnterieures(record) + history.length + 1;
 
   // ── Historique : ajout, jamais d'écrasement ──
   const entry = {

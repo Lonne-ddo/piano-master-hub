@@ -1,7 +1,8 @@
 // ─── Stats élèves (eleves/[id].js, eleves/[slug]/public.js, save-seance.js) ─
 // Les stats sont DÉRIVÉES de l'historique des séances publiées
 // (seances:<slug>) et du type d'accompagnement de l'élève :
-//   - nb_seances / nb_cours : nombre de séances publiées
+//   - nb_seances / nb_cours : séances antérieures (saisies à la main,
+//     record.seances_anterieures) + séances publiées
 //   - avec_fin (défaut) : date_debut = date de la 1re séance publiée,
 //                         date_fin   = date_debut + 8 semaines,
 //                         progression_pct = temps écoulé entre les deux
@@ -16,6 +17,14 @@ const MONTHS_LONG_FR = [
 
 export const ACCOMPAGNEMENTS = ['avec_fin', 'sans_fin'];
 export const DUREE_AVEC_FIN_JOURS = 8 * 7;
+
+export const SEANCES_ANTERIEURES_MAX = 500;
+
+// Séances faites avant la publication (entier ≥ 0, défaut 0).
+export function seancesAnterieures(record) {
+  const n = Number(record && record.seances_anterieures);
+  return Number.isInteger(n) && n > 0 ? Math.min(n, SEANCES_ANTERIEURES_MAX) : 0;
+}
 
 export function normalizeAccompagnement(v) {
   return v === 'sans_fin' ? 'sans_fin' : 'avec_fin';
@@ -70,7 +79,9 @@ export function computeEleveStats(record, history) {
   const ov = (record && record.stats_override) || {};
   const isSet = (v) => v !== undefined && v !== null && v !== '';
   const accompagnement = normalizeAccompagnement(record && record.accompagnement);
-  const nb = Array.isArray(history) ? history.length : 0;
+  const publiees = Array.isArray(history) ? history.length : 0;
+  const anterieures = seancesAnterieures(record);
+  const nb = anterieures + publiees;
 
   const dateDebut = isSet(ov.date_debut) ? ov.date_debut : firstSeanceDate(history);
   let dateFin = null;
@@ -82,6 +93,8 @@ export function computeEleveStats(record, history) {
     accompagnement,
     nb_seances: nb,
     nb_cours: nb,
+    seances_anterieures: anterieures,
+    nb_publiees: publiees,
     total_cours: isSet(ov.total_cours) ? Number(ov.total_cours) : 8,
     date_debut: dateDebut || null,
     date_debut_label: labelFr(dateDebut),

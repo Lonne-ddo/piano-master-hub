@@ -282,6 +282,14 @@ async function seanceRoundTrip(C, H) {
     if (pa.status === 200 && st2.accompagnement === 'sans_fin' && st2.date_fin === null && st2.progression_pct === null)
       ok(C, 'Accompagnement sans_fin : ni date de fin ni progression', '');
     else ko(C, 'Accompagnement sans_fin : ni date de fin ni progression', `PATCH ${pa.status} ${JSON.stringify(st2)}`);
+    // Séances antérieures : 7 + 9 publiées → prochaine = 17, « Séance 17 » côté élève
+    const pant = await http(`/api/eleves/${slug}`, { method: 'PATCH', headers: auth, body: JSON.stringify({ seances_anterieures: 7 }) });
+    const r17 = await http(`/api/eleves/${slug}/seance`, { method: 'POST', headers: auth, body: JSON.stringify({
+      date: '2026-09-20', titre: 'Séance 17', resume: [], devoirs: [] }) });
+    const pub3 = await http(`/api/eleves/${slug}/public`, H);
+    if (pant.status === 200 && r17.body?.entry?.n === 17 && pub3.body?.stats?.nb_seances === 17)
+      ok(C, 'Séances antérieures : numéro = antérieures + publiées + 1', 'n=17');
+    else ko(C, 'Séances antérieures : numéro = antérieures + publiées + 1', `PATCH ${pant.status}, n=${r17.body?.entry?.n}, nb=${pub3.body?.stats?.nb_seances}`);
   } finally {
     await http(`/api/eleves/${slug}`, { method: 'DELETE', headers: H.headers });
   }

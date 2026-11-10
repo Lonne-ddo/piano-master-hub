@@ -409,6 +409,7 @@
       font-size: 16px; font-family: inherit;
     }
     .acc-select:focus { outline: none; border-color: var(--v); }
+    .ant-input { width: 96px; }
     .date-label {
       font-size: 10.5px;
       text-transform: uppercase;
@@ -1242,6 +1243,7 @@ function renderProfile(s) {
   const accompagnement = stats?.accompagnement === 'sans_fin' ? 'sans_fin' : 'avec_fin';
   const avecFin = accompagnement === 'avec_fin';
   const progression = typeof stats?.progression_pct === 'number' ? stats.progression_pct : 0;
+  const anterieures = seancesAnterieuresOf(s);
 
   // Dates ISO pour édition inline + labels français
   const debutIso = stats?.date_debut || '';
@@ -1270,6 +1272,12 @@ function renderProfile(s) {
           <option value="avec_fin"${avecFin ? ' selected' : ''}>Avec fin (8 semaines)</option>
           <option value="sans_fin"${avecFin ? '' : ' selected'}>Sans fin</option>
         </select>
+      </div>
+      <div class="date-edit">
+        <label class="date-label" for="antInput">Séances antérieures</label>
+        <input id="antInput" class="acc-select ant-input" type="number" min="0" max="500" step="1" inputmode="numeric"
+          value="${anterieures}" title="Séances faites avant la publication : la prochaine séance publiée sera la n° ${anterieures + 1 + ((seancesCache[s.id] || []).length)}"
+          onchange="setSeancesAnterieures('${s.id}', this.value)" />
       </div>
       <div class="date-edit" data-field="date_debut">
         <span class="date-label">Début</span>
@@ -1674,6 +1682,45 @@ async function resetDateOverride(studentId, field) {
 }
 window.resetDateOverride = resetDateOverride;
 
+// Séances antérieures (faites avant la publication) : entier ≥ 0, défaut 0
+function seancesAnterieuresOf(rec) {
+  const n = Number(rec && (rec.stats && rec.stats.seances_anterieures != null ? rec.stats.seances_anterieures : rec.seances_anterieures));
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+
+async function setSeancesAnterieures(studentId, raw) {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0 || n > 500) {
+    showToast('Nombre entier entre 0 et 500');
+    if (clientCache[studentId]) renderProfile(clientCache[studentId]);
+    return;
+  }
+  showToast('Sauvegarde…');
+  try {
+    const res = await fetch(`/api/eleves/${studentId}`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seances_anterieures: n }),
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload.error || !(payload.ok || payload.success)) {
+      throw new Error(payload.error || `HTTP ${res.status}`);
+    }
+    if (payload.data) {
+      clientCache[studentId] = payload.data;
+      const scrollY = window.scrollY;
+      renderProfile(payload.data);
+      window.scrollTo(0, scrollY);
+    }
+    showToast(`Séances antérieures : ${n} ✓`);
+  } catch (e) {
+    showToast('Erreur, réessaie');
+    if (clientCache[studentId]) renderProfile(clientCache[studentId]);
+  }
+}
+window.setSeancesAnterieures = setSeancesAnterieures;
+
 // Type d'accompagnement : avec_fin (fin = 1re séance + 8 semaines) | sans_fin
 async function setAccompagnement(studentId, value) {
   showToast('Sauvegarde…');
@@ -1729,7 +1776,7 @@ function renderSeancesCard(studentId) {
   if (!card || !list) return;
   const recent = list.slice(0, 5);
   card.innerHTML = `
-    <div class="card-title">🗓️ Séances publiées <span class="sc-label">${list.length}</span></div>
+    <div class="card-title">🗓️ Séances publiées <span class="sc-label">${list.length}${(() => { const a = seancesAnterieuresOf(clientCache[studentId]); return a ? ` · +${a} antérieure${a > 1 ? 's' : ''}` : ''; })()}</span></div>
     ${recent.length
       ? `<ul class="sc-list">${recent.map(h => `<li>${h.n ? `<span class="sc-n">S${h.n}</span>` : ''}<span class="sc-date">${escapeHtml(fmtSessionDate(h.date))}</span>${escapeHtml(h.titre)}</li>`).join('')}</ul>`
       : '<p class="empty-note">Aucune séance publiée pour l\'instant.</p>'}`;
@@ -1738,7 +1785,7 @@ function renderSeancesCard(studentId) {
 // ─── Post-séance : coller une fiche → aperçu → Publier ───────────
 // POST /api/eleves/:id/seance : ajoute la séance à l'historique (jamais
 // écrasé). Le numéro de séance est calculé côté serveur (séances déjà
-// publiées + 1). Les champs « Saisir à la main » sont la source unique de
+// publiées + séances antérieures + 1). Les champs « Saisir à la main » sont la source unique de
 // ce qui est publié : la fiche collée les remplit, l'aperçu les reflète.
 let quickUpdateActiveId = null;
 let quickNextN = null;         // numéro indicatif de la prochaine séance
@@ -1783,7 +1830,7 @@ async function openQuickUpdateModal(studentId) {
     const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/seances`, { credentials: 'same-origin' });
     const j = await res.json().catch(() => null);
     if (res.ok && j && Array.isArray(j.seances) && quickUpdateActiveId === studentId) {
-      quickNextN = j.seances.length + 1;
+      quickNextN = seancesAnterieuresOf(clientCache[studentId]) + j.seances.length + 1;
       renderFichePreview();
     }
   } catch (e) { /* aperçu sans numéro */ }
