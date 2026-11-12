@@ -1,12 +1,14 @@
 // ─── Enregistrement d'une séance (logique partagée) ──────────────
-// Utilisé par POST /api/eleves/:slug/seance (formulaire post-séance admin).
+// Utilisé par POST /api/eleves/:slug/seance (publication) et
+// PUT/DELETE /api/eleves/:slug/seances/:id (modification, suppression).
 //
 // Entrée : { date, titre, resume[], devoirs[], livrable?, note_coach? }
-//   n : calculé ici = séances antérieures + séances déjà publiées + 1
-//       (un `n` envoyé par le client est ignoré).
+//   n : recalculé à chaque écriture = séances antérieures + rang
+//       chronologique (un `n` envoyé par le client est ignoré).
 //
 // Effets :
-//   - seances:<slug>  : la séance est AJOUTÉE à l'historique (jamais écrasé)
+//   - seances:<slug>  : publication = AJOUT (jamais d'écrasement) ;
+//                       modification / suppression ciblées par id
 //   - roadmap         : jamais touchée (parcours retiré ; données KV ignorées)
 //   - derniere_seance : la plus récente de l'historique, manualEdit:true
 //   - stats           : recalculées depuis l'historique (cf. _lib/eleves-stats.js)
@@ -44,15 +46,10 @@ export async function readSeances(env, slug) {
   return Array.isArray(history) ? history : [];
 }
 
-// Valide et enregistre une séance.
-// Retourne { ok: true, entry, data, seances }
-//       ou { ok: false, status, error, detail? }.
-export async function saveSeance(env, slug, body) {
-  slug = String(slug || '').toLowerCase();
-  if (!SLUG_RE.test(slug)) return { ok: false, status: 400, error: 'invalid_slug' };
+// Valide le corps d'une séance (publication ou modification).
+// Retourne { ok: true, fields } ou { ok: false, status, error }.
+export function validateSeanceBody(body) {
   if (!body || typeof body !== 'object') return { ok: false, status: 400, error: 'JSON invalide' };
-
-  // ── Validation ──
   const date = typeof body.date === 'string' ? body.date : '';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || parseIsoDate(date) === null) {
     return { ok: false, status: 400, error: 'date invalide (YYYY-MM-DD)' };
@@ -63,60 +60,140 @@ export async function saveSeance(env, slug, body) {
   const devoirs = cleanList(body.devoirs ?? []);
   if (!resume || !devoirs) return { ok: false, status: 400, error: 'resume et devoirs : listes attendues' };
   const livrable = cleanText(body.livrable, SEANCE_LIMITS.livrable);
-  const noteCoach = cleanText(body.note_coach, SEANCE_LIMITS.note_coach);
+  const note_coach = cleanText(body.note_coach, SEANCE_LIMITS.note_coach);
+  return { ok: true, fields: { date, titre, resume, devoirs, livrable, note_coach } };
+}
 
-  const record = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`, { type: 'json' });
-  if (!record) return { ok: false, status: 404, error: 'Élève introuvable' };
+// Tri chronologique stable : date de séance, puis ordre de saisie.
+function sortHistory(history) {
+  return history
+    .map((s, i) => ({ s, i }))
+    .sort((a, b) => {
+      if (a.s.date !== b.s.date) return a.s.date < b.s.date ? -1 : 1;
+      const ca = a.s.createdAt || '', cb = b.s.createdAt || '';
+      if (ca !== cb) return ca < cb ? -1 : 1;
+      return a.i - b.i;
+    })
+    .map(x => x.s);
+}
 
-  // ── Numéro : séances antérieures + séances déjà publiées + 1 ──
-  const historyKey = `seances:${slug}`;
-  let history = await readSeances(env, slug);
-  const n = seancesAnterieures(record) + history.length + 1;
-
-  // ── Historique : ajout, jamais d'écrasement ──
-  const entry = {
-    id: crypto.randomUUID(),
-    n, date, titre, resume, devoirs, livrable,
-    note_coach: noteCoach,
-    createdAt: new Date().toISOString(),
-  };
-  history.push(entry);
-  // Tri chronologique stable (date de séance, puis ordre de saisie)
-  history.sort((a, b) => (a.date === b.date ? 0 : a.date < b.date ? -1 : 1));
+// Recalcule tout ce qui dépend de l'historique puis écrit seances:<slug>
+// et eleve:<slug> :
+//   - ordre chronologique + numéros (n = séances antérieures + rang)
+//   - derniere_seance (devoirs affichés) = la plus récente de l'historique
+//   - stats : nombre de séances, date de début, date de fin auto
+// Retourne { ok: true, data, seances } ou { ok: false, status, error, detail }.
+export async function commitHistory(env, slug, record, history) {
+  history = sortHistory(history);
   if (history.length > SEANCE_LIMITS.history) history = history.slice(history.length - SEANCE_LIMITS.history);
+  const anterieures = seancesAnterieures(record);
+  history.forEach((s, i) => { s.n = anterieures + i + 1; });
 
-  // ── derniere_seance = la plus récente de l'historique ──
+  const now = new Date().toISOString();
+  const latest = history[history.length - 1] || null;
   // Exception : une séance du Doc (sync, sans manualEdit) plus récente que
   // tout l'historique reste affichée.
-  const latest = history[history.length - 1];
   const existingDs = record.derniere_seance;
-  const keepDocSeance = existingDs && existingDs.manualEdit !== true
-    && typeof existingDs.date === 'string' && existingDs.date > latest.date;
-  const stats = computeEleveStats(record, history);
+  const isDocSeance = existingDs && existingDs.manualEdit !== true;
+  const keepDocSeance = isDocSeance && typeof existingDs.date === 'string'
+    && (!latest || existingDs.date > latest.date);
+
   const updated = {
     ...record,
-    stats,
+    stats: computeEleveStats(record, history),
     nb_seances: history.length,
     sessionCount: history.length,
-    _patchedAt: new Date().toISOString(),
+    _patchedAt: now,
   };
   if (!keepDocSeance) {
-    updated.derniere_seance = {
-      date: latest.date,
-      titre: latest.titre,
-      devoirs: latest.devoirs,
-      resume: latest.resume,
-      manualEdit: true,
-      _editedAt: new Date().toISOString(),
-    };
+    if (latest) {
+      updated.derniere_seance = {
+        date: latest.date,
+        titre: latest.titre,
+        devoirs: latest.devoirs,
+        resume: latest.resume,
+        manualEdit: true,
+        _editedAt: now,
+      };
+    } else {
+      // Plus aucune séance publiée : plus de « dernière séance ».
+      updated.derniere_seance = null;
+    }
   }
 
   try {
-    await env.MASTERHUB_STUDENTS.put(historyKey, JSON.stringify(history));
+    await env.MASTERHUB_STUDENTS.put(`seances:${slug}`, JSON.stringify(history));
     await env.MASTERHUB_STUDENTS.put(`eleve:${slug}`, JSON.stringify(updated));
   } catch (e) {
     return { ok: false, status: 500, error: 'kv_put_failed', detail: e?.message || '' };
   }
+  return { ok: true, data: updated, seances: history };
+}
 
-  return { ok: true, entry, data: updated, seances: history };
+async function loadRecord(env, slug) {
+  slug = String(slug || '').toLowerCase();
+  if (!SLUG_RE.test(slug)) return { ok: false, status: 400, error: 'invalid_slug' };
+  const record = await env.MASTERHUB_STUDENTS.get(`eleve:${slug}`, { type: 'json' });
+  if (!record) return { ok: false, status: 404, error: 'Élève introuvable' };
+  return { ok: true, slug, record };
+}
+
+// Valide et enregistre une nouvelle séance (ajout, jamais d'écrasement).
+// Retourne { ok: true, entry, data, seances }
+//       ou { ok: false, status, error, detail? }.
+export async function saveSeance(env, slug, body) {
+  const v = validateSeanceBody(body);
+  if (!v.ok) return v;
+  const r = await loadRecord(env, slug);
+  if (!r.ok) return r;
+
+  const history = await readSeances(env, r.slug);
+  const entry = {
+    id: crypto.randomUUID(),
+    n: null,
+    ...v.fields,
+    createdAt: new Date().toISOString(),
+  };
+  history.push(entry);
+  const res = await commitHistory(env, r.slug, r.record, history);
+  if (!res.ok) return res;
+  return { ok: true, entry, data: res.data, seances: res.seances };
+}
+
+// Remplace titre, date, résumé, devoirs, livrable, note_coach d'une séance.
+// Garde id et createdAt, ajoute updatedAt.
+export async function updateSeance(env, slug, id, body) {
+  const v = validateSeanceBody(body);
+  if (!v.ok) return v;
+  const r = await loadRecord(env, slug);
+  if (!r.ok) return r;
+
+  const history = await readSeances(env, r.slug);
+  const idx = history.findIndex(s => s && s.id === id);
+  if (idx === -1) return { ok: false, status: 404, error: 'Séance introuvable' };
+  const prev = history[idx];
+  const entry = {
+    ...prev,
+    ...v.fields,
+    id: prev.id,
+    createdAt: prev.createdAt,
+    updatedAt: new Date().toISOString(),
+  };
+  history[idx] = entry;
+  const res = await commitHistory(env, r.slug, r.record, history);
+  if (!res.ok) return res;
+  return { ok: true, entry, data: res.data, seances: res.seances };
+}
+
+// Supprime une séance de l'historique.
+export async function deleteSeance(env, slug, id) {
+  const r = await loadRecord(env, slug);
+  if (!r.ok) return r;
+  const history = await readSeances(env, r.slug);
+  const idx = history.findIndex(s => s && s.id === id);
+  if (idx === -1) return { ok: false, status: 404, error: 'Séance introuvable' };
+  const [removed] = history.splice(idx, 1);
+  const res = await commitHistory(env, r.slug, r.record, history);
+  if (!res.ok) return res;
+  return { ok: true, removed: { id: removed.id, date: removed.date, titre: removed.titre }, data: res.data, seances: res.seances };
 }
