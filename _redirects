@@ -1,3 +1,9 @@
+# Fichiers internes (docs, outils de test) : jamais servis au public.
+# Placés en tête : la première règle qui correspond l'emporte.
+/CLAUDE.md               /    302
+/AUDIT-2026-04-30.md     /    302
+/*.md                    /    302
+/tools/*                 /    302
 # Espace élève — URLs personnelles (Cloudflare Pages)
 # Slug en query string pour /outils et /quiz (CF Pages ne respecte pas
 # fiablement le rewrite 200 multi-segment). Routes /{slug} simples seulement.
