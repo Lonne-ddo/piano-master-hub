@@ -550,8 +550,41 @@
       text-transform: none; letter-spacing: 0; font-weight: 500;
       color: var(--text2); font-size: 12px;
     }
-    .sc-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
-    .sc-list li { font-size: 13px; color: var(--text2); line-height: 1.4; }
+    .sc-list { list-style: none; display: flex; flex-direction: column; }
+    .sc-list li {
+      font-size: 13px; color: var(--text2); line-height: 1.4;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 4px 0; border-bottom: 1px solid var(--border);
+    }
+    .sc-list li:last-child { border-bottom: none; }
+    .sc-text { flex: 1 1 180px; min-width: 0; }
+    .sc-actions { display: flex; gap: 6px; margin-left: auto; }
+    .sc-btn {
+      min-height: 44px; padding: 0 12px; border-radius: 8px;
+      background: var(--bg2); border: 1px solid var(--border);
+      color: var(--text2); font: inherit; font-size: 12px; cursor: pointer;
+    }
+    .sc-btn:hover { border-color: var(--v); color: var(--text1); }
+    .sc-btn.danger:hover { border-color: var(--red); color: var(--red); }
+    .sc-btn[disabled] { opacity: .5; cursor: wait; }
+    .sc-more {
+      margin-top: 6px; min-height: 44px; background: none; border: none;
+      color: var(--v); font: inherit; font-size: 12px; cursor: pointer; padding: 0;
+    }
+    .quick-link {
+      align-self: flex-end; min-height: 44px; background: none; border: none;
+      color: var(--text2); font: inherit; font-size: 12px; text-decoration: underline;
+      cursor: pointer; padding: 0;
+    }
+    .quick-link:hover { color: var(--v); }
+    .quick-link[hidden], .quick-done[hidden] { display: none; }
+    .quick-done { display: flex; flex-direction: column; gap: 12px; }
+    .quick-done-msg { font-size: 14px; line-height: 1.5; color: var(--text1); }
+    .quick-done-msg strong { color: var(--green); }
+    .fp-dupe {
+      border: 1px solid var(--amber-border); background: var(--amber-tint);
+      border-radius: 8px; padding: 8px 10px; font-size: 13px; color: var(--amber); line-height: 1.4;
+    }
     .sc-n { font-family: 'DM Mono', monospace; color: var(--v); margin-right: 6px; }
     .sc-date { font-family: 'DM Mono', monospace; color: var(--text3); margin-right: 6px; }
     .prefill-box {
@@ -580,6 +613,7 @@
     }
     .fiche-mismatch input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--red); }
     #quickUpdateForm { display: flex; flex-direction: column; gap: 12px; }
+    #quickUpdateForm[hidden] { display: none; }
     .quick-actions .hbtn { min-height: 44px; }
     .fiche-preview {
       border: 1px solid var(--border); border-radius: 10px;
@@ -1097,7 +1131,15 @@
         <button type="button" class="hbtn" onclick="closeQuickUpdateModal()">Annuler</button>
         <button type="submit" class="hbtn primary" id="quickUpdateSubmit" disabled>Publier</button>
       </div>
+      <button type="button" class="quick-link" id="quickPublishExtra" hidden onclick="publishAsExtra()">Publier quand m&ecirc;me une s&eacute;ance en plus</button>
     </form>
+    <div class="quick-done" id="quickDone" hidden role="status" aria-live="polite">
+      <div class="quick-done-msg" id="quickDoneMsg"></div>
+      <div class="quick-actions">
+        <button type="button" class="hbtn" onclick="closeQuickUpdateModal()">Fermer</button>
+        <button type="button" class="hbtn primary" id="quickDoneView" onclick="viewAsEleveFromDone()">Voir comme &eacute;l&egrave;ve</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1777,17 +1819,81 @@ async function loadSeancesCard(studentId) {
   }
 }
 
+const seancesShowAll = {};
+
 function renderSeancesCard(studentId) {
   const card = document.getElementById('seancesCard');
   const list = seancesCache[studentId];
   if (!card || !list) return;
-  const recent = list.slice(0, 5);
+  const showAll = !!seancesShowAll[studentId];
+  const recent = showAll ? list : list.slice(0, 5);
+  const sid = escapeHtml(studentId);
   card.innerHTML = `
     <div class="card-title">🗓️ Séances publiées <span class="sc-label">${list.length}${(() => { const a = seancesAnterieuresOf(clientCache[studentId]); return a ? ` · +${a} antérieure${a > 1 ? 's' : ''}` : ''; })()}</span></div>
     ${recent.length
-      ? `<ul class="sc-list">${recent.map(h => `<li>${h.n ? `<span class="sc-n">S${h.n}</span>` : ''}<span class="sc-date">${escapeHtml(fmtSessionDate(h.date))}</span>${escapeHtml(h.titre)}</li>`).join('')}</ul>`
+      ? `<ul class="sc-list">${recent.map(h => `<li>
+          <span class="sc-text">${h.n ? `<span class="sc-n">S${h.n}</span>` : ''}<span class="sc-date">${escapeHtml(fmtSessionDate(h.date))}</span>${escapeHtml(h.titre)}</span>
+          ${h.id ? `<span class="sc-actions">
+            <button type="button" class="sc-btn" onclick="openEditSeanceModal('${sid}','${escapeHtml(h.id)}')">Modifier</button>
+            <button type="button" class="sc-btn danger" onclick="deleteSeanceUi('${sid}','${escapeHtml(h.id)}', this)">Supprimer</button>
+          </span>` : ''}
+        </li>`).join('')}</ul>
+        ${list.length > 5 ? `<button type="button" class="sc-more" onclick="toggleSeancesAll('${sid}')">${showAll ? 'Afficher moins' : `Tout afficher (${list.length})`}</button>` : ''}`
       : '<p class="empty-note">Aucune séance publiée pour l\'instant.</p>'}`;
 }
+
+function toggleSeancesAll(studentId) {
+  seancesShowAll[studentId] = !seancesShowAll[studentId];
+  renderSeancesCard(studentId);
+}
+window.toggleSeancesAll = toggleSeancesAll;
+
+// Applique la réponse serveur (record + historique) après publication,
+// modification ou suppression : fiche élève et carte séances à jour.
+function applySeancesPayload(studentId, payload) {
+  if (payload && payload.data) clientCache[studentId] = payload.data;
+  if (payload && Array.isArray(payload.seances)) {
+    // Même forme que GET /seances : plus récente d'abord, sans note_coach
+    seancesCache[studentId] = payload.seances.slice().reverse().map(s => ({
+      id: s.id, n: s.n, date: s.date, titre: s.titre,
+      resume: s.resume || [], devoirs: s.devoirs || [], livrable: s.livrable || '',
+    }));
+  } else {
+    delete seancesCache[studentId];
+  }
+  if (activeId === studentId && clientCache[studentId]) {
+    const scrollY = window.scrollY;
+    renderProfile(clientCache[studentId]);
+    window.scrollTo(0, scrollY);
+  }
+}
+
+// Supprimer : confirmation avec date + titre, puis DELETE
+async function deleteSeanceUi(studentId, seanceId, btn) {
+  const s = (seancesCache[studentId] || []).find(x => x.id === seanceId);
+  if (!s) return;
+  const ok = window.confirm(
+    `Supprimer la séance du ${fmtSessionDate(s.date)} « ${s.titre} » ?\n\n` +
+    'Elle disparaîtra de l\'espace de l\'élève et les numéros des séances suivantes seront recalculés.\n\n' +
+    'Cette action est irréversible.'
+  );
+  if (!ok) return;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/seances/${encodeURIComponent(seanceId)}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || !payload.ok) throw new Error(payload.error || `HTTP ${res.status}`);
+    applySeancesPayload(studentId, payload);
+    showToast('Séance supprimée ✓');
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    showToast('Erreur : ' + (e.message || 'réessaie'));
+  }
+}
+window.deleteSeanceUi = deleteSeanceUi;
 
 // ─── Post-séance : coller une fiche → aperçu → Publier ───────────
 // POST /api/eleves/:id/seance : ajoute la séance à l'historique (jamais
@@ -1810,14 +1916,45 @@ function studentDisplayName(studentId) {
   return cached.nom || (studentId.charAt(0).toUpperCase() + studentId.slice(1));
 }
 
-async function openQuickUpdateModal(studentId) {
+// Mode de la fenêtre : 'publish' (nouvelle séance) | 'edit' (séance existante)
+let quickMode = 'publish';
+let quickEditSeance = null;    // { id, n, date, titre } en mode edit
+let quickSeances = [];         // historique (plus récente d'abord) pour le doublon de date
+let quickDoneSlug = null;
+
+// ── Brouillon : texte collé gardé par élève tant qu'il n'est pas publié ──
+function draftKey(studentId) { return 'mh-fiche-draft:' + studentId; }
+function readDraft(studentId) {
+  try { return localStorage.getItem(draftKey(studentId)) || ''; } catch (e) { return ''; }
+}
+function writeDraft(studentId, text) {
+  try {
+    if (text && text.trim()) localStorage.setItem(draftKey(studentId), text);
+    else localStorage.removeItem(draftKey(studentId));
+  } catch (e) { /* stockage indisponible : pas de brouillon */ }
+}
+
+// Fiche au format texte (même format que celui collé à la publication)
+function seanceToFiche(studentId, s) {
+  const bullets = items => (items || []).map(x => '- ' + x).join('\n');
+  return [
+    'ÉLÈVE: ' + studentDisplayName(studentId),
+    'DATE: ' + (s.date || ''),
+    'TITRE: ' + (s.titre || ''),
+    'DEVOIRS:', bullets(s.devoirs),
+    'LIVRABLE: ' + (s.livrable || ''),
+    'RÉSUMÉ:', bullets(s.resume),
+    'NOTE COACH:', (s.note_coach || ''),
+  ].filter((l, i, a) => l !== '' || i === a.length - 1).join('\n').replace(/\n+$/, '\n');
+}
+
+function resetQuickModal(studentId) {
   quickUpdateActiveId = studentId;
   quickNextN = null;
   ficheMismatch = false;
-  const name = studentDisplayName(studentId);
-  document.getElementById('quickUpdateTitle').textContent = `Publier une séance — ${name}`;
-  document.getElementById('quickUpdateSub').textContent =
-    `Colle la fiche, vérifie l'aperçu, puis publie : la séance s'affiche dans l'espace de ${name}.`;
+  quickSeances = [];
+  document.getElementById('quickUpdateForm').hidden = false;
+  document.getElementById('quickDone').hidden = true;
   document.getElementById('ficheInput').value = '';
   document.getElementById('quickDate').value = todayIso();
   for (const id of ['quickTitre', 'quickResume', 'quickDevoirs', 'quickLivrable', 'quickNote']) {
@@ -1828,15 +1965,33 @@ async function openQuickUpdateModal(studentId) {
   setFicheReport([], false);
   showFicheMismatch(null);
   document.getElementById('quickUpdateError').textContent = '';
-  renderFichePreview();
+}
+
+async function openQuickUpdateModal(studentId) {
+  quickMode = 'publish';
+  quickEditSeance = null;
+  resetQuickModal(studentId);
+  const name = studentDisplayName(studentId);
+  document.getElementById('quickUpdateTitle').textContent = `Publier une séance — ${name}`;
+  const draft = readDraft(studentId);
+  document.getElementById('quickUpdateSub').textContent = draft
+    ? 'Brouillon restauré : reprends où tu t\'étais arrêté, puis publie.'
+    : `Colle la fiche, vérifie l'aperçu, puis publie : la séance s'affiche dans l'espace de ${name}.`;
+  if (draft) {
+    document.getElementById('ficheInput').value = draft;
+    applyFiche();
+  } else {
+    renderFichePreview();
+  }
   document.getElementById('quickUpdateOverlay').style.display = 'flex';
   setTimeout(() => document.getElementById('ficheInput').focus(), 50);
 
-  // Numéro indicatif : séances déjà publiées + 1 (le serveur fait foi)
+  // Numéro indicatif (le serveur fait foi) + séances existantes pour le doublon de date
   try {
     const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/seances`, { credentials: 'same-origin' });
     const j = await res.json().catch(() => null);
-    if (res.ok && j && Array.isArray(j.seances) && quickUpdateActiveId === studentId) {
+    if (res.ok && j && Array.isArray(j.seances) && quickUpdateActiveId === studentId && quickMode === 'publish') {
+      quickSeances = j.seances;
       quickNextN = seancesAnterieuresOf(clientCache[studentId]) + j.seances.length + 1;
       renderFichePreview();
     }
@@ -1844,12 +1999,51 @@ async function openQuickUpdateModal(studentId) {
 }
 window.openQuickUpdateModal = openQuickUpdateModal;
 
+// « Modifier » : fenêtre pré-remplie avec la fiche texte de la séance
+async function openEditSeanceModal(studentId, seanceId) {
+  showToast('Chargement de la séance…');
+  let s;
+  try {
+    const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/seances/${encodeURIComponent(seanceId)}`, { credentials: 'same-origin' });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok || !j.seance) throw new Error(j.error || `HTTP ${res.status}`);
+    s = j.seance;
+  } catch (e) {
+    showToast('Erreur : ' + (e.message || 'réessaie'));
+    return;
+  }
+  quickMode = 'edit';
+  quickEditSeance = { id: s.id, n: s.n, date: s.date, titre: s.titre };
+  resetQuickModal(studentId);
+  const name = studentDisplayName(studentId);
+  document.getElementById('quickUpdateTitle').textContent = `Modifier la séance${s.n ? ' ' + s.n : ''} — ${name}`;
+  document.getElementById('quickUpdateSub').textContent =
+    `Corrige la fiche, vérifie l'aperçu, puis enregistre : l'espace de ${name} est mis à jour.`;
+  document.getElementById('ficheInput').value = seanceToFiche(studentId, s);
+  applyFiche();
+  document.getElementById('quickUpdateOverlay').style.display = 'flex';
+  setTimeout(() => document.getElementById('ficheInput').focus(), 50);
+}
+window.openEditSeanceModal = openEditSeanceModal;
+
 function closeQuickUpdateModal() {
   document.getElementById('quickUpdateOverlay').style.display = 'none';
   quickUpdateActiveId = null;
+  quickEditSeance = null;
   clearTimeout(ficheParseTimer);
 }
 window.closeQuickUpdateModal = closeQuickUpdateModal;
+
+// Séance déjà publiée à la même date (mode publication uniquement)
+function sameDateSeance(f) {
+  if (quickMode !== 'publish' || !isValidIsoDate(f.date)) return null;
+  return quickSeances.find(s => s && s.id && s.date === f.date) || null;
+}
+
+function viewAsEleveFromDone() {
+  if (quickDoneSlug) impersonateEleve(quickDoneSlug);
+}
+window.viewAsEleveFromDone = viewAsEleveFromDone;
 
 // ── Pré-remplissage depuis une transcription (10 dernières, mode séance) ──
 async function openPrefill() {
@@ -2062,11 +2256,21 @@ function publishBlocker(f) {
   return null;
 }
 
+function submitLabel(f) {
+  if (quickMode === 'edit') return 'Enregistrer';
+  const dupe = sameDateSeance(f);
+  return dupe ? `Remplacer la séance du ${fmtSessionDate(dupe.date)}` : 'Publier';
+}
+
 function updatePublishState() {
   const f = readSeanceFields();
   const blocker = publishBlocker(f);
   const btn = document.getElementById('quickUpdateSubmit');
-  if (btn.dataset.busy !== '1') btn.disabled = !!blocker;
+  if (btn.dataset.busy !== '1') {
+    btn.disabled = !!blocker;
+    btn.textContent = submitLabel(f);
+  }
+  document.getElementById('quickPublishExtra').hidden = !sameDateSeance(f) || !!blocker;
   const hasContent = f.titre || f.resume.length || f.devoirs.length;
   document.getElementById('quickUpdateError').textContent = hasContent && blocker ? blocker : '';
 }
@@ -2077,10 +2281,18 @@ function renderFichePreview() {
   const hasContent = f.titre || f.resume.length || f.devoirs.length || f.livrable || f.note_coach;
   if (!hasContent) { box.hidden = true; box.innerHTML = ''; updatePublishState(); return; }
   const list = items => '<ul class="bullets">' + items.map(x => `<li>${escapeHtml(x)}</li>`).join('') + '</ul>';
-  const kicker = [quickNextN ? `Séance ${quickNextN}` : 'Nouvelle séance',
-    isValidIsoDate(f.date) ? fmtSessionDate(f.date) : 'date à corriger'].join(' · ');
+  const dupe = sameDateSeance(f);
+  const head = quickMode === 'edit'
+    ? (quickEditSeance && quickEditSeance.n ? `Séance ${quickEditSeance.n}` : 'Séance')
+    : dupe ? (dupe.n ? `Séance ${dupe.n}` : 'Séance')
+    : (quickNextN ? `Séance ${quickNextN}` : 'Nouvelle séance');
+  const kicker = [head, isValidIsoDate(f.date) ? fmtSessionDate(f.date) : 'date à corriger'].join(' · ');
+  const dupeHtml = dupe
+    ? `<div class="fp-dupe">Une séance existe déjà le ${escapeHtml(fmtSessionDate(dupe.date))} : « ${escapeHtml(dupe.titre || 'Sans titre')} ». Elle sera remplacée par celle-ci.</div>`
+    : '';
   box.innerHTML = `
-    <div class="fp-label">Aperçu</div>
+    <div class="fp-label">Aperçu${quickMode === 'edit' ? ' (modification)' : ''}</div>
+    ${dupeHtml}
     <div class="fp-kicker">${escapeHtml(kicker)}</div>
     <div class="fp-title">${f.titre ? escapeHtml(f.titre) : '<span class="fp-missing">Titre manquant</span>'}</div>
     <div class="fp-section fp-devoirs"><div class="ds-section-label">Devoirs à préparer</div>${f.devoirs.length ? list(f.devoirs) : '<p class="fp-empty">—</p>'}</div>
@@ -2095,20 +2307,24 @@ function renderFichePreview() {
 document.getElementById('ficheInput').addEventListener('input', function () {
   clearTimeout(ficheParseTimer);
   ficheParseTimer = setTimeout(applyFiche, 200);
+  // Brouillon (publication uniquement : une modification n'écrase pas le brouillon)
+  if (quickMode === 'publish' && quickUpdateActiveId) writeDraft(quickUpdateActiveId, this.value);
 });
 // Correction à la main : l'aperçu suit les champs
 for (const id of ['quickDate', 'quickTitre', 'quickResume', 'quickDevoirs', 'quickLivrable', 'quickNote']) {
   document.getElementById(id).addEventListener('input', renderFichePreview);
 }
 
-document.getElementById('quickUpdateForm').addEventListener('submit', async function (ev) {
-  ev.preventDefault();
+// Envoi : POST (nouvelle séance) ou PUT (modification / remplacement du
+// doublon de date). forceNew = « Publier quand même une séance en plus ».
+async function submitSeance(forceNew) {
   if (!quickUpdateActiveId) return;
   clearTimeout(ficheParseTimer);
   if (document.getElementById('ficheInput').value.trim()) applyFiche();
   const studentId = quickUpdateActiveId;
   const errorEl = document.getElementById('quickUpdateError');
   const submitBtn = document.getElementById('quickUpdateSubmit');
+  const extraBtn = document.getElementById('quickPublishExtra');
   const f = readSeanceFields();
   const blocker = publishBlocker(f);
   if (blocker) {
@@ -2117,39 +2333,57 @@ document.getElementById('quickUpdateForm').addEventListener('submit', async func
     return;
   }
 
+  const mode = quickMode;
+  const dupe = forceNew ? null : sameDateSeance(f);
+  const targetId = mode === 'edit' ? quickEditSeance && quickEditSeance.id : dupe && dupe.id;
+  const base = `/api/eleves/${encodeURIComponent(studentId)}`;
+  const url = targetId ? `${base}/seances/${encodeURIComponent(targetId)}` : `${base}/seance`;
+
   submitBtn.dataset.busy = '1';
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Publication…';
+  extraBtn.disabled = true;
+  submitBtn.textContent = targetId ? 'Enregistrement…' : 'Publication…';
   try {
-    const res = await fetch(`/api/eleves/${encodeURIComponent(studentId)}/seance`, {
-      method: 'POST',
+    const res = await fetch(url, {
+      method: targetId ? 'PUT' : 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(f),
     });
     const payload = await res.json().catch(() => ({}));
     if (!res.ok || !payload.ok) throw new Error(payload.error || `HTTP ${res.status}`);
-    if (payload.data) clientCache[studentId] = payload.data;
-    onSeancePublished(studentId, payload);
-    closeQuickUpdateModal();
-    if (activeId === studentId && clientCache[studentId]) {
-      const scrollY = window.scrollY;
-      renderProfile(clientCache[studentId]);
-      window.scrollTo(0, scrollY);
-    }
-    showToast(`Séance ${payload.entry && payload.entry.n ? payload.entry.n + ' ' : ''}publiée ✓`);
+    // Publication (ou remplacement depuis la publication) : brouillon effacé
+    if (mode === 'publish') writeDraft(studentId, '');
+    applySeancesPayload(studentId, payload);
+    const n = payload.entry && payload.entry.n;
+    const verb = mode === 'edit' ? 'enregistrée' : targetId ? 'remplacée' : 'publiée';
+    showQuickDone(studentId, `<strong>Séance${n ? ' ' + n : ''} ${verb} ✓</strong><br>${escapeHtml(fmtSessionDate(f.date))} · ${escapeHtml(f.titre)}`);
   } catch (e) {
     errorEl.textContent = 'Erreur : ' + (e.message || 'réessaie');
   } finally {
     delete submitBtn.dataset.busy;
-    submitBtn.textContent = 'Publier';
+    extraBtn.disabled = false;
     updatePublishState();
   }
+}
+
+document.getElementById('quickUpdateForm').addEventListener('submit', function (ev) {
+  ev.preventDefault();
+  submitSeance(false);
 });
 
-// Après publication : la carte Séances publiées se recharge
-function onSeancePublished(studentId) {
-  delete seancesCache[studentId];
+function publishAsExtra() { submitSeance(true); }
+window.publishAsExtra = publishAsExtra;
+
+// Confirmation dans la fenêtre, avec « Voir comme élève » (impersonation)
+function showQuickDone(studentId, html) {
+  quickDoneSlug = studentId;
+  quickEditSeance = null;
+  document.getElementById('quickUpdateForm').hidden = true;
+  document.getElementById('quickUpdateSub').textContent = `C'est en ligne dans l'espace de ${studentDisplayName(studentId)}.`;
+  document.getElementById('quickDoneMsg').innerHTML = html;
+  document.getElementById('quickDone').hidden = false;
+  setTimeout(() => document.getElementById('quickDoneView').focus(), 50);
 }
 
 // Esc ferme la modale post-séance
