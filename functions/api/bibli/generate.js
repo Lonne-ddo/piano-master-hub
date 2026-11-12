@@ -16,11 +16,13 @@
 //   { ok: true, type: 'suggestions', message,
 //     suggestions: [{ titre, artiste, raison }] }
 //
-// Session élève valide ou admin (appel LLM payant : pas d'accès anonyme).
+// Session élève valide ou admin (appel LLM payant : pas d'accès anonyme),
+// 20 générations / heure / élève (budget commun grilles + bibli), admin non limité.
 // Pas de palette d'accords contrainte : le LLM utilise la notation jazz complète,
 // le frontend simplifie via le mode toggle (Original/Simplifié).
 
 import { requireAnySessionOrAdmin } from '../_lib/session.js';
+import { limitGenerations } from '../_lib/rate-limit.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -141,6 +143,10 @@ export async function onRequestPost({ request, env }) {
   if (!env.GROQ_API_KEY) {
     return json({ error: 'groq_not_configured' }, 500);
   }
+
+  // Limite par élève (appel LLM payant) : comptée une fois la requête validée.
+  const limited = await limitGenerations(env, auth, CORS);
+  if (limited) return limited;
 
   const paletteStr = PALETTE_LLM.join(', ');
 

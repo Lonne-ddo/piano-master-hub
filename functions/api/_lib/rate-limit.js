@@ -60,3 +60,18 @@ export async function consumeRateLimit(env, scope, id, limit, windowSec) {
   if (!r.limited) await recordAttempt(env, scope, id, windowSec);
   return r;
 }
+
+// ─── Générations LLM (grilles, bibli) : budget commun par élève ────
+// Admin non limité. Retourne null si autorisé, sinon une Response 429.
+export const GENERATIONS_PER_HOUR = 20;
+
+export async function limitGenerations(env, auth, cors = {}) {
+  if (!auth || auth.role === 'admin') return null;
+  const who = (auth.session && auth.session.slug) || 'unknown';
+  const r = await consumeRateLimit(env, 'llm-gen', who, GENERATIONS_PER_HOUR, 3600);
+  if (!r.limited) return null;
+  return new Response(JSON.stringify({ error: 'rate_limited', limit: GENERATIONS_PER_HOUR, retryAfter: r.retryAfter }), {
+    status: 429,
+    headers: { ...cors, 'Content-Type': 'application/json', 'Retry-After': String(r.retryAfter) },
+  });
+}

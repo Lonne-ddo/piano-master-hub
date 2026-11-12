@@ -5,19 +5,7 @@
 
 import { requireEleveOrAdmin } from '../../_lib/session.js';
 import { loadEleveStats } from '../../_lib/eleves-stats.js';
-
-// Source primaire : KV `eleves:list`. FALLBACK_SLUGS pour dégradation gracieuse.
-const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
-
-async function isValidSlug(slug, env) {
-  try {
-    const list = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
-    const valid = Array.isArray(list) && list.length ? list : FALLBACK_SLUGS;
-    return valid.includes(slug);
-  } catch {
-    return FALLBACK_SLUGS.includes(slug);
-  }
-}
+import { checkSlug, ELEVES_UNAVAILABLE } from '../../_lib/eleves-list.js';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -38,7 +26,9 @@ export async function onRequestOptions() {
 
 export async function onRequestGet({ params, request, env }) {
   const slug = String(params.slug || '').toLowerCase();
-  if (!await isValidSlug(slug, env)) {
+  const known = await checkSlug(env, slug);
+  if (known === null) return jsonResponse(ELEVES_UNAVAILABLE, 503);
+  if (!known) {
     return jsonResponse({ error: 'invalid_slug' }, 400);
   }
 

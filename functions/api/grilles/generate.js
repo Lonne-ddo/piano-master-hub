@@ -5,12 +5,14 @@
 // Body : { types: ['min7','7','maj7'] }
 //   - 1+ types depuis MhTheory (whitelist 22 entries)
 //   - Session élève valide ou admin (appel LLM payant : pas d'accès anonyme)
+//   - 20 générations / heure / élève (budget commun grilles + bibli), admin non limité
 //
 // Response : { ok: true, progressions: [{ key, key_label_fr, chords[], degrees[] }] }
 //   - 5 progressions max, 4 ou 8 accords chacune
 //   - Tonalités différentes parmi les 24 (12 majeures + 12 mineures)
 
 import { requireAnySessionOrAdmin } from '../_lib/session.js';
+import { limitGenerations } from '../_lib/rate-limit.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -99,6 +101,10 @@ export async function onRequestPost({ request, env }) {
   if (!env.GROQ_API_KEY) {
     return json({ error: 'groq_not_configured' }, 500);
   }
+
+  // Limite par élève (appel LLM payant) : comptée une fois la requête validée.
+  const limited = await limitGenerations(env, auth, CORS);
+  if (limited) return limited;
 
   // Ceiling de complexité : le niveau le plus élevé parmi les types cochés.
   // La palette autorisée pour la grille = tous les types ≤ ce niveau.

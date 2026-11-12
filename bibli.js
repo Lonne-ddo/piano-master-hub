@@ -438,6 +438,7 @@
 
         fetch('/api/bibli/generate', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
                 titre: titre,
@@ -446,12 +447,11 @@
             }),
             signal: controller ? controller.signal : undefined
         }).then(function (res) {
-            return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+            return res.json().catch(function () { return null; }).then(function (data) { return { ok: res.ok, status: res.status, data: data }; });
         }).then(function (r) {
             clearLoaderTimers();
             if (!r.ok || !r.data || !r.data.ok) {
-                var err = (r.data && r.data.error) || 'erreur inconnue';
-                showToast('Génération échouée : ' + err);
+                showToast(generateErrorMessage(r.status, r.data));
                 state.phase = 'search';
                 renderAll();
                 return;
@@ -490,6 +490,16 @@
             state.phase = 'search';
             renderAll();
         });
+    }
+
+    // Message clair selon le refus serveur (session absente, limite atteinte…)
+    function generateErrorMessage(status, data) {
+        if (status === 401) return 'Connecte-toi à ton espace élève pour lancer une génération.';
+        if (status === 429) {
+            var min = Math.max(1, Math.ceil(((data && data.retryAfter) || 3600) / 60));
+            return 'Limite atteinte : ' + ((data && data.limit) || 20) + ' générations par heure. Réessaie dans ' + min + ' min.';
+        }
+        return 'Génération échouée : ' + ((data && data.error) || 'erreur inconnue');
     }
 
     // Strip caractères de contrôle + brackets ChordPro/HTML — pareil au backend.

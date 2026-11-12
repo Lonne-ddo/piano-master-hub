@@ -13,28 +13,13 @@
 
 import { CORS_PUBLIC } from '../../_lib/cors.js';
 import { requireAdminPassword, requireEleveOrAdmin } from '../../_lib/session.js';
-
-const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
+import { checkSlug, ELEVES_UNAVAILABLE } from '../../_lib/eleves-list.js';
 
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { ...CORS_PUBLIC, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
-}
-
-async function isValidSlug(slug, env) {
-  if (!slug) return false;
-  if (!env.MASTERHUB_STUDENTS) return FALLBACK_SLUGS.includes(slug);
-  try {
-    const list = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
-    const valid = (Array.isArray(list) && list.length)
-      ? list.map((s) => String(s).toLowerCase())
-      : FALLBACK_SLUGS;
-    return valid.includes(slug);
-  } catch {
-    return FALLBACK_SLUGS.includes(slug);
-  }
 }
 
 async function readRecord(env, slug) {
@@ -55,7 +40,9 @@ export async function onRequestGet({ params, request, env }) {
   const slug = String(params?.slug || '').toLowerCase();
   const auth = await requireEleveOrAdmin(slug, request, env);
   if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status);
-  if (!(await isValidSlug(slug, env))) return jsonResponse({ error: 'not_found' }, 404);
+  const known = await checkSlug(env, slug);
+  if (known === null) return jsonResponse(ELEVES_UNAVAILABLE, 503);
+  if (!known) return jsonResponse({ error: 'not_found' }, 404);
 
   const rec = await readRecord(env, slug);
   const firstSeenAt = (rec && typeof rec.firstSeenAt === 'number') ? rec.firstSeenAt : null;
@@ -67,7 +54,9 @@ export async function onRequestPost({ params, request, env }) {
   const slug = String(params?.slug || '').toLowerCase();
   const auth = await requireEleveOrAdmin(slug, request, env);
   if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status);
-  if (!(await isValidSlug(slug, env))) return jsonResponse({ error: 'not_found' }, 404);
+  const known = await checkSlug(env, slug);
+  if (known === null) return jsonResponse(ELEVES_UNAVAILABLE, 503);
+  if (!known) return jsonResponse({ error: 'not_found' }, 404);
   if (!env.MASTERHUB_HISTORY) return jsonResponse({ error: 'kv_not_bound' }, 500);
 
   // Idempotent : si un firstSeenAt existe déjà, on ne l'écrase jamais.
@@ -93,7 +82,9 @@ export async function onRequestDelete({ params, request, env }) {
     return jsonResponse({ error: 'unauthorized' }, 401);
   }
   const slug = String(params?.slug || '').toLowerCase();
-  if (!(await isValidSlug(slug, env))) return jsonResponse({ error: 'not_found' }, 404);
+  const known = await checkSlug(env, slug);
+  if (known === null) return jsonResponse(ELEVES_UNAVAILABLE, 503);
+  if (!known) return jsonResponse({ error: 'not_found' }, 404);
   if (!env.MASTERHUB_HISTORY) return jsonResponse({ error: 'kv_not_bound' }, 500);
 
   try {
