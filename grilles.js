@@ -300,6 +300,16 @@
         }
     }
 
+    // Message clair selon le refus serveur (session absente, limite atteinte…)
+    function generateErrorMessage(status, data) {
+        if (status === 401) return 'Connecte-toi à ton espace élève pour lancer une génération.';
+        if (status === 429) {
+            var min = Math.max(1, Math.ceil(((data && data.retryAfter) || 3600) / 60));
+            return 'Limite atteinte : ' + ((data && data.limit) || 20) + ' générations par heure. Réessaie dans ' + min + ' min.';
+        }
+        return 'Génération échouée : ' + ((data && data.error) || 'erreur inconnue');
+    }
+
     // ═══ API call ═══
     function generate() {
         if (state.selectedTypes.length < 2) return;
@@ -310,15 +320,15 @@
 
         fetch('/api/grilles/generate', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ types: state.selectedTypes })
         }).then(function (res) {
-            return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+            return res.json().catch(function () { return null; }).then(function (data) { return { ok: res.ok, status: res.status, data: data }; });
         }).then(function (r) {
             state.loading = false;
             if (!r.ok || !r.data || !r.data.ok) {
-                var err = (r.data && r.data.error) || 'erreur inconnue';
-                showToast('Génération échouée : ' + err);
+                showToast(generateErrorMessage(r.status, r.data));
                 renderSelection();
                 return;
             }
