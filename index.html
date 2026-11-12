@@ -17,16 +17,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap">
 
-    <!-- Tabler Icons (webfont) -->
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.30.0/dist/tabler-icons.min.css">
-
     <!-- Design system Master Hub (tokens + utility classes) -->
     <link rel="stylesheet" href="/assets/css/design-system.css">
     <link rel="stylesheet" href="/assets/css/multitrack.css">
 
-    <script>window.Koalendar=window.Koalendar||function(){(Koalendar.props=Koalendar.props||[]).push(arguments)};</script>
-    <script async src="https://koalendar.com/assets/widget.js"></script>
     <script type="application/manifest+json">
     {
         "name": "Master Hub",
@@ -367,6 +361,15 @@
         .mh-impersonation-banner button:hover  { opacity: 0.85; }
         .mh-impersonation-banner button:disabled { opacity: 0.5; cursor: wait; }
 
+        /* ── Icônes SVG inline (Tabler outline, 1em comme l'ancienne police) ── */
+        .ti {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            flex-shrink: 0;
+            vertical-align: -0.125em;
+        }
+
         /* ── Koalendar widget toggle ── */
         .mh-booking-cta-wrap { margin-top: 18px; }
         .mh-koalendar-section {
@@ -642,6 +645,24 @@
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    // Icônes Tabler (outline, MIT) en SVG inline : seules celles utilisées
+    // ici, au lieu de la police complète (~900 Ko).
+    var ICON_PATHS = {
+        'arrow-down': '<path d="M12 5l0 14"/><path d="M18 13l-6 6"/><path d="M6 13l6 6"/>',
+        'bolt': '<path d="M13 3l0 7l6 0l-8 11l0 -7l-6 0l8 -11"/>',
+        'book': '<path d="M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0"/><path d="M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0"/><path d="M3 6l0 13"/><path d="M12 6l0 13"/><path d="M21 6l0 13"/>',
+        'brand-telegram': '<path d="M15 10l-4 4l6 6l4 -16l-18 7l4 2l2 6l3 -4"/>',
+        'calendar-plus': '<path d="M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v5"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/><path d="M16 19h6"/><path d="M19 16v6"/>',
+        'chevron-down': '<path d="M6 9l6 6l6 -6"/>',
+        'player-play': '<path d="M7 4v16l13 -8z"/>',
+        'tool': '<path d="M7 10h3v-3l-3.5 -3.5a6 6 0 0 1 8 8l6 6a2 2 0 0 1 -3 3l-6 -6a6 6 0 0 1 -8 -8l3.5 3.5"/>'
+    };
+    function icon(name) {
+        return '<svg class="ti ti-' + name + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+            'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+            (ICON_PATHS[name] || '') + '</svg>';
     }
 
     // Parse une date ISO "YYYY-MM-DD" → timestamp ms (minuit local), ou null.
@@ -1382,7 +1403,7 @@
             : '';
         var linkHtml = cleanList(latest.resume).length
             ? '<button type="button" class="mh-seance-toggle mh-hero-resume-link" data-open-seance="0">' +
-                '<span>Voir le résumé de la séance</span><i class="ti ti-arrow-down" aria-hidden="true"></i>' +
+                '<span>Voir le résumé de la séance</span>' + icon('arrow-down') +
               '</button>'
             : '';
 
@@ -1473,7 +1494,7 @@
                 '<button type="button" class="mh-seance-row" aria-expanded="false" aria-controls="' + bid + '">' +
                     (date ? '<span class="mh-seance-date">' + escapeHtml(date) + '</span>' : '') +
                     '<span class="mh-seance-title">' + escapeHtml(titre) + '</span>' +
-                    '<i class="ti ti-chevron-down" aria-hidden="true"></i>' +
+                    icon('chevron-down') +
                 '</button>' +
                 '<div class="mh-seance-body" id="' + bid + '" hidden>' + body + '</div>' +
             '</article>';
@@ -1543,7 +1564,7 @@
         html += resourceCardHtml('https://www.bonzai.pro/Lonne/shop/lvgv_2905/piano-master', 'ti-player-play', 'pink', 'Cours vidéo', 'Accès Bonzai', true);
         // 6. Cours en live (Discord) — gold (id explicite pour le deeplink mobile)
         html += '<a class="mh-card mh-card-stack" id="card-live" href="https://discord.gg/KtJF8dPT" target="_blank" rel="noopener noreferrer" aria-label="Cours en live sur Discord">' +
-            '<div class="mh-icon-box gold"><i class="ti ti-bolt" aria-hidden="true"></i></div>' +
+            '<div class="mh-icon-box gold">' + icon('bolt') + '</div>' +
             '<div class="mh-card-title">Cours en live</div>' +
             '<div class="mh-card-sub">Discord</div>' +
         '</a>';
@@ -1569,7 +1590,7 @@
             ? ' target="_blank" rel="noopener noreferrer"'
             : '';
         return '<a class="mh-card mh-card-stack" href="' + escapeHtml(href) + '"' + ext + ' aria-label="' + escapeHtml(title) + '">' +
-            '<div class="mh-icon-box ' + accent + '"><i class="ti ' + iconClass + '" aria-hidden="true"></i></div>' +
+            '<div class="mh-icon-box ' + accent + '">' + icon(iconClass.replace(/^ti-/, '')) + '</div>' +
             '<div class="mh-card-title">' + escapeHtml(title) + '</div>' +
             '<div class="mh-card-sub">' + escapeHtml(sub) + '</div>' +
         '</a>';
@@ -1578,13 +1599,25 @@
     // ──────────────────────────────────────────────
     //  CTA bas — Réserver mon prochain cours (Koalendar inline toggle)
     // ──────────────────────────────────────────────
+    // Script Koalendar chargé seulement au premier clic sur « Réserver » :
+    // la file d'attente window.Koalendar garde l'appel jusqu'au chargement.
+    function loadKoalendar() {
+        window.Koalendar = window.Koalendar || function () { (Koalendar.props = Koalendar.props || []).push(arguments); };
+        if (document.getElementById('koalendar-widget-js')) return;
+        var sc = document.createElement('script');
+        sc.id = 'koalendar-widget-js';
+        sc.async = true;
+        sc.src = 'https://koalendar.com/assets/widget.js';
+        document.head.appendChild(sc);
+    }
+
     function renderBookingCta(eleve) {
         var wrap = document.getElementById("booking-cta-wrap");
         if (!wrap) return;
         var koalendarUrl = "https://koalendar.com/e/cours-piano-master?name=" + encodeURIComponent(eleve.display);
         wrap.innerHTML =
             '<button type="button" class="mh-btn-primary" id="booking-cta-btn">' +
-                '<i class="ti ti-calendar-plus" aria-hidden="true"></i>' +
+                icon('calendar-plus') +
                 '<span>Réserver mon prochain cours</span>' +
             '</button>' +
             '<div class="mh-koalendar-section" id="koalendar-section">' +
@@ -1601,6 +1634,7 @@
             btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
             if (isOpen && !koalendarInitialized) {
                 koalendarInitialized = true;
+                loadKoalendar();
                 Koalendar("inline", {
                     "url": koalendarUrl,
                     "selector": "#inline-widget-cours-piano-master"
