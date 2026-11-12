@@ -617,19 +617,6 @@
 
     <script>
     // ──────────────────────────────────────────────
-    //  WHITELIST ÉLÈVES — fallback hardcodé. Remplacé au boot par
-    //  /api/eleves (source de vérité KV eleves:list). Cf bootstrap() plus bas.
-    //  Aucune URL Drive/Telegram/Koalendar custom ici :
-    //  les données privées sont servies par /api/eleves/{slug}/...
-    // ──────────────────────────────────────────────
-    var ELEVES_WHITELIST = {
-        japhet: { display: "Japhet", aliases: ["japhet"] },
-        tara:   { display: "Tara",   aliases: ["tara"] },
-        dexter: { display: "Dexter", aliases: ["dexter"] },
-        messon: { display: "Messon", aliases: ["messon"] }
-    };
-
-    // ──────────────────────────────────────────────
     //  Helpers
     // ──────────────────────────────────────────────
     function normalize(s) {
@@ -640,10 +627,11 @@
             .trim();
     }
 
-    function findEleveBySlug(slug) {
+    // Élève à partir de son slug. Aucune liste en dur : le serveur valide
+    // le slug (KV eleves:list) sur chaque appel /api/eleves/{slug}/…
+    function eleveFromSlug(slug) {
         var key = normalize(slug);
-        if (!key || !ELEVES_WHITELIST[key]) return null;
-        return { slug: key, display: ELEVES_WHITELIST[key].display };
+        return { slug: key, display: key.charAt(0).toUpperCase() + key.slice(1) };
     }
 
     // Échappe aussi " et ' : la fonction sert dans des attributs (href, title…).
@@ -688,8 +676,7 @@
                 .then(function(r) { return r.ok ? r.json() : null; })
                 .then(function(jAdmin) {
                     if (jAdmin && jAdmin.ok && slugParam) {
-                        var adminEleve = findEleveBySlug(slugParam)
-                            || { slug: slugParam, display: slugParam.charAt(0).toUpperCase() + slugParam.slice(1) };
+                        var adminEleve = eleveFromSlug(slugParam);
                         renderEspaceEleve(adminEleve);
                         return true;
                     }
@@ -727,8 +714,7 @@
                     window.location.replace("/?eleve=" + encodeURIComponent(j.slug));
                     return;
                 }
-                var meEleve = findEleveBySlug(j.slug)
-                    || { slug: j.slug, display: j.slug.charAt(0).toUpperCase() + j.slug.slice(1) };
+                var meEleve = eleveFromSlug(j.slug);
                 localStorage.setItem("eleve_slug", meEleve.slug);
                 renderEspaceEleve(meEleve);
             })
@@ -742,19 +728,7 @@
             });
     }
 
-    // Source de vérité : /api/eleves (KV eleves:list). Fallback ELEVES_WHITELIST.
-    fetch('/api/eleves').then(function(r) { return r.json(); }).then(function(j) {
-        if (j && j.ok && Array.isArray(j.eleves) && j.eleves.length) {
-            var fresh = {};
-            j.eleves.forEach(function(s) {
-                var key = normalize(s);
-                if (!key) return;
-                var display = key.charAt(0).toUpperCase() + key.slice(1);
-                fresh[key] = { display: display, aliases: [key] };
-            });
-            ELEVES_WHITELIST = fresh;
-        }
-    }).catch(function() { /* fallback hardcodé */ }).then(runInit, runInit);
+    runInit();
 
     // ──────────────────────────────────────────────
     //  Mode 1 — élève non identifié : login email (magic link)

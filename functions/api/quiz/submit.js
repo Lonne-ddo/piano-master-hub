@@ -5,7 +5,7 @@
 //
 // Body attendu :
 // {
-//   slug: "japhet" | "tara" | "dexter" | "messon",
+//   slug: string (élève présent dans KV eleves:list),
 //   mode: "notes" | "intervals" | "chords",
 //   level: "debutant" | "intermediaire" | "avance",
 //   score: 0..10,
@@ -15,20 +15,8 @@
 // }
 
 import { requireEleveOrAdmin } from '../_lib/session.js';
+import { checkSlug, ELEVES_UNAVAILABLE } from '../_lib/eleves-list.js';
 
-// Source primaire : KV `eleves:list`. FALLBACK pour dégradation gracieuse.
-const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
-
-async function isValidSlug(slug, env) {
-  if (!env || !env.MASTERHUB_STUDENTS) return FALLBACK_SLUGS.includes(slug);
-  try {
-    const list = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
-    const valid = Array.isArray(list) && list.length ? list : FALLBACK_SLUGS;
-    return valid.includes(slug);
-  } catch {
-    return FALLBACK_SLUGS.includes(slug);
-  }
-}
 const VALID_MODES = ['notes', 'intervals', 'chords', 'scales', 'progressions'];
 const VALID_LEVELS = ['debutant', 'intermediaire', 'avance', 'custom'];
 
@@ -58,7 +46,9 @@ export async function onRequestPost({ request, env }) {
   const slug = String(data.slug || '').toLowerCase();
   const auth = await requireEleveOrAdmin(slug, request, env);
   if (!auth.ok) return json({ ok: false, error: auth.error }, auth.status);
-  if (!await isValidSlug(slug, env)) {
+  const known = await checkSlug(env, slug);
+  if (known === null) return json({ ok: false, ...ELEVES_UNAVAILABLE }, 503);
+  if (!known) {
     return json({ ok: false, error: 'invalid_slug' }, 400);
   }
   if (!VALID_MODES.includes(data.mode)) {

@@ -26,8 +26,7 @@
 
 import { requireEleveOrAdmin } from '../../_lib/session.js';
 import { loadFolders, sortFolders } from '../../analyse/_folders.js';
-
-const FALLBACK_SLUGS = ['japhet', 'tara', 'dexter', 'messon'];
+import { checkSlug, ELEVES_UNAVAILABLE } from '../../_lib/eleves-list.js';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -40,17 +39,6 @@ function jsonResponse(data, status = 200) {
     status,
     headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
-}
-
-async function isValidSlug(slug, env) {
-  if (!env.MASTERHUB_STUDENTS) return FALLBACK_SLUGS.includes(slug);
-  try {
-    const list = await env.MASTERHUB_STUDENTS.get('eleves:list', { type: 'json' });
-    const valid = Array.isArray(list) && list.length ? list : FALLBACK_SLUGS;
-    return valid.includes(slug);
-  } catch {
-    return FALLBACK_SLUGS.includes(slug);
-  }
 }
 
 // Liste les records MASTERHUB_ANALYSE assignés au slug.
@@ -151,7 +139,9 @@ export async function onRequestOptions() {
 
 export async function onRequestGet({ params, request, env }) {
   const slug = String(params?.slug || '').toLowerCase();
-  if (!await isValidSlug(slug, env)) return jsonResponse({ error: 'invalid_slug' }, 400);
+  const known = await checkSlug(env, slug);
+  if (known === null) return jsonResponse(ELEVES_UNAVAILABLE, 503);
+  if (!known) return jsonResponse({ error: 'invalid_slug' }, 400);
 
   const auth = await requireEleveOrAdmin(slug, request, env);
   if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status);
